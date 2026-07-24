@@ -32,10 +32,10 @@
   --font-display: 'Fraunces', 'Georgia', serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 
-  --fs-display-xl: clamp(2.75rem, 3.5vw + 1.5rem, 5.5rem);
-  --fs-display-lg: clamp(2.25rem, 2.5vw + 1.25rem, 3.75rem);
-  --fs-display-md: clamp(1.75rem, 1.5vw + 1rem, 2.75rem);
-  --fs-lg: clamp(1.15rem, 0.4vw + 1rem, 1.375rem);
+  --fs-display-xl: clamp(2.1rem, 4.5vw + 1rem, 5.5rem);
+  --fs-display-lg: clamp(1.85rem, 3vw + 1rem, 3.75rem);
+  --fs-display-md: clamp(1.5rem, 2vw + 0.85rem, 2.75rem);
+  --fs-lg: clamp(1.05rem, 0.4vw + 0.95rem, 1.375rem);
   --fs-md: 1rem;
   --fs-sm: 0.875rem;
   --fs-xs: 0.75rem;
@@ -53,7 +53,7 @@
 
   /* --- Layout --- */
   --container-width: 1280px;
-  --container-pad: clamp(1.25rem, 4vw, 4rem);
+  --container-pad: clamp(1rem, 4vw, 4rem);
   --radius-sm: 0.5rem;
   --radius-md: 1rem;
   --radius-lg: 1.75rem;

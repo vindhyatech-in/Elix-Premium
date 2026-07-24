@@ -57,6 +57,8 @@
     const navbar = document.getElementById('navbar');
     const burger = document.getElementById('burger');
     const drawer = document.getElementById('mobile-drawer');
+    const drawerClose = document.getElementById('drawer-close');
+    const backdrop = document.getElementById('drawer-backdrop');
     if (!navbar) return;
 
     const onScroll = () => navbar.classList.toggle('is-scrolled', window.scrollY > 40);
@@ -64,19 +66,49 @@
     window.addEventListener('scroll', onScroll, { passive: true });
 
     if (burger && drawer) {
+      const closeDrawer = () => {
+        drawer.classList.remove('is-open');
+        if (backdrop) backdrop.classList.remove('is-open');
+        burger.classList.remove('is-active');
+        burger.setAttribute('aria-expanded', 'false');
+        document.body.style.overflow = '';
+        if (window.__lenis) window.__lenis.start();
+      };
+
+      const openDrawer = () => {
+        drawer.classList.add('is-open');
+        if (backdrop) backdrop.classList.add('is-open');
+        burger.classList.add('is-active');
+        burger.setAttribute('aria-expanded', 'true');
+        document.body.style.overflow = 'hidden';
+        if (window.__lenis) window.__lenis.stop();
+      };
+
       burger.addEventListener('click', () => {
-        const isOpen = drawer.classList.toggle('is-open');
-        burger.classList.toggle('is-active', isOpen);
-        burger.setAttribute('aria-expanded', String(isOpen));
-        document.body.style.overflow = isOpen ? 'hidden' : '';
+        const isOpen = drawer.classList.contains('is-open');
+        if (isOpen) closeDrawer();
+        else openDrawer();
       });
 
+      if (drawerClose) drawerClose.addEventListener('click', closeDrawer);
+      if (backdrop) backdrop.addEventListener('click', closeDrawer);
+
       drawer.querySelectorAll('a').forEach((link) => {
-        link.addEventListener('click', () => {
-          drawer.classList.remove('is-open');
-          burger.classList.remove('is-active');
-          burger.setAttribute('aria-expanded', 'false');
-          document.body.style.overflow = '';
+        link.addEventListener('click', (e) => {
+          closeDrawer();
+          const href = link.getAttribute('href');
+          if (href && href.startsWith('#')) {
+            const target = document.querySelector(href);
+            if (target) {
+              setTimeout(() => {
+                if (window.__lenis) {
+                  window.__lenis.scrollTo(target, { offset: -60 });
+                } else {
+                  target.scrollIntoView({ behavior: 'smooth' });
+                }
+              }, 100);
+            }
+          }
         });
       });
     }
