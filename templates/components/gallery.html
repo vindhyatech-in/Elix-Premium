@@ -1,0 +1,44 @@
+{% load static %}
+<section class="gallery section" id="gallery" data-api="/api/v1/gallery/" aria-labelledby="gallery-title">
+  <div class="container">
+    <div class="section-head" data-aos="fade-up">
+      <p class="eyebrow">Gallery</p>
+      <h2 class="section-title" id="gallery-title">Transformations, <em>side by side</em>.</h2>
+      <p class="section-lead">Drag the handle to see the difference our specialists make.</p>
+    </div>
+
+    <div class="gallery__compare-row" data-aos="fade-up" data-aos-delay="100">
+      {% for item in gallery.before_after %}
+        <div class="compare" data-compare>
+          <div class="compare__before compare__before--{{ item.tone }}">
+            <img src="{% static item.before_photo %}" alt="{{ item.label }} — before" loading="lazy">
+            <span class="compare__tag">Before</span>
+          </div>
+          <div class="compare__after compare__after--{{ item.tone }}" data-compare-after style="--pos: 50%;">
+            <img src="{% static item.after_photo %}" alt="{{ item.label }} — after" loading="lazy">
+            <span class="compare__tag">After</span>
+          </div>
+          <div class="compare__handle" data-compare-handle style="left: 50%;" aria-hidden="true">
+            <span></span>
+          </div>
+          <input type="range" class="compare__range" min="0" max="100" value="50" aria-label="Compare before and after: {{ item.label }}" data-compare-range>
+          <span class="compare__caption">{{ item.label }}</span>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="section-head" data-aos="fade-up" style="margin-top: var(--space-2xl);">
+      <p class="eyebrow">Portfolio</p>
+      <h2 class="section-title">Our latest <em>work</em>.</h2>
+    </div>
+
+    <div class="gallery__masonry" data-aos="fade-up" data-aos-delay="100">
+      {% for item in gallery.portfolio %}
+        <figure class="portfolio-item portfolio-item--{{ item.tone }}">
+          <img src="{% static item.photo %}" alt="{{ item.label }}" loading="lazy">
+          <figcaption>{{ item.label }}</figcaption>
+        </figure>
+      {% endfor %}
+    </div>
+  </div>
+</section>

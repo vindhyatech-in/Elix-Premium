@@ -1,0 +1,51 @@
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-brand__logo">Glamour<span>At</span>Home</div>
+        <p>{{ SITE.description }}</p>
+        <div class="footer-social">
+          <a href="{{ SITE.social.instagram }}" aria-label="Instagram" target="_blank" rel="noopener">IG</a>
+          <a href="{{ SITE.social.facebook }}" aria-label="Facebook" target="_blank" rel="noopener">FB</a>
+          <a href="{{ SITE.social.youtube }}" aria-label="YouTube" target="_blank" rel="noopener">YT</a>
+          <a href="{{ SITE.social.linkedin }}" aria-label="LinkedIn" target="_blank" rel="noopener">IN</a>
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h5>Company</h5>
+        <ul>
+          <li><a href="#why-us">Why Us</a></li>
+          <li><a href="#beauticians">Beauticians</a></li>
+          <li><a href="#stories">Customer Stories</a></li>
+          <li><a href="#tips">Beauty Tips</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h5>Get In Touch</h5>
+        <ul>
+          <li><a href="tel:{{ SITE.phone }}">{{ SITE.phone }}</a></li>
+          <li><a href="mailto:{{ SITE.email }}">{{ SITE.email }}</a></li>
+          <li>{{ SITE.address }}</li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h5>Stay in the glow</h5>
+        <p style="color: rgba(250,246,239,.65); font-size: var(--fs-sm);">Beauty tips &amp; offers, once a week. No spam.</p>
+        <form class="footer-newsletter" data-newsletter-form novalidate>
+          <label class="sr-only" for="newsletter-email">Email address</label>
+          <input type="email" id="newsletter-email" name="email" placeholder="you@email.com" required>
+          <button type="submit" class="btn-icon" aria-label="Subscribe">→</button>
+        </form>
+        <p class="form-status" data-newsletter-status></p>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <span>&copy; {% now "Y" %} {{ SITE.name }}. All rights reserved.</span>
+      <span><a href="#">Privacy Policy</a> · <a href="#">Terms of Service</a></span>
+    </div>
+  </div>
+</footer>

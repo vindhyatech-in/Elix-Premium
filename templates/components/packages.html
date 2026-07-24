@@ -1,0 +1,29 @@
+<section class="packages section" id="packages" data-api="/api/v1/packages/" aria-labelledby="packages-title">
+  <div class="container">
+    <div class="section-head section-head--center" data-aos="fade-up">
+      <p class="eyebrow">Beauty Packages</p>
+      <h2 class="section-title" id="packages-title">One ritual, or a <em>full indulgence</em>.</h2>
+      <p class="section-lead">Transparent pricing. No hidden charges. Cancel or reschedule anytime, free.</p>
+    </div>
+
+    <div class="packages__grid">
+      {% for package in packages %}
+        <article class="package-card{% if package.featured %} package-card--featured{% endif %}" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
+          {% if package.featured %}<span class="package-card__badge">Most Loved</span>{% endif %}
+          <h3 class="package-card__name">{{ package.name }}</h3>
+          <p class="package-card__tagline">{{ package.tagline }}</p>
+          <div class="package-card__price">
+            <span class="package-card__amount">₹{{ package.price }}</span>
+            <span class="package-card__period">{{ package.period }}</span>
+          </div>
+          <ul class="package-card__features">
+            {% for feature in package.features %}
+              <li>{{ feature }}</li>
+            {% endfor %}
+          </ul>
+          <a href="#contact" class="btn {% if package.featured %}btn--primary{% else %}btn--ghost{% endif %}">Choose {{ package.name }}</a>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>

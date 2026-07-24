@@ -1,0 +1,45 @@
+/* ============================================================
+   RESPONSIVE — breakpoint overrides not already mobile-first
+   inline within base/components/sections.
+   ============================================================ */
+
+/* Nav: collapse links into the burger + drawer below 960px */
+@media (max-width: 959.98px) {
+  .navbar__links { display: none; }
+  .navbar__actions .btn--ghost { display: none; }
+  .navbar__burger { display: inline-flex; }
+}
+
+@media (min-width: 960px) {
+  .mobile-drawer { display: none; }
+}
+
+/* Burger -> close (X) animation */
+.navbar__burger.is-active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.navbar__burger.is-active span:nth-child(2) { opacity: 0; }
+.navbar__burger.is-active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Tighten section rhythm on small screens */
+@media (max-width: 639.98px) {
+  .section { padding-block: var(--space-2xl); }
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+  .footer-bottom { flex-direction: column; gap: var(--space-2xs); text-align: center; }
+}
+
+@media (min-width: 640px) and (max-width: 959.98px) {
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (min-width: 960px) {
+  .footer-grid { grid-template-columns: 1.4fr 1fr 1fr 1.2fr; }
+}
+
+/* Cursor glow: pointer-fine devices only (JS also gates this, CSS is the safety net) */
+@media (hover: none), (pointer: coarse) {
+  .cursor-glow { display: none; }
+}
+
+/* Large screens: cap hero max-width for very wide monitors */
+@media (min-width: 1600px) {
+  .container { max-width: 1440px; }
+}

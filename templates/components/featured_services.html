@@ -1,0 +1,41 @@
+{% load static %}
+<section class="services section" id="services" data-api="/api/v1/services/featured/" aria-labelledby="services-title">
+  <div class="container">
+    <div class="services__head">
+      <div class="section-head">
+        <p class="eyebrow" data-aos="fade-up">Featured Services</p>
+        <h2 class="section-title" id="services-title" data-aos="fade-up">Rituals, curated for <em>every mood</em>.</h2>
+        <p class="section-lead" data-aos="fade-up">From a 45-minute manicure to a full bridal transformation — every service is delivered by a verified specialist.</p>
+      </div>
+
+      <div class="services__filters" role="tablist" aria-label="Filter services by category" data-service-filters>
+        {% for category in categories %}
+          <button type="button" class="chip{% if forloop.first %} is-active{% endif %}" role="tab" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" data-filter="{{ category }}">{{ category }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="services__grid" data-service-grid>
+      {% for service in services %}
+        <article class="service-card" data-category="{{ service.category }}" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
+          <div class="service-card__visual service-card__visual--{{ service.tone }}">
+            <img class="service-card__photo" src="{% static service.photo %}" alt="{{ service.name }}" loading="lazy">
+            <span class="service-card__category">{{ service.category }}</span>
+          </div>
+          <div class="service-card__body">
+            <div class="service-card__top">
+              <h3 class="service-card__name">{{ service.name }}</h3>
+              <span class="stars" aria-label="Rated {{ service.rating }} out of 5">★ {{ service.rating }}</span>
+            </div>
+            <p class="service-card__desc">{{ service.description }}</p>
+            <div class="service-card__meta">
+              <span>{{ service.duration }}</span>
+              <span class="service-card__price">₹{{ service.price }}</span>
+            </div>
+            <a href="#contact" class="btn btn--ghost btn--sm service-card__cta">Enquire Now</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>

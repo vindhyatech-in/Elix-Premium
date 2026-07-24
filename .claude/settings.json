@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./venv/bin/python manage.py check)",
+      "Bash(./venv/bin/python manage.py runserver 0.0.0.0:8008)",
+      "Bash(curl -s -o /tmp/index.html -w \"HTTP %{http_code}\\\\n\" http://127.0.0.1:8008/)",
+      "Bash(curl -s -o /dev/null -w \"robots.txt: %{http_code}\\\\n\" http://127.0.0.1:8008/robots.txt)",
+      "Bash(curl -s -o /dev/null -w \"sitemap.xml: %{http_code}\\\\n\" http://127.0.0.1:8008/sitemap.xml)",
+      "Bash(curl -s -o /dev/null -w \"main.css: %{http_code}\\\\n\" http://127.0.0.1:8008/static/css/main.css)",
+      "Bash(cat /tmp/glamour_runserver.log | tail -40)",
+      "Read(//private/tmp/**)",
+      "Bash(grep -n \"★\" /tmp/index.html | head -10 *)",
+      "Bash(python3 -c ' *)",
+      "Bash(pkill -f \"manage.py runserver 0.0.0.0:8008\")",
+      "Bash(curl -s -o /tmp/index2.html -w \"index: %{http_code}\\\\n\" http://127.0.0.1:8008/)",
+      "Bash(curl -s http://127.0.0.1:8008/static/css/sections.css -o /tmp/sections2.css)",
+      "WebSearch",
+      "WebFetch(domain:www.pexels.com)",
+      "WebFetch(domain:unsplash.com)",
+      "Bash(curl -L -s -o service-hair-spa.jpg \"https://images.pexels.com/photos/23349902/pexels-photo-23349902.jpeg\")",
+      "Bash(curl -L -s -o service-facial.jpg \"https://images.pexels.com/photos/37229301/pexels-photo-37229301.jpeg\")",
+      "Bash(curl -L -s -o service-bridal-makeup.jpg \"https://images.pexels.com/photos/29143452/pexels-photo-29143452.jpeg\")",
+      "Bash(curl -L -s -o service-manicure.jpg \"https://images.pexels.com/photos/939835/pexels-photo-939835.jpeg\")",
+      "Bash(curl -L -s -o service-massage.jpg \"https://images.pexels.com/photos/38407788/pexels-photo-38407788.jpeg\")",
+      "Bash(curl -sL -A \"Mozilla/5.0\" -o artist-2-candidate.jpg \"https://images.pexels.com/photos/29852895/pexels-photo-29852895.jpeg?auto=compress&cs=tinysrgb&w=1000\")",
+      "Bash(curl -L -o /private/tmp/claude-504/-Users-sachin-Documents-Poject-VindhyaTech-client-projects-GlamourAtHome/5afa9745-8634-4fd8-ac85-facf96c9da5b/scratchpad/hero-candidate-rosa.jpg 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=1920&h=1080&fit=crop&q=80&auto=format')",
+      "Bash(curl -L -o /private/tmp/claude-504/-Users-sachin-Documents-Poject-VindhyaTech-client-projects-GlamourAtHome/5afa9745-8634-4fd8-ac85-facf96c9da5b/scratchpad/hero-candidate-karelys.jpg https://unsplash.com/photos/woman-receiving-facial-skincare-treatment-PqyzuzFiQfY/download?w=1920)",
+      "Bash(curl -s -o /tmp/index3.html -w \"index: %{http_code}\\\\n\" http://127.0.0.1:8008/)",
+      "Bash(grep -n \"hero__photo\\\\|hero__scrim\\\\|why-us__frame-photo\" /tmp/index3.html)",
+      "Read(//tmp/**)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --no-sandbox --window-size=1440,1000 --virtual-time-budget=3000 --screenshot=/tmp/hero.png http://127.0.0.1:8008/)",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --no-sandbox \\\\ *)",
+      "Bash(sips -g pixelWidth -g pixelHeight /tmp/full2.png)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --no-sandbox --window-size=1440,900 --virtual-time-budget=3000 --screenshot=/tmp/hero3.png http://127.0.0.1:8008/)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}

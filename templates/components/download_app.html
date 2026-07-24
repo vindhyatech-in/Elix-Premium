@@ -1,0 +1,51 @@
+{% load static glamour_extras %}
+<section class="download section" id="download-app" aria-labelledby="download-title">
+  <div class="container download__inner">
+    <div class="download__copy" data-aos="fade-up">
+      <p class="eyebrow">Download The App</p>
+      <h2 class="section-title" id="download-title">Your salon, in your <em>pocket</em>.</h2>
+      <p class="section-lead">Book in under a minute, track your artist live, and unlock app-only rituals and offers.</p>
+
+      <div class="download__badges">
+        <a href="{{ SITE.apps.ios }}" class="store-badge" aria-label="Download on the App Store">
+          <span class="store-badge__icon"></span>
+          <span><small>Download on the</small>App Store</span>
+        </a>
+        <a href="{{ SITE.apps.android }}" class="store-badge" aria-label="Get it on Google Play">
+          <span class="store-badge__icon"></span>
+          <span><small>Get it on</small>Google Play</span>
+        </a>
+      </div>
+
+      <div class="download__qr">
+        <!-- Decorative placeholder — replace with a server-generated QR
+             pointing at SITE.apps (e.g. via the `qrcode` package) once a
+             smart-link / deep-link URL is available. -->
+        <div class="qr-mock" aria-hidden="true">
+          {% for i in 49|times %}<span></span>{% endfor %}
+        </div>
+        <span class="download__qr-label">Scan to download</span>
+      </div>
+    </div>
+
+    <div class="download__visual" data-aos="fade-up" data-aos-delay="150">
+      <div class="phone-mock">
+        <div class="phone-mock__screen">
+          <div class="phone-mock__card phone-mock__card--1">
+            <span class="badge">✓ Confirmed</span>
+            <p>Radiance Glow Facial</p>
+            <small>Today, 5:30 PM · Kavya N.</small>
+          </div>
+          <div class="phone-mock__card phone-mock__card--2">
+            <span class="stars">★★★★★</span>
+            <p>Rate your ritual</p>
+          </div>
+          <div class="phone-mock__card phone-mock__card--3">
+            <p>20% off your next booking</p>
+            <small>App-exclusive offer</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

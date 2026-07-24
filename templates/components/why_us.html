@@ -1,0 +1,33 @@
+{% load static %}
+<section class="why-us section" id="why-us" data-api="/api/v1/value-pillars/" aria-labelledby="why-us-title">
+  <div class="container why-us__inner">
+    <div class="why-us__list">
+      <div class="section-head" data-aos="fade-up">
+        <p class="eyebrow">Why Glamour At Home</p>
+        <h2 class="section-title" id="why-us-title">Luxury isn't an add-on.<br>It's the <em>standard</em>.</h2>
+      </div>
+
+      {% for pillar in pillars %}
+        <article class="pillar" data-pillar="{{ forloop.counter0 }}">
+          <span class="pillar__index">{{ pillar.index }}</span>
+          <div>
+            <h3 class="pillar__title">{{ pillar.title }}</h3>
+            <p class="pillar__body">{{ pillar.body }}</p>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+
+    <div class="why-us__visual">
+      <div class="why-us__sticky">
+        {% for pillar in pillars %}
+          <div class="why-us__frame why-us__frame--{{ pillar.image }}{% if forloop.first %} is-active{% endif %}" data-frame="{{ forloop.counter0 }}">
+            <img class="why-us__frame-photo" src="{% static 'images/pillar-'|add:pillar.image|add:'.jpg' %}" alt="">
+            <span class="why-us__frame-index">{{ pillar.index }}</span>
+            <span class="why-us__frame-label">{{ pillar.title }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>

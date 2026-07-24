@@ -1,0 +1,7 @@
+Django==6.0.7
+
+# --- Future, once the REST API layer is built (see developed.md) ---
+# djangorestframework
+# django-cors-headers
+# Pillow          # image handling once real photography/media models exist
+# qrcode          # server-generated App Store/Play Store QR codes

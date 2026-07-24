@@ -1,0 +1,43 @@
+{% load static %}
+<section class="artists section" id="beauticians" data-api="/api/v1/beauticians/" aria-labelledby="artists-title">
+  <div class="container">
+    <div class="artists__head">
+      <div class="section-head" data-aos="fade-up">
+        <p class="eyebrow">Meet Our Beauticians</p>
+        <h2 class="section-title" id="artists-title">The hands behind <em>the glow</em>.</h2>
+      </div>
+    </div>
+
+    <div class="artists__carousel" data-aos="fade-up" data-aos-delay="100">
+      <button class="btn-icon carousel-arrow carousel-arrow--prev" id="artists-prev" aria-label="Previous beautician">←</button>
+
+      <div class="swiper artists__swiper">
+        <div class="swiper-wrapper">
+          {% for artist in artists %}
+            <div class="swiper-slide">
+              <article class="artist-card">
+                <div class="artist-card__visual">
+                  <img src="{% static artist.photo %}" alt="{{ artist.name }}, {{ artist.specialty }}" loading="lazy">
+                </div>
+                <div class="artist-card__body">
+                  <h3 class="artist-card__name">{{ artist.name }}</h3>
+                  <p class="artist-card__specialty">{{ artist.specialty }}</p>
+                  <p class="artist-card__experience">{{ artist.experience }}</p>
+                  <div class="artist-card__rating">
+                    <span class="stars" aria-label="Rated {{ artist.rating }} out of 5">★ {{ artist.rating }}</span>
+                    <span class="artist-card__reviews">({{ artist.reviews }} reviews)</span>
+                  </div>
+                  <div class="artist-card__skills">
+                    {% for skill in artist.skills %}<span class="chip">{{ skill }}</span>{% endfor %}
+                  </div>
+                </div>
+              </article>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <button class="btn-icon carousel-arrow carousel-arrow--next" id="artists-next" aria-label="Next beautician">→</button>
+    </div>
+  </div>
+</section>

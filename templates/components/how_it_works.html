@@ -1,0 +1,21 @@
+<section class="how-it-works section" id="how-it-works" data-api="/api/v1/how-it-works/" aria-labelledby="hiw-title">
+  <div class="container">
+    <div class="section-head section-head--center" data-aos="fade-up">
+      <p class="eyebrow">How It Works</p>
+      <h2 class="section-title" id="hiw-title">Five steps to <em>your</em> ritual.</h2>
+    </div>
+
+    <div class="how-it-works__track" data-hiw-track>
+      <div class="how-it-works__line" aria-hidden="true"><span class="how-it-works__line-fill" data-line-fill></span></div>
+
+      {% for step in steps %}
+        <div class="how-it-works__step" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
+          <span class="how-it-works__dot" aria-hidden="true"></span>
+          <span class="how-it-works__num">{{ step.step }}</span>
+          <h3 class="how-it-works__title">{{ step.title }}</h3>
+          <p class="how-it-works__body">{{ step.body }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>

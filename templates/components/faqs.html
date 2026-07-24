@@ -1,0 +1,23 @@
+<section class="faqs section" id="faqs" data-api="/api/v1/faqs/" aria-labelledby="faqs-title">
+  <div class="container faqs__inner">
+    <div class="section-head" data-aos="fade-up">
+      <p class="eyebrow">FAQs</p>
+      <h2 class="section-title" id="faqs-title">Questions, <em>answered</em>.</h2>
+      <p class="section-lead">Can't find what you're looking for? <a href="#contact" style="text-decoration: underline;">Talk to our concierge team</a>.</p>
+    </div>
+
+    <div class="accordion" data-aos="fade-up" data-aos-delay="100">
+      {% for faq in faqs %}
+        <div class="accordion-item{% if forloop.first %} is-open{% endif %}" data-accordion-item>
+          <button class="accordion-item__trigger" data-accordion-trigger aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+            <span>{{ faq.question }}</span>
+            <span class="accordion-item__icon" aria-hidden="true"></span>
+          </button>
+          <div class="accordion-item__panel" data-accordion-panel{% if forloop.first %} style="height:auto;"{% endif %}>
+            <div class="accordion-item__panel-inner">{{ faq.answer }}</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>

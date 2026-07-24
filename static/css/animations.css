@@ -1,0 +1,83 @@
+/* ============================================================
+   ANIMATIONS — preloader, cursor glow, keyframes
+   Scroll-reveal timing/easing is configured in main.js (AOS.init);
+   GSAP handles the hero text reveal + counters + line-draw.
+   ============================================================ */
+
+/* --- Preloader --- */
+.preloader {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-preloader);
+  background: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  transition: opacity var(--dur-lg) var(--ease-premium), visibility var(--dur-lg) var(--ease-premium);
+}
+
+.preloader.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.preloader__mark { position: relative; width: 84px; height: 84px; display: flex; align-items: center; justify-content: center; }
+
+.preloader__letter {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 2.25rem;
+  color: var(--gold-light);
+}
+
+.preloader__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(233, 214, 172, 0.25);
+  border-top-color: var(--gold-light);
+  animation: spin 1.4s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.preloader__bar {
+  width: 160px;
+  height: 2px;
+  background: rgba(255,255,255,0.12);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.preloader__bar-fill {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: var(--gradient-gold);
+  transition: width var(--dur-lg) var(--ease-soft);
+}
+
+/* --- Cursor glow (desktop pointer devices only, see main.js) --- */
+.cursor-glow {
+  position: fixed;
+  top: 0; left: 0;
+  width: 260px; height: 260px;
+  margin: -130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201,161,90,0.12) 0%, rgba(201,161,90,0) 70%);
+  pointer-events: none;
+  z-index: var(--z-cursor);
+  opacity: 0;
+  transition: opacity var(--dur-md) var(--ease-soft);
+  will-change: transform;
+}
+
+.cursor-glow.is-active { opacity: 1; }
+
+/* --- Generic reveal utility (fallback for non-AOS elements) --- */
+.reveal-up {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity var(--dur-md) var(--ease-premium), transform var(--dur-md) var(--ease-premium);
+}
+
+.reveal-up.is-visible { opacity: 1; transform: translateY(0); }

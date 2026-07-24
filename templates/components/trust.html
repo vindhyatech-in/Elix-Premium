@@ -1,0 +1,29 @@
+<section class="trust section" id="trust" data-api="/api/v1/trust/" aria-labelledby="trust-title">
+  <div class="container">
+    <div class="trust__stats">
+      {% for point in points %}
+        <div class="trust__stat" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
+          <span class="trust__stat-value" data-counter data-target="{{ point.value }}" data-suffix="{{ point.suffix }}">0</span>
+          <span class="trust__stat-label">{{ point.label }}</span>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="trust__divider" aria-hidden="true"></div>
+
+    <div class="trust__head" data-aos="fade-up">
+      <p class="eyebrow">Why Customers Trust Us</p>
+      <h2 class="section-title" id="trust-title">Trust, engineered into <em>every visit</em>.</h2>
+    </div>
+
+    <div class="trust__badges">
+      {% for badge in badges %}
+        <div class="trust-badge" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
+          <span class="trust-badge__index">{{ forloop.counter|stringformat:"02d" }}</span>
+          <h3 class="trust-badge__title">{{ badge.title }}</h3>
+          <p class="trust-badge__body">{{ badge.body }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>

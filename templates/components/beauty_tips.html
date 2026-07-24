@@ -1,0 +1,29 @@
+{% load static %}
+<section class="tips section" id="tips" data-api="/api/v1/blogs/" aria-labelledby="tips-title">
+  <div class="container">
+    <div class="services__head">
+      <div class="section-head" data-aos="fade-up">
+        <p class="eyebrow">Beauty Tips</p>
+        <h2 class="section-title" id="tips-title">Notes from our <em>artists</em>.</h2>
+      </div>
+      <a href="#" class="btn btn--ghost">View All Articles</a>
+    </div>
+
+    <div class="tips__grid">
+      {% for tip in tips %}
+        <article class="tip-card{% if forloop.first %} tip-card--feature{% endif %}" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
+          <div class="tip-card__visual">
+            <img src="{% static tip.photo %}" alt="{{ tip.title }}" loading="lazy">
+            <span class="tip-card__category">{{ tip.category }}</span>
+          </div>
+          <div class="tip-card__body">
+            <span class="tip-card__meta">{{ tip.date }} · {{ tip.read_time }}</span>
+            <h3 class="tip-card__title">{{ tip.title }}</h3>
+            <p class="tip-card__excerpt">{{ tip.excerpt }}</p>
+            <a href="#" class="tip-card__link">Read Article →</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>

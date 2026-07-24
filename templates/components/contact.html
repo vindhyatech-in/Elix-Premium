@@ -1,0 +1,48 @@
+<section class="contact section" id="contact-form" aria-labelledby="contact-title">
+  <div class="container contact__inner">
+    <div class="contact__form-wrap glass-panel" data-aos="fade-up">
+      <p class="eyebrow">Contact</p>
+      <h2 class="section-title" id="contact-title">Tell us what you <em>need</em>.</h2>
+      <p class="section-lead">Share a few details and our concierge team will call you back within the hour.</p>
+
+      <!--
+        Intercepted client-side for now (see static/js/main.js `initContactForm`).
+        Future wiring: POST /api/v1/leads/ with { name, phone, service, message }.
+      -->
+      <form class="contact__form" data-contact-form novalidate>
+        <div class="field">
+          <label for="contact-name">Full Name</label>
+          <input type="text" id="contact-name" name="name" required>
+        </div>
+        <div class="field">
+          <label for="contact-phone">Phone Number</label>
+          <input type="tel" id="contact-phone" name="phone" required>
+        </div>
+        <div class="field">
+          <label for="contact-message">What are you looking for?</label>
+          <textarea id="contact-message" name="message" placeholder="e.g. Bridal makeup trial for a wedding on 14th August"></textarea>
+        </div>
+        <button type="submit" class="btn btn--primary">Request a Callback</button>
+        <p class="form-status" data-contact-status></p>
+      </form>
+    </div>
+
+    <div class="contact__info" data-aos="fade-up" data-aos-delay="150">
+      <div class="contact__map" aria-hidden="true">
+        <span class="contact__map-pin"></span>
+      </div>
+      <div class="contact__detail">
+        <h3>Call Us</h3>
+        <a href="tel:{{ SITE.phone }}">{{ SITE.phone }}</a>
+      </div>
+      <div class="contact__detail">
+        <h3>Email Us</h3>
+        <a href="mailto:{{ SITE.email }}">{{ SITE.email }}</a>
+      </div>
+      <div class="contact__detail">
+        <h3>Hours</h3>
+        <p>Every day · 7 AM – 10 PM</p>
+      </div>
+    </div>
+  </div>
+</section>

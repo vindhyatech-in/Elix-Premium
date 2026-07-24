@@ -1,0 +1,45 @@
+{% load static %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "name": "{{ SITE.name }}",
+  "description": "{{ SITE.description|escapejs }}",
+  "image": "{{ request.scheme }}://{{ request.get_host }}{% static 'images/og-cover.svg' %}",
+  "telephone": "{{ SITE.phone }}",
+  "email": "{{ SITE.email }}",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "{{ SITE.address }}"
+  },
+  "url": "{{ request.build_absolute_uri }}",
+  "priceRange": "₹₹",
+  "sameAs": [
+    "{{ SITE.social.instagram }}",
+    "{{ SITE.social.facebook }}",
+    "{{ SITE.social.youtube }}",
+    "{{ SITE.social.linkedin }}"
+  ]
+}
+</script>
+
+{% if faqs %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for faq in faqs %}
+    {
+      "@type": "Question",
+      "name": "{{ faq.question|escapejs }}",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "{{ faq.answer|escapejs }}"
+      }
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ]
+}
+</script>
+{% endif %}

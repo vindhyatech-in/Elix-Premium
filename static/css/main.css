@@ -1,0 +1,12 @@
+/*
+ * Glamour At Home — stylesheet entry point.
+ * Order matters: tokens -> reset/base -> components -> sections -> animations -> responsive overrides.
+ * Shipped as @import for development clarity; for production, concatenate + minify
+ * these six files into one request (see developed.md "Performance").
+ */
+@import url('variables.css');
+@import url('base.css');
+@import url('components.css');
+@import url('sections.css');
+@import url('animations.css');
+@import url('responsive.css');

@@ -1,0 +1,38 @@
+{% load glamour_extras %}
+<section class="stories section" id="stories" data-api="/api/v1/testimonials/" aria-labelledby="stories-title">
+  <div class="container stories__inner">
+    <div class="section-head" data-aos="fade-up">
+      <p class="eyebrow">Customer Stories</p>
+      <h2 class="section-title" id="stories-title">Words, not <em>ours</em>.</h2>
+    </div>
+
+    <div class="stories__carousel" data-aos="fade-up" data-aos-delay="100">
+      <button class="btn-icon carousel-arrow carousel-arrow--prev" id="stories-prev" aria-label="Previous story">←</button>
+
+      <div class="swiper stories__swiper">
+        <div class="swiper-wrapper">
+          {% for story in stories %}
+            <div class="swiper-slide">
+              <blockquote class="story-card">
+                <span class="story-card__mark" aria-hidden="true">&ldquo;</span>
+                <p class="story-card__quote">{{ story.quote }}</p>
+                <footer class="story-card__footer">
+                  <div>
+                    <cite class="story-card__name">{{ story.name }}</cite>
+                    <span class="story-card__meta">{{ story.location }} · {{ story.service }}</span>
+                  </div>
+                  <span class="stars" aria-label="Rated {{ story.rating }} out of 5">
+                    {% for _ in story.rating|times %}★{% endfor %}
+                  </span>
+                </footer>
+              </blockquote>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="swiper-pagination"></div>
+      </div>
+
+      <button class="btn-icon carousel-arrow carousel-arrow--next" id="stories-next" aria-label="Next story">→</button>
+    </div>
+  </div>
+</section>

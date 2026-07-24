@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+  {% include 'components/hero.html' with hero=hero %}
+  {% include 'components/why_us.html' with pillars=value_pillars %}
+  {% include 'components/featured_services.html' with categories=service_categories services=featured_services %}
+  {% include 'components/packages.html' with packages=packages %}
+  {% include 'components/how_it_works.html' with steps=how_it_works %}
+  {% include 'components/trust.html' with points=trust_points badges=trust_badges %}
+  {% include 'components/beauticians.html' with artists=beauticians %}
+  {% include 'components/testimonials.html' with stories=testimonials %}
+  {% include 'components/gallery.html' with gallery=gallery %}
+  {% include 'components/beauty_tips.html' with tips=beauty_tips %}
+  {% include 'components/download_app.html' %}
+  {% include 'components/faqs.html' with faqs=faqs %}
+  {% include 'components/contact.html' %}
+{% endblock %}
