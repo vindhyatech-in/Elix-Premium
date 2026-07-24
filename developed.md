@@ -176,6 +176,87 @@ integration point in one pass.
   motion` disables/shortens all custom JS animation (canvas, GSAP, counters)
   — check this media query before adding new motion.
 
+## Dark mode / theming (added 2026-07-25)
+
+Toggled via `<html data-theme="light|dark">`, persisted to `localStorage`
+('theme' key), defaulting to `prefers-color-scheme` when no stored value
+exists. Two toggle buttons exist (`[data-theme-toggle]`): one in the navbar
+(`navbar.html`), one in the mobile drawer header — both wired by
+`initThemeToggle()` in `main.js`. An inline `<script>` at the very top of
+`base.html`'s `<head>` (before any CSS) sets the attribute immediately, so
+the page never flashes the wrong theme on load.
+
+**Token architecture — this is the part to understand before touching
+colors.** `variables.css` has two tiers:
+
+- **Fixed tokens** (`--ink`, `--cream`, `--white`, `--ink-soft`, all
+  gradients, `--border-hairline-dark`): **never** redefined by theme. These
+  are used as *fixed contrast pairs* throughout the CSS — gold buttons
+  (`--ink` text on a gold gradient that never changes), dark-accent hovers
+  (`.chip.is-active`, `.btn--dark`, accordion-open icon — background flips
+  to `--ink` regardless of theme), photo-overlay badges (category tags,
+  before/after labels, the gallery compare-handle — see the "known gap"
+  below), the hero (photo overlay) and navbar's default (unscrolled,
+  over-photo) state, and the **footer + mobile drawer**, which stay dark
+  regardless of theme by deliberate, still-current design choice (a common
+  pattern — many sites keep the footer/off-canvas menu dark regardless of
+  page theme). The phone-mockup illustration in the download section
+  (`.phone-mock`, `.phone-mock__card`) is the same story: it's a fixed
+  decorative graphic, not a real page surface, so it doesn't flip either.
+- **Theme-aware tokens** (`--surface-1/2/3`, `--text-body`, `--text-soft`,
+  `--accent-gold`, plus `--ink-muted` and `--border-hairline` which are
+  redefined in place under the same names): these ARE redefined under
+  `:root[data-theme="dark"]` in `variables.css`. `--surface-1/2/3` replace
+  what used to be direct `var(--cream)`/`var(--white)`/`var(--cream-deep)`
+  background usages on section/card surfaces; `--text-body` replaced
+  `var(--ink)` as the default body/heading text color; `--text-soft`
+  replaced the *text* (not background) uses of `--ink-soft` on
+  chips/badges/feature lists; `--accent-gold` is `--gold-deep` in light
+  mode / `--gold-light` in dark mode, for gold accents that need to stay
+  legible against a surface that itself flips (trust/download eyebrows,
+  stat values, badge indices — plain `--gold-light` washes out on a light
+  background).
+
+**Trust and Download-App *do* flip with theme** (changed 2026-07-25 — they
+were originally in the fixed-dark list above, on the assumption they were
+a deliberate "always dark accent" like Apple's occasional dark sections.
+That reads as broken once a real toggle exists: a user in light mode
+reasonably expects every section to go light). Their pattern: default
+(light-mode) rule uses `--surface-3` + `--text-body` + `--accent-gold`;
+a `[data-theme="dark"] .trust { background: var(--gradient-ink); }` (same
+for `.download`) restores the original premium dark gradient look in dark
+mode specifically, since that's a hardcoded gradient no variable
+reference can flip automatically. If you touch these sections again,
+keep both halves in sync.
+
+If you add a new **light-surfaced** section or card: use `--surface-1/2/3`
+for its background and `--text-body`/`--text-soft`/`--ink-muted` for text,
+`--accent-gold` for gold accents — never `--cream`/`--white`/`--ink`/
+`--gold-light` directly, or it won't flip in dark mode. If you add a new
+**intentionally-always-dark** element (another photo overlay, another
+fixed decorative graphic): use `--ink`/`--cream` directly, same as the
+footer/drawer/phone-mock — it should look identical in both themes. And
+watch for the specific trap that caused two real bugs already: an element
+with no *explicit* color, relying on inherited body text — that inherited
+color now varies by theme, so anything meant to keep fixed text (a white
+photo-overlay badge, a card floating on a fixed-dark illustration) needs
+an explicit fixed color, not silent inheritance.
+
+`.theme-transitioning` (added to `<html>` by JS for ~450ms around a toggle
+click) briefly makes every element's color/background/border transition,
+so the switch fades instead of snapping — scoped to that one class rather
+than a permanent global transition, so it doesn't fight component's own
+hover/focus transitions. Skipped under `prefers-reduced-motion`.
+
+**Known gap / acceptable scope boundary**: small accent/active-state
+elements that pair `--ink`/`--cream` as backgrounds (chip.is-active,
+btn--dark, accordion-open icon, the gallery compare-handle, photo-overlay
+badges like service category tags and before/after labels) do **not**
+invert between themes — they render identically in light and dark mode.
+This was a deliberate scope call (see the fixed-tokens list above) rather
+than an oversight; revisit only if it reads as a real visual bug in
+practice, not just theoretical inconsistency.
+
 ## SEO
 
 - `partials/meta.html`: title/description blocks (overridable per-template

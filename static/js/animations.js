@@ -153,22 +153,26 @@
 
     // Keeps the sticky image roughly level with whichever pillar text is
     // currently focused, instead of sitting frozen at one fixed height.
-    // Driven by pillar INDEX (not raw pixel distance) mapped evenly across a
-    // fixed travel range — a pixel-distance version of this saturated its
-    // clamp after the 2nd pillar (real spacing exceeded the cap), leaving
-    // pillars 3/4 stuck at the same offset as pillar 2. Index-based mapping
-    // guarantees an even step for every pillar regardless of actual spacing.
-    // Pillar 1 stays at 0 (its natural `top: 7rem` sticky position was
-    // already a good match) — only 2/3/4 progressively drift downward from
-    // there. An earlier version centered the range (-100..+100), which
-    // shifted pillar 1 upward away from its already-correct position.
-    const TRAVEL = 160; // total px the image drifts from the first pillar to the last
-
+    //
+    // Two earlier approaches both under-shot this:
+    //  1. A fixed index-based step (equal % of a hardcoded constant) needed
+    //     a magic-number travel distance that never quite matched reality.
+    //  2. Estimating travel from (list height - sticky height) was closer
+    //     but still an approximation, and visibly fell short of the real
+    //     gap by the last pillar.
+    // This version measures the ACTUAL live pixel distance between the
+    // active pillar's center and the first pillar's center via
+    // getBoundingClientRect() every time — a direct 1:1 correspondence with
+    // how far the text has really scrolled, not an estimate of it. No
+    // hardcoded constant, no clamp — the image moves exactly as far as the
+    // text did.
     function focusImageOn(pillar) {
       if (!sticky || !hasGSAP || prefersReducedMotion) return;
-      const index = Array.prototype.indexOf.call(pillars, pillar);
-      const lastIndex = pillars.length - 1;
-      const targetY = lastIndex > 0 ? (index / lastIndex) * TRAVEL : 0;
+      const firstRect = pillars[0].getBoundingClientRect();
+      const activeRect = pillar.getBoundingClientRect();
+      const firstCenter = firstRect.top + firstRect.height / 2;
+      const activeCenter = activeRect.top + activeRect.height / 2;
+      const targetY = activeCenter - firstCenter;
       gsap.to(sticky, { y: targetY, duration: 0.7, ease: 'power3.out', overwrite: 'auto' });
     }
 

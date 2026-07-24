@@ -11,12 +11,13 @@ html {
 
 body {
   margin: 0;
-  background: var(--cream);
-  color: var(--ink);
+  background: var(--surface-1);
+  color: var(--text-body);
   font-family: var(--font-body);
   font-size: var(--fs-md);
   line-height: 1.6;
   overflow-x: hidden;
+  transition: background-color var(--dur-md) var(--ease-soft), color var(--dur-md) var(--ease-soft);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -89,7 +90,7 @@ h1, h2, h3, h4 {
 
 .section-title {
   font-size: var(--fs-display-md);
-  color: var(--ink);
+  color: var(--text-body);
 }
 
 .section-title em {
@@ -143,6 +144,22 @@ h1, h2, h3, h4 {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Theme toggle: briefly transitions every element's colors so switching
+   light/dark fades instead of snapping — scoped to this one class (added by
+   JS for ~450ms around the toggle) rather than a permanent global transition,
+   so it never fights with each component's own hover/focus transitions.
+   Skipped entirely under reduced-motion (that block above already forces
+   0.01ms on everything, and its plain `*` selector has lower specificity
+   than `html.theme-transitioning *`, so this guard keeps it from re-enabling
+   motion for reduced-motion users). */
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-transitioning,
+  html.theme-transitioning * {
+    transition: background-color 0.4s var(--ease-soft), color 0.4s var(--ease-soft),
+      border-color 0.4s var(--ease-soft), box-shadow 0.4s var(--ease-soft) !important;
   }
 }
 

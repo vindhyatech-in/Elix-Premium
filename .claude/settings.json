@@ -31,10 +31,17 @@
       "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --no-sandbox --window-size=1440,1000 --virtual-time-budget=3000 --screenshot=/tmp/hero.png http://127.0.0.1:8008/)",
       "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --no-sandbox \\\\ *)",
       "Bash(sips -g pixelWidth -g pixelHeight /tmp/full2.png)",
-      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --no-sandbox --window-size=1440,900 --virtual-time-budget=3000 --screenshot=/tmp/hero3.png http://127.0.0.1:8008/)"
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --disable-gpu --no-sandbox --window-size=1440,900 --virtual-time-budget=3000 --screenshot=/tmp/hero3.png http://127.0.0.1:8008/)",
+      "Bash(./venv/bin/python /tmp/cdp_theme_shot.py \"http://127.0.0.1:8080/\" /tmp/theme_light.png light)",
+      "Bash(./venv/bin/python /tmp/cdp_theme_shot.py \"http://127.0.0.1:8080/\" /tmp/theme_dark.png dark)",
+      "Bash(pkill -f \"manage.py runserver\")",
+      "Bash(pkill -f \"remote-debugging-port\")",
+      "Bash(./venv/bin/pip uninstall *)"
     ],
     "additionalDirectories": [
-      "/tmp"
+      "/tmp",
+      "/private/tmp",
+      "/private/tmp/chrome-dm2-profile"
     ]
   }
 }

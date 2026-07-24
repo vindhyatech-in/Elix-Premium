@@ -28,6 +28,27 @@
   --border-hairline: rgba(22, 18, 15, 0.1);
   --border-hairline-dark: rgba(250, 246, 239, 0.14);
 
+  /* --- Theme-aware surface/text tokens ---
+     Light-mode values below; [data-theme="dark"] redefines these same
+     names further down. Everything else in this file (--ink, --cream,
+     --white, --ink-soft, gradients, etc.) is intentionally NEVER redefined
+     by theme — those are used throughout the CSS as fixed contrast pairs
+     (gold buttons, dark-accent hovers, chip.is-active, photo-overlay
+     badges, the footer/mobile-drawer which stay dark regardless of theme
+     by deliberate design). Trust/download used to be in that fixed-dark
+     list too, but that reads as broken once a real theme toggle exists
+     (2026-07-25: they now flip like any other section — see their rules
+     in sections.css). Flipping the tokens below would break the
+     still-fixed ones, since they pair a fixed background with fixed text.
+     Only page-level surfaces/body text should flip — that's what these
+     tokens are for. See developed.md "Dark mode". */
+  --surface-1: var(--cream);       /* default section/page background */
+  --surface-2: var(--white);       /* cards, chips, form fields, inputs */
+  --surface-3: var(--cream-deep);  /* alternate section background */
+  --text-body: var(--ink);         /* default body/heading text */
+  --text-soft: var(--ink-soft);    /* secondary text on light surfaces (chips, badges, feature lists) */
+  --accent-gold: var(--gold-deep); /* gold accent tuned for legibility against a LIGHT surface */
+
   /* --- Typography --- */
   --font-display: 'Fraunces', 'Georgia', serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -77,4 +98,28 @@
   --z-preloader: 900;
   --z-cursor: 800;
   --z-modal: 700;
+}
+
+/* ============================================================
+   DARK THEME — overrides applied when <html data-theme="dark">.
+   Only the theme-aware tokens above (surface-1/2/3, text-body,
+   text-soft) plus --ink-muted/--border-hairline/shadows are redefined.
+   Everything else (--ink, --cream, --white, --ink-soft, gradients,
+   --border-hairline-dark) is intentionally untouched — see the note
+   above --surface-1 for why.
+   ============================================================ */
+:root[data-theme="dark"] {
+  --surface-1: #16120f;
+  --surface-2: #241e19;
+  --surface-3: #1c1712;
+  --text-body: #f3ede1;
+  --text-soft: #cfc3b3;
+  --ink-muted: #a89a89;
+  --border-hairline: rgba(250, 246, 239, 0.12);
+  --accent-gold: var(--gold-light); /* legible against the now-dark surfaces */
+
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 12px 40px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.5);
+  --shadow-gold: 0 16px 45px rgba(169, 127, 55, 0.25);
 }

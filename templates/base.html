@@ -1,6 +1,16 @@
 {% load static %}<!doctype html>
 <html lang="en-IN">
 <head>
+  <script>
+    // Runs before any CSS paints, so the page never flashes the wrong theme.
+    // Kept inline (not in main.js, which loads deferred/later) specifically
+    // for that reason. Preference: localStorage override > OS preference.
+    (function () {
+      var stored = localStorage.getItem('theme');
+      var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
   {% include 'partials/meta.html' %}
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
   <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">

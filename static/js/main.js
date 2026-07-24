@@ -115,6 +115,56 @@
   }
 
   /* ---------------------------------------------------------
+   * Theme toggle (light/dark) — data-theme on <html>, persisted to
+   * localStorage. The initial value is set by an inline script in
+   * base.html's <head> (before CSS paints, to avoid a flash); this just
+   * wires up the button(s) and keeps them in sync if there are several
+   * (navbar + mobile drawer both have one).
+   * ------------------------------------------------------- */
+  function initThemeToggle() {
+    const toggles = document.querySelectorAll('[data-theme-toggle]');
+    if (!toggles.length) return;
+
+    const root = document.documentElement;
+
+    const syncLabels = () => {
+      const isDark = root.getAttribute('data-theme') === 'dark';
+      toggles.forEach((btn) => {
+        btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+      });
+    };
+    syncLabels();
+
+    const applyTheme = (theme) => {
+      if (!prefersReducedMotion) {
+        root.classList.add('theme-transitioning');
+        setTimeout(() => root.classList.remove('theme-transitioning'), 450);
+      }
+      root.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      syncLabels();
+    };
+
+    toggles.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+      });
+    });
+
+    // Follow the OS-level preference live, but only until the visitor makes
+    // an explicit choice of their own (once they've clicked a toggle,
+    // localStorage holds their pick and this stops overriding it).
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (localStorage.getItem('theme')) return;
+        root.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+        syncLabels();
+      });
+    }
+  }
+
+  /* ---------------------------------------------------------
    * AOS — scroll reveal for section headers/cards
    * ------------------------------------------------------- */
   function initAOS() {
@@ -295,6 +345,7 @@
     initPreloader();
     window.__lenis = initSmoothScroll();
     initNavbar();
+    initThemeToggle();
     initAOS();
     initCarousels();
     initServiceFilters();
