@@ -1,0 +1,120 @@
+/* ============================================================
+   AUTH PAGES — login, signup, password reset (django-allauth)
+   Own bundle (imports tokens/reset/components directly, not main.css) —
+   see developed.md "Authentication". allauth's default templates render
+   through small {% element %} partials (h1/p/button/form/etc.) which we've
+   overridden in templates/allauth/ to carry these classes — every page
+   (login/signup/password reset/logout) is styled consistently from just
+   this one file + those element overrides, no per-page CSS needed.
+   ============================================================ */
+@import 'variables.css';
+@import 'base.css';
+@import 'components.css';
+
+body.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg) var(--container-pad);
+  background: var(--surface-1);
+}
+
+.auth-shell {
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.auth-shell__logo { font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; color: var(--text-body); }
+.auth-shell__logo span { color: var(--accent-gold); font-style: italic; }
+
+.auth-messages { width: 100%; }
+.auth-message {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-body);
+  font-size: var(--fs-sm);
+  margin-bottom: 0.5rem;
+}
+
+.auth-card {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-xl) var(--space-lg);
+}
+
+.auth-card__title { font-family: var(--font-display); font-size: 1.75rem; color: var(--text-body); margin-bottom: var(--space-sm); }
+.auth-card__subtitle { font-family: var(--font-display); font-size: 1.1rem; color: var(--text-body); margin: var(--space-lg) 0 var(--space-sm); text-align: center; }
+.auth-card__text { font-size: var(--fs-sm); color: var(--ink-muted); margin-bottom: var(--space-md); line-height: 1.6; }
+.auth-card__text a { color: var(--accent-gold); font-weight: 600; text-decoration: underline; }
+.auth-card__divider { border: none; border-top: 1px solid var(--border-hairline); margin: var(--space-lg) 0 0; }
+.auth-card__alert {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-body);
+  font-size: var(--fs-sm);
+  margin-bottom: var(--space-md);
+}
+
+/* Every form on every allauth page renders via Django's plain form.as_p
+   (see the `fields` element in allauth's templates) — no classes of its
+   own to hook into, so we style by tag/type scoped to .auth-card. */
+.auth-card form p { margin-bottom: var(--space-md); }
+.auth-card form label {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  margin-bottom: 0.35rem;
+}
+.auth-card form input[type='text'],
+.auth-card form input[type='email'],
+.auth-card form input[type='password'] {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-1);
+  color: var(--text-body);
+  font-size: var(--fs-sm);
+}
+.auth-card form input:focus { border-color: var(--gold-deep); outline: none; }
+.auth-card form input[type='checkbox'] { width: auto; margin-right: 0.5rem; }
+.auth-card form p:has(input[type='checkbox']) label { display: inline; text-transform: none; font-weight: 500; letter-spacing: normal; }
+.auth-card form .errorlist {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+  color: #c0392b;
+  font-size: var(--fs-xs);
+}
+[data-theme='dark'] .auth-card form .errorlist { color: #ff8a80; }
+.auth-card form small,
+.auth-card form .helptext {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--ink-muted);
+  margin-top: 0.3rem;
+}
+
+.auth-card .btn,
+.auth-card__btn { width: 100%; }
+.auth-card__btn + .auth-card__btn { margin-top: var(--space-sm); }
+.auth-card__button-group { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-sm); }
+
+.auth-social { list-style: none; padding: 0; margin: var(--space-sm) 0 0; display: flex; flex-direction: column; gap: var(--space-sm); }
+.auth-social__btn { display: flex; align-items: center; justify-content: center; gap: 0.6rem; width: 100%; }
+
+.auth-shell__back { font-size: var(--fs-sm); color: var(--ink-muted); }
+.auth-shell__back:hover { color: var(--accent-gold); }

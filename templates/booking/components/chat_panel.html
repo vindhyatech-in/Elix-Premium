@@ -1,0 +1,28 @@
+{# Phase 1: a minimal, working preview — one scripted bot reply per message. #}
+{# Phase 3: real AI/Support/FAQ tabs, per developed.md "Service Booking App". #}
+<div class="chat-panel" id="chat-panel" data-chat-panel hidden>
+  <div class="chat-panel__header">
+    <div>
+      <strong>Glamour At Home</strong>
+      <span>Usually replies in a few minutes</span>
+    </div>
+    <button type="button" class="chat-panel__close" data-chat-close aria-label="Close chat">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <div class="chat-panel__messages" data-chat-messages>
+    <div class="chat-bubble chat-bubble--bot">
+      Hi! I'm previewing the Glamour At Home assistant — full live chat and FAQ search are launching soon.
+      For anything urgent right now, call <a href="tel:{{ SITE.phone }}">{{ SITE.phone }}</a>.
+    </div>
+  </div>
+
+  <form class="chat-panel__form" data-chat-form>
+    <label for="chat-input" class="sr-only">Message</label>
+    <input type="text" id="chat-input" placeholder="Type a message…" autocomplete="off" data-chat-input>
+    <button type="submit" class="btn-icon" aria-label="Send message">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </form>
+</div>

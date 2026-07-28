@@ -14,6 +14,12 @@ no React/Vue, no frontend build step. Goal of this phase is explicitly
 installs. Every dynamic-looking section is architected to later swap its
 data source for a REST API without touching HTML structure.
 
+A second, structurally distinct page now exists alongside it:
+**`/services-booking/`**, the actual booking application (catalog browsing +
+cart, Phase 1 of 3 — see "Service Booking App" further down). Everything in
+this section and up through "Placeholders" below describes the marketing
+page only; don't assume it applies to the booking app.
+
 ## Stack
 
 - Django 6.0 (see `requirements.txt`), Python 3.12, SQLite (untouched default —
@@ -51,23 +57,41 @@ static assets return 200 (last checked 2026-07-24).
 ## Folder map
 
 ```
-GlamourAtHome/settings.py   INSTALLED_APPS=['core'], TEMPLATES DIRS=[BASE_DIR/'templates'],
-                            STATICFILES_DIRS=[BASE_DIR/'static'], SITE_* constants (brand info)
-GlamourAtHome/urls.py       includes core.urls at '/', serves static in DEBUG
+GlamourAtHome/settings.py   INSTALLED_APPS=['core', 'accounts', 'catalog', 'bookings', django-allauth apps],
+                            TEMPLATES DIRS=[BASE_DIR/'templates'], STATICFILES_DIRS=[BASE_DIR/'static'],
+                            SITE_* constants (brand info) — see "Authentication" for the allauth config block
+GlamourAtHome/urls.py       'accounts/' -> allauth.urls, '' -> bookings.urls (POST /services-booking/book/),
+                            includes core.urls at '/', serves static in DEBUG
+
+catalog/                    Category/Service/ServiceVariant models + admin — the
+                             booking catalog's real backing store. See "Catalog &
+                             Bookings models". migrations/0002 seeds the 12-item catalog.
+bookings/                   Booking/BookingItem models + admin + create_booking view/
+                             urls (POST /services-booking/book/). See "Catalog &
+                             Bookings models".
 
 core/
-  mock_data.py              *** THE FILE TO EDIT FOR CONTENT CHANGES ***
+  mock_data.py              *** THE FILE TO EDIT FOR MARKETING PAGE CONTENT ***
                              One get_*() function per section. Each docstring
                              names the future REST endpoint it stands in for.
+  booking_data.py           Same convention as mock_data.py, but for the Service
+                             Booking app (/services-booking/) — get_booking_categories()/
+                             get_booking_catalog() now query catalog/'s models (same
+                             return shape as before); offers/notifications/trending
+                             searches remain genuine mock data.
+                             See "Service Booking App" section below.
   views.py                  index() builds one big context dict from mock_data.
+                             services_booking() does the same from booking_data,
+                             renders booking/pages/service_booking.html.
                              robots_txt() / sitemap_xml() are hand-rolled views
-                             (no django.contrib.sitemaps — single page, not worth it
+                             (no django.contrib.sitemaps — few pages, not worth it
                              yet; revisit if blog/beautician detail pages are added).
   context_processors.py     site_meta() — injects `SITE` (name/phone/email/social/
                              app links) into every template from settings.py constants.
   templatetags/glamour_extras.py   `times` filter — {% for _ in n|times %} to repeat
-                             a block n times (used for star ratings, QR mock grid).
-  urls.py                   '', 'robots.txt', 'sitemap.xml'
+                             a block n times (used for star ratings, QR mock grid,
+                             booking catalog skeleton cards).
+  urls.py                   '', 'services-booking/', 'robots.txt', 'sitemap.xml'
 
 templates/
   base.html                 <head> via partials/meta.html, preloader, navbar, {% block
@@ -78,24 +102,50 @@ templates/
   sitemap.xml                template rendered by views.sitemap_xml
   partials/                  meta.html (SEO/OG/Twitter/fonts), navbar.html, footer.html,
                              preloader.html, schema.html (LocalBusiness + FAQPage JSON-LD)
-  components/                 one file per section — see "Section map" below
+  components/                 one file per marketing-page section — see "Section map" below
+  booking/                  Service Booking app templates — own layout, not base.html.
+                             See "Service Booking App" section below for the full map.
+    layouts/booking_base.html
+    pages/service_booking.html
+    components/              app_navbar, bottom_nav, search_bar, filter_sidebar, sort_bar,
+                              catalog_grid, catalog_card, quick_view_modal, floating_cart,
+                              notifications_dropdown, profile_dropdown, chat_panel,
+                              booking_drawer (Phase 2 — 5-step booking flow)
+  allauth/                  Overrides of django-allauth's own template partials, not
+                             full pages — see "Authentication" section below.
+    layouts/base.html         page shell (logo, centered .auth-card) every account
+                               page extends, in place of allauth's unstyled default
+    elements/                 h1/h2/p/hr/alert/button/button_group/provider/
+                               provider_list.html — the small partials allauth's
+                               login/signup/password-reset pages are built from
 
 static/
-  css/  variables.css (design tokens) → base.css (reset/typography/a11y) →
-        components.css (buttons/chips/nav/cards/forms/footer) →
-        sections.css (bespoke per-section layout — the bulk of the visual design) →
-        animations.css (preloader/cursor-glow keyframes) →
-        responsive.css (breakpoint overrides not already mobile-first inline)
-        all pulled together by main.css via @import
+  css/  variables.css (design tokens, incl. booking app's --z-* tokens) → base.css
+        (reset/typography/a11y) → components.css (buttons/chips/nav/cards/forms/footer) →
+        sections.css (bespoke per-section layout — the bulk of the marketing page's visual
+        design) → animations.css (preloader/cursor-glow keyframes) → responsive.css
+        (breakpoint overrides not already mobile-first inline)
+        all pulled together by main.css via @import — marketing page only.
+        booking.css and auth.css are SEPARATE bundles (import variables.css +
+        base.css [+ components.css for auth.css] directly) — see "Service
+        Booking App" and "Authentication" sections below.
   js/   main.js        library bootstrapping: preloader, Lenis+ScrollTrigger wiring,
                         navbar scroll/burger state, AOS.init, Swiper instances,
                         service category filter, FAQ accordion, contact/newsletter
-                        form handlers (simulated success — no backend yet), cursor glow
+                        form handlers (simulated success — no backend yet), cursor glow,
+                        theme toggle (shared with the booking app — see below)
         animations.js   bespoke motion: hero canvas orb background, hero headline
                         GSAP reveal, count-up stats (IntersectionObserver + GSAP),
                         "why us" sticky-frame swap (IntersectionObserver), how-it-works
-                        scroll-scrubbed line (ScrollTrigger), before/after drag sliders,
-                        subtle card tilt on hover
+                        scroll-scrubbed line + staggered step reveal (ScrollTrigger),
+                        before/after drag sliders, subtle card tilt on hover
+        booking.js      SEPARATE bundle for the booking app — catalog filter/sort/
+                        search, wishlist, quick view, cart, chat FAB, dropdowns, ripple,
+                        toasts. Exposes window.GlamourBooking for booking_drawer.js.
+        booking_drawer.js   Phase 2 — booking drawer: step navigation/validation,
+                        hand-rolled calendar, Leaflet+OpenStreetMap address map,
+                        localStorage addresses, simulated payment, confirmation.
+                        See "Service Booking App" section below.
   images/ favicon.svg, og-cover.svg — placeholder brand marks (see "Placeholders" below)
 ```
 
@@ -137,6 +187,58 @@ insert a section, re-check its neighbors don't collide on background color.
 Each section root element has a `data-api="/api/v1/..."` attribute matching
 its mock function's docstring — grep for `data-api` to find every future
 integration point in one pass.
+
+## Navbar — reduced to two focal CTAs (added 2026-07-29)
+
+The marketing navbar (`partials/navbar.html`) was deliberately trimmed:
+desktop/mobile nav links dropped from 6/7 down to 4 (Services, Packages,
+How It Works, Stories — Beauticians/FAQs/Contact are still real page
+sections, just no longer in the nav/drawer; reachable by scrolling or
+direct anchor), and the actions area now has exactly two CTAs instead of
+"Contact" + "Get the App": **Download App** (`btn--ghost` → `#download-app`)
+and **Book Now** (`btn--primary` → `{% url 'services_booking' %}`). If more
+nav items get added later, keep re-asking "does this belong in the two-CTA
+focus, or is it better as a page-in-page anchor" rather than letting the
+action area grow back to 3+ competing buttons.
+
+## Marketing → Booking cart handoff (added 2026-07-29)
+
+"Book Now" (`components/featured_services.html`) and "Choose `<package>`"
+(`components/packages.html`) no longer link to `#contact` — they add the
+item to the Service Booking app's cart and hand off to
+`/services-booking/`, landing with the mini-cart already open.
+
+- **Why this works with zero lookup/mapping table**: `mock_data.py`'s
+  `get_featured_services()`/`get_packages()` item `id`s (`hair-spa`,
+  `glow-facial`, `bridal-makeup`, `gel-manicure`, `thai-massage`,
+  `keratin-smoothing`, `essential`, `signature`, `indulgence`) were chosen
+  to match `core/booking_data.py`'s catalog `id`s exactly. **This id
+  parity is now a real cross-file contract, not a coincidence** — if either
+  file's ids are ever renamed/added independently, this handoff silently
+  breaks (the marketing CTA would add a non-existent id to the cart; the
+  booking page would just skip rendering that line item). Keep the two
+  id sets in sync, or add a lookup/validation step if they're ever allowed
+  to diverge.
+- **Mechanism**: each CTA is `<a href="{% url 'services_booking' %}?open_cart=1" data-add-to-booking-cart data-catalog-id="{{ item.id }}">`.
+  `main.js::initMarketingBookButtons()` writes `{id, qty}` into the same
+  `glamour_cart` localStorage key `booking.js` owns (incrementing `qty` if
+  already present) on click, then lets the normal `<a>` navigation proceed
+  — no `preventDefault`/manual redirect needed, since the localStorage
+  write is synchronous. This duplicates ~8 lines of `booking.js`'s
+  `addItem()` logic rather than importing it — the marketing and booking
+  pages are deliberately separate JS bundles (see "Service Booking App"
+  below), and a shared cart-write function isn't worth a new shared file
+  for this little logic.
+- **`?open_cart=1`**: `booking.js::initFloatingCart()` checks this query
+  param after its initial `render()`, calls the mini-cart's own `open()`,
+  and strips the param via `history.replaceState` so a later page refresh
+  doesn't reopen it. This is what makes the item's arrival in the cart
+  actually visible instead of a silent background write.
+- If the marketing site ever needs to add an item type Booking doesn't
+  carry (e.g. a future marketing-only bundle), either add it to
+  `booking_data.py`'s catalog too, or give that specific CTA a plain
+  `#contact` link instead of `data-add-to-booking-cart` — don't point
+  `data-catalog-id` at an id the booking catalog doesn't have.
 
 ## API-ready data flow (how to plug in a real backend later)
 
@@ -329,12 +431,504 @@ practice, not just theoretical inconsistency.
 - `DEBUG=True` and the default Django `SECRET_KEY` in `settings.py` are
   dev-only; rotate the key and set `ALLOWED_HOSTS` before any real deploy.
 
+## Service Booking App — `/services-booking/` (added 2026-07-27)
+
+A second, structurally distinct page from the marketing landing page above:
+the actual booking application (Urban Company/Airbnb/Zomato-style catalog +
+cart + booking flow), not a scroll-page. Built in three phases; **Phase 1
+and Phase 2 exist so far**.
+
+- **Phase 1 (built):** app shell (desktop sticky nav + mobile bottom nav +
+  chat FAB), full catalog browsing — search, filters, sort, quick view,
+  wishlist — and a persistent localStorage-backed cart.
+- **Phase 2 (built, 2026-07-28):** the 5-step booking drawer (address →
+  date → booking type/time → payment → summary/confirm), opened from the
+  cart's "Proceed to Booking" button. **Built deliberately without real
+  Google Maps or Razorpay keys** — the user explicitly declined to provide
+  either — so the address step uses a free/keyless Leaflet+OpenStreetMap
+  map instead of Google Maps, and payment is a simulated checkout instead
+  of real Razorpay. This is not a temporary stopgap; see the dedicated
+  subsection below before "upgrading" either.
+- **Phase 3 (not built):** full chat (AI/Support/FAQ tabs — Phase 1 only has
+  a scripted single-reply preview), real notifications backend, a wishlist
+  page, and a bookings dashboard (upcoming/completed/cancelled/rebook/review).
+
+### Architecture
+
+- **No new Django app** — the project stays single-app (`core`) by design.
+  `core/booking_data.py` is a sibling to `mock_data.py` (same `get_*()`-per-
+  endpoint convention, own docstrings) so the marketing data file stays
+  untouched. `core/views.py::services_booking` renders
+  `booking/pages/service_booking.html`.
+- **Templates** live flat under `templates/booking/{layouts,components,pages}/`,
+  matching the existing flat `templates/{components,partials}/` convention —
+  no per-app template namespacing is used anywhere in this project.
+- **Own layout, not `base.html`**: `booking/layouts/booking_base.html` is a
+  sibling to `templates/base.html`, not an extension of it — different
+  navbar/footer entirely (this page has no footer at all; the app shell IS
+  the chrome). It reuses the same no-flash theme-detection script as
+  `base.html` (dark mode still applies here — same tokens, same domain) and
+  the same vendor CDN set, **plus Choices.js** (new — for the sort/category
+  `<select>`, the only select-enhancement library in the stack).
+- **Own static bundles**, not appended to the marketing ones:
+  `static/css/booking.css` (imports `variables.css` + `base.css` for tokens/
+  reset only, then all app-shell/catalog-specific rules — follows the exact
+  same theme-aware token rules documented in "Dark mode / theming" above) and
+  `static/js/booking.js` (self-contained IIFE, same style as `main.js`/
+  `animations.js`). `main.js` is *also* loaded on this page for the parts
+  that genuinely are shared (Lenis smooth scroll, theme toggle, AOS
+  bootstrap) — every other main.js function targets marketing-only elements
+  (preloader, hero navbar/drawer, carousels, accordion, lead forms) and
+  no-ops harmlessly here since those elements don't exist on this page.
+- **Search lives in the catalog content, not the navbar** (changed
+  2026-07-30 — it was briefly navbar-inline on desktop + an icon-triggered
+  overlay on mobile; the mobile version had no visible entry point at all
+  in an earlier pass, then a toggle icon, before landing here). `search_bar.html`
+  is included once in `catalog_grid.html` inside `.catalog__search`, directly
+  above the sort bar, and stays visible at every breakpoint — no mobile-only
+  toggle/JS needed. If a future change moves it back into the navbar, remove
+  `.catalog__search` and re-add `margin-left: auto` removal from
+  `.app-navbar__actions` (added specifically to fill the gap search used to
+  occupy).
+- **Mobile filter sidebar has two entry points on purpose**: the bottom
+  nav's "Categories" icon (original, still works) and a "Filters" button
+  in `sort_bar.html`, mobile-only (`.sort-bar__filter-btn`, hidden on
+  desktop since the sidebar's already permanently visible there). Both
+  carry `[data-filters-toggle]` and open the same `#filter-sidebar` panel —
+  `initMobileFilters()` in `booking.js` uses `querySelectorAll` (not
+  `querySelector`) specifically so any number of toggles stay in sync; if
+  a third entry point is ever added, it only needs the same attribute, no
+  JS changes. The redundancy is deliberate — "Categories" alone undersold
+  what's actually behind it (price/rating/duration/etc., not just
+  categories), so the sort-bar button is the more discoverable one.
+- **Unified catalog**: single services and packages are one list —
+  `get_booking_catalog()` — each item tagged `kind: 'service' | 'package'`,
+  so filter/sort/search/cart/wishlist all treat every item generically.
+  `discount_pct` and `duration_label` are derived server-side (not hand-
+  entered) from `price`/`mrp`/`duration_mins` to avoid drift. The catalog is
+  embedded once as JSON via Django's `json_script` filter
+  (`{{ booking_catalog|json_script:"catalog-data" }}` in `catalog_grid.html`)
+  — `booking.js` parses it once (`getCatalog()`, memoized) as the single
+  source of truth for filtering/sorting/search/quick-view/cart rendering;
+  server-rendered `.catalog-card` DOM nodes are then just reordered/hidden
+  in place, never re-rendered from a JS template.
+- **State**: cart (`glamour_cart`), wishlist (`glamour_wishlist`), and
+  recent searches (`glamour_recent_searches`) persist to `localStorage` —
+  proven pattern already used for the theme toggle. There's no backend/auth
+  yet, so this is the correct place for it until Phase 2/3.
+- **"Coming soon" stubs**: any nav/menu destination not built in this phase
+  (Bookings, Wishlist page, Addresses, Notification Settings, Support,
+  Logout, "Proceed to Booking") carries `data-coming-soon="<Feature name>"`;
+  a single delegated handler in `booking.js` shows a toast instead of a dead
+  link. Grep `data-coming-soon` to find every Phase 2/3 hookup point.
+- **Static image reuse**: Phase 1 has no new photography — the catalog
+  reuses the marketing site's existing `static/images/service-*.jpg` and
+  `portfolio-*.jpg` files (see `core/booking_data.py`), which is why some
+  package/service photos are thematically approximate rather than exact.
+  Swap for real catalog photography alongside the other marketing
+  placeholders noted above.
+
+### Booking drawer (Phase 2) — architecture
+
+- **Files**: `templates/booking/components/booking_drawer.html` (right-side
+  slide-in panel, same slide-in mechanics as the marketing `mobile-drawer`)
+  plus `static/js/booking_drawer.js` (own file, not folded into `booking.js`
+  — "catalog browsing" and "booking flow" stay separate concerns, same
+  rationale as the existing `main.js` vs `animations.js` split).
+- **Shared surface**: `booking.js` exposes `window.GlamourBooking = {
+  getCart, saveCart, getCatalog, formatCurrency, showToast,
+  getAppliedDiscountRate }` at the end of its `DOMContentLoaded` handler.
+  `booking_drawer.js` reads/clears the cart and reads the mini-cart's
+  applied-coupon discount rate through this instead of duplicating cart
+  logic. `saveCart()` dispatches a `glamour:cart-changed` window event
+  rather than calling the mini-cart's render function directly — that's
+  what keeps the mini-cart panel in sync when `booking_drawer.js` clears
+  the cart on confirm, without either file needing to know the other's
+  internals. `main.js`/`booking.js`/`booking_drawer.js` are all `defer`red
+  in that order, so `GlamourBooking` is guaranteed to exist by the time
+  `booking_drawer.js`'s own `DOMContentLoaded` handler runs (listeners for
+  the same event fire in registration order, and registration order
+  follows script/source order).
+- **No beautician selection anywhere** — carried over from the original
+  spec; don't add it even as a "nice to have".
+- **Addresses**: `glamour_addresses` in `localStorage` (own key, separate
+  from cart/wishlist), each `{id, label, text, pincode, lat, lng}`. `lat`/
+  `lng` come from a Leaflet map click; there's no reverse-geocoding (no key
+  for that either), so the customer still types the address line manually
+  — the pin is just a visual/lat-lng convenience, not parsed into the text.
+- **Calendar**: hand-rolled month-grid (`renderCalendar()` in
+  `booking_drawer.js`), not a library — consistent with this project's
+  "no dependency for something easily hand-built" pattern (the FAQ
+  accordion and before/after slider are the same story). Past dates are
+  disabled; no maximum-future-date cap exists yet.
+- **Step validation**: `validateStep(n)` gates the Next button reactively
+  (disabled until each step's required selection is made) — see
+  `updateNextButtonState()`. Step 4 (payment) requires
+  `state.paymentConfirmed`, which is set immediately for "Pay At Home" but
+  only after the simulated "Pay Now" processing delay resolves.
+- **Progress persistence**: closing the drawer via the × button or backdrop
+  does **not** reset in-progress selections — reopening resumes at the last
+  active step. State only resets after a completed booking ("Done") or if
+  the cart becomes empty while the drawer is closed (stale item references
+  would otherwise dangle). This was a deliberate UX choice, not an oversight
+  — revisit only if it reads as confusing in practice.
+- **Confirmation**: a mock booking ID (`GAH######`) is generated
+  client-side (`Math.random()`), the cart is cleared via
+  `GlamourBooking.saveCart([])`, and no booking record persists anywhere
+  (no backend yet) — closing/reloading loses it. This is the same
+  "no-backend mock" scope boundary as everything else in Phase 1/2.
+
+### `.env` (Google Maps / Razorpay — reserved, not currently used)
+
+`requirements.txt` includes `python-decouple`; `GlamourAtHome/settings.py`
+reads `GOOGLE_MAPS_API_KEY` / `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` via
+`config(..., default='')` — safe empty defaults, **nothing consumes them**.
+`.env.example` documents the exact variable names; `.env` is already
+gitignored.
+
+**Important**: Phase 2 (the booking drawer) is already built and works
+without these — the address step uses free/keyless Leaflet + OpenStreetMap,
+and payment is a simulated checkout. This was an explicit user decision
+("still i will not provide API keys for map and razorpay"), not a blocker
+that stalled the work. Do **not** assume adding real keys is required to
+finish Phase 2 — it's already finished. If real Google Maps / Razorpay
+integration is wanted later, that's a distinct, separately-scoped upgrade:
+swap Leaflet's tile layer + pin-drop for the Google Maps JS API in
+`booking_drawer.js::initMap()`, and replace the `[data-pay-now-simulate]`
+click handler's `setTimeout` with a real Razorpay Checkout.js call — both
+are isolated enough to swap without touching the rest of the drawer.
+
+### A CSS gotcha worth knowing before touching `booking.css`
+
+Several components toggle visibility with the plain `hidden` HTML attribute
+(cart rows, search-panel sections, empty states) while also being styled
+with an authored `display: flex/grid` rule for when they ARE visible. An
+authored `display` rule beats the browser's built-in `[hidden] { display:
+none }` at equal specificity (author styles always win over the UA
+stylesheet), which silently makes `el.hidden = true` do nothing — this was a
+real bug (the cart's "Discount" row stayed visible showing "-₹0" even when
+no coupon was applied). Fixed with a blanket `[hidden] { display: none !important; }`
+near the top of `booking.css`. If a new toggled-via-`hidden` element doesn't
+disappear as expected, this is almost certainly why — don't add a competing
+`display` override, rely on the attribute.
+
+### `position: sticky` silently didn't work anywhere on this page until 2026-07-30
+
+`.filter-sidebar` (Phase 1) and `.catalog__toolbar` (search + result count +
+Filters/Sort, added 2026-07-30) both use `position: sticky` — neither
+actually stuck on scroll; both just scrolled away with the page, and this
+went unnoticed through all of Phase 1/2 because every prior CDP check only
+captured a screenshot at the top of the page, never after scrolling.
+
+**Root cause**: `base.css` (shared with the marketing site) sets
+`body { overflow-x: hidden; }`. Per the CSS spec, when one axis's overflow
+is non-`visible` and the other is left `visible` (the default), the
+`visible` one computes to `auto` instead — so `body` silently became
+`overflow-x: hidden; overflow-y: auto`, which changes body into an
+overflow-participating box and breaks `position: sticky` for its
+descendants (a well-documented CSS gotcha, not a Lenis issue — verified via
+CDP that Lenis wasn't touching any transforms/overflow here).
+
+**Fix**: `body.booking-app` in `booking.css` sets `overflow-x: clip;`
+instead of relying on the inherited `hidden` — `clip` hides the same
+horizontal overflow without triggering the visible→auto conversion. Scoped
+to the booking app only (didn't touch `base.css`, so the marketing site —
+which has no sticky elements, just `position: fixed` — is unaffected).
+
+**Lesson for future CDP verification passes on this page**: always check
+element position/rect *after* scrolling, not just at the initial viewport —
+a screenshot at scroll-position-zero cannot catch a broken `position:
+sticky`, since sticky and static/relative look identical until you scroll
+past the element's natural position.
+
+### Two more real bugs found via CDP click-tracing while building Phase 2
+
+- **Never reuse a `components.css` class name for a new booking-app
+  element, even one that "sounds generic".** The booking drawer's backdrop
+  was originally classed `drawer-backdrop drawer-backdrop--booking`,
+  intending `--booking` as a modifier — but `.drawer-backdrop` already
+  exists in `components.css` for the marketing mobile-nav drawer, with
+  `z-index: 999990 !important`. That `!important` silently won over this
+  element's intended `z-index: calc(var(--z-drawer) - 1)`, making the
+  backdrop render *above* the drawer's own content — clicks meant for the
+  Leaflet map inside the drawer were actually landing on the backdrop
+  behind it (confirmed by dispatching a synthetic click and checking
+  `document.elementFromPoint()` before/after: it resolved to the backdrop
+  div, not the map). Renamed to the standalone `.booking-drawer-backdrop`
+  (no shared base class with the marketing drawer at all) to fix. Before
+  giving a new booking-app element a name that overlaps with an existing
+  marketing class, grep `components.css`/`sections.css` for it first.
+- **A `saveCart([])` call inside your own confirmation flow can trigger
+  your own "cart emptied externally" safety net and undo itself.**
+  `confirmBooking()` clears the cart via `GlamourBooking.saveCart([])`,
+  which dispatches `glamour:cart-changed` *synchronously* — the same event
+  `booking_drawer.js` listens for elsewhere to detect the cart being
+  emptied *outside* the drawer (e.g. from the mini-cart while the drawer is
+  closed) and reset stale state. Without a guard, that listener fired
+  immediately after `confirmBooking()` set up the confirmation screen,
+  treated it as an external clear, and called `resetState()` — silently
+  swapping the confirmation screen back to step 1 in the same tick (only
+  caught because the CDP screenshot right after "confirm" showed step 1
+  instead of the confirmation UI). Fixed with a `justConfirmed` flag set
+  before `saveCart([])` in `confirmBooking()` and checked (and cleared) in
+  the listener/`resetState()` — see `booking_drawer.js`. The general lesson:
+  when two independent pieces of code react to the same shared event,
+  double-check that one's own action doesn't re-trigger the other's
+  "something changed unexpectedly" logic.
+
+## Authentication (added 2026-07-30)
+
+Built before Phase 3 (chat/notifications backend/wishlist page/bookings
+dashboard are meaningfully more useful once tied to a real logged-in user).
+Login, signup, logout, and password reset are fully functional now; Google
+and Apple sign-in buttons render but won't complete a real login until real
+credentials are dropped into `.env` — same "scaffold now, wire later"
+pattern as `GOOGLE_MAPS_API_KEY`/`RAZORPAY_KEY_ID` in the booking app.
+
+- **Library: `django-allauth[socialaccount]`** (note the extra — plain
+  `django-allauth` doesn't pull in `requests`/`PyJWT`/`oauthlib`, which the
+  Google/Apple providers need; installing without it crashes at startup with
+  `ModuleNotFoundError`). `requests` is consequently now a **real, permanent
+  project dependency** — unlike earlier phases, don't uninstall it after a
+  CDP testing session; only `websocket-client` is test-only.
+- **No custom User model.** allauth's `ACCOUNT_LOGIN_METHODS = {'email'}` +
+  `ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']` give
+  email-based login/signup on top of Django's default `auth.User` — no
+  `AUTH_USER_MODEL` swap needed (which would've been painful *after*
+  migrations exist, but was never necessary here at all).
+- **No custom adapter needed either.** allauth's `get_login_redirect_url()`/
+  `get_logout_redirect_url()` fall back to Django's own standard
+  `LOGIN_REDIRECT_URL`/`LOGOUT_REDIRECT_URL` settings (both point at
+  `/services-booking/`) — a project-specific `AccountAdapter` subclass was
+  planned but turned out to be unnecessary; the `accounts` app exists purely
+  as a placeholder for future account-specific model/signal work.
+- **Credentials via `SOCIALACCOUNT_PROVIDERS`** (settings dict reading
+  `.env` through the existing `python-decouple` pattern), not
+  database-managed `SocialApp` records. `.env.example` has
+  `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET` and
+  `APPLE_OAUTH_CLIENT_ID`/`_TEAM_ID`/`_KEY_ID`/`_PRIVATE_KEY` (Services ID/
+  Team ID/Key ID/the `.p8` file's contents respectively). Apple's
+  `certificate_key` is nested under `APP['settings']` in
+  `SOCIALACCOUNT_PROVIDERS`, not top-level in `APP` — the top-level spot
+  still works but logs a deprecation warning.
+- **Password reset emails use the console backend** (`EMAIL_BACKEND =
+  'django.core.mail.backends.console.EmailBackend'`) — reset links print to
+  the `runserver` terminal instead of sending. Swap `EMAIL_BACKEND` (+ add
+  SMTP host/port/credentials settings) for real delivery; no template/view
+  changes needed.
+- **Templates override allauth's `{% element %}` partials, not full
+  pages.** allauth 65.x renders every account page (login/signup/password
+  reset/logout) through small reusable template partials
+  (`allauth/elements/h1.html`, `p.html`, `button.html`, `form.html`, etc. —
+  all shipped **completely unstyled**, no classes at all, by design, meant
+  to be overridden) rather than one big template per page. We override just
+  `templates/allauth/layouts/base.html` (the page shell — logo, centered
+  `.auth-card`, no navbar/footer) plus `templates/allauth/elements/{h1,h2,p,
+  hr,alert,button,button_group,provider,provider_list}.html` (adding our own
+  classes). Every current and *future* allauth page (change-password,
+  email-change, MFA, etc. if ever enabled) automatically inherits this
+  styling with zero additional template files — don't write a full custom
+  template per allauth view; find the `{% element %}` tag it uses and style
+  that partial instead. `button.html` reads `attrs.tags` (a list) to decide
+  `.btn--primary` vs `.btn--ghost` — e.g. the password-reset-from-key page's
+  "Cancel" button passes `tags="link,cancel"` and renders ghost.
+- **Forms render via Django's plain `form.as_p`** (allauth's `fields`
+  element just calls `attrs.form.as_p`) — no per-field classes to hook
+  into, so `auth.css` styles `input[type=...]`/`label`/`.errorlist` etc.
+  scoped under `.auth-card form` by tag/attribute instead.
+- **`static/css/auth.css`** is its own bundle (imports `variables.css` +
+  `base.css` + `components.css` directly, not `main.css`) — same
+  per-surface-bundle pattern as `booking.css`.
+- **Profile dropdown is now real**: `templates/booking/components/
+  profile_dropdown.html` branches on `user.is_authenticated` (available
+  everywhere via the existing `django.contrib.auth.context_processors.auth`
+  context processor — no view changes needed). Signed out → Sign In/Create
+  Account links with the current page as `?next=`. Signed in → real email +
+  a working Logout (POSTs to `account_logout`). Profile/Bookings/Wishlist/
+  Addresses/Notification Settings/Support stay `data-coming-soon` — still
+  Phase 3 territory. `app_navbar.html`'s avatar shows the user's email
+  initial when authenticated, a generic person icon when not.
+- **This is the project's first real migration.** `python manage.py
+  makemigrations && migrate` has now actually been run (previously only
+  Django's framework-default tables existed, unapplied). The default
+  `django.contrib.sites` Site record was updated from `example.com` to
+  `glamourathome.com`/`SITE_NAME` — if `db.sqlite3` is ever recreated from
+  scratch, redo that (`Site.objects.get(pk=1)`, set `domain`/`name`) or
+  allauth's emails will show `example.com` in links.
+
+## Catalog & Bookings models (added 2026-07-31)
+
+The booking catalog and the booking drawer's "Confirm Booking" step are no
+longer mock — two new apps, `catalog` and `bookings`, back them with real
+models and the project's second/third real migration sets (after
+Authentication). Marketing (`mock_data.py`) is untouched.
+
+- **`catalog` app** — `Category` (slug/name/icon, same shape the mock
+  categories always had), `Service` (the conceptual offering — slug, name,
+  category FK, kind `service`/`package`, description, photo, tone, rating,
+  reviews_count, popularity_score, badges JSONField, available_today,
+  is_active), `ServiceVariant` (the actual priced/bookable SKU — service FK,
+  label, duration_mins, price, mrp, is_default, is_active, sort_order).
+  **Why the split**: a `Service` can have multiple price/duration
+  combinations (e.g. "60 min" vs "90 min" facial) without duplicating name/
+  description/category per price point — `Service.default_variant` picks
+  which one a catalog card shows. **Only one variant per service is seeded
+  today** (`is_default=True`) — no variant-picker UI exists yet; that's a
+  distinct future task, not implied by this schema existing.
+- **`Service.slug` = the pre-existing mock catalog ids, unchanged**
+  (`hair-spa`, `essential`, etc.) — **this is now a real, grep-able
+  cross-file contract**: marketing `mock_data.py`'s service/package `id`
+  fields must keep matching these slugs, or the marketing "Book Now"/
+  "Choose `<package>`" → booking-cart handoff (see "Marketing → Booking
+  cart handoff" above) silently breaks — a cart entry would reference a
+  slug with no matching `Service`. Don't rename a `Service.slug` without
+  updating `mock_data.py`'s matching id in the same change.
+- **`core/booking_data.py::get_booking_categories()`/`get_booking_catalog()`
+  kept their exact names and exact return shape** (list of dicts, same
+  keys as always) — only their *implementation* changed, from hardcoded
+  lists to ORM queries shaped into the same dicts.
+  `core/views.py::services_booking` needed **zero changes**; neither did
+  any template or `booking.js`/`booking_drawer.js` filter/sort/cart logic.
+  `get_booking_catalog()` explicitly orders by `id` (creation order), not
+  `Service.Meta.ordering` (`-popularity_score`) — `booking.js`'s "Newest"
+  sort assumes the embedded catalog array reflects chronological order and
+  reverses it; sorting by popularity here would silently break that option.
+  `discount_pct`/`duration_label` are `ServiceVariant` properties (derived,
+  not stored), same anti-drift principle the mock version used.
+  **Decimal → float gotcha**: `price`/`mrp`/`rating` are explicitly cast to
+  `float()` before they reach the dict — `json_script` (how this data
+  reaches `booking.js`, via `{{ booking_catalog|json_script:"catalog-data" }}`
+  in `catalog_grid.html`) serializes `Decimal` through `DjangoJSONEncoder`
+  as a *string*; left as Decimal, `item.price * qty` in JS would silently
+  become string concatenation instead of multiplication.
+  `get_booking_offers()`/`get_notifications_mock()`/`get_trending_searches()`
+  remain genuine mock data — not asked to become models yet.
+- **`catalog/migrations/0002_seed_catalog.py`** is a data migration seeding
+  the 6 categories + 12 services/variants with the exact values the old
+  mock functions hardcoded — `python manage.py migrate` reproduces the
+  full catalog from scratch, no separate fixture-loading step.
+- **`bookings` app** — `Booking` (booking_number unique/auto-generated with
+  a collision-check loop — same `GAH######` shape the old client-side mock
+  id used, user FK, **snapshotted** address fields — not just an FK to a
+  saved address, so a booking stays accurate if the address is later
+  edited/deleted — scheduled_date, booking_type/time_slot/exact_time,
+  payment_method/payment_status, **snapshotted** subtotal/discount_amount/
+  total_amount, coupon_code, status), `BookingItem` (booking FK,
+  service_variant FK nullable-on-delete, **snapshotted** name/price/
+  duration, quantity). Both apps' admin registrations include inlines
+  (`ServiceVariant` under `Service`, `BookingItem` under `Booking`).
+- **`POST /services-booking/book/`** (`bookings/views.py::create_booking`,
+  `bookings/urls.py` included at root) — **recomputes subtotal/discount/
+  total server-side from real `ServiceVariant` prices, never trusts
+  client-sent totals** (a stale cart or tampered request must not be able
+  to under/overcharge). Coupon rates (`GLAM10`/`WEEKDAY15`/`BUNDLE20`) are
+  duplicated in a small Python dict (`COUPON_RATES`) matching `booking.js`'s
+  `COUPONS` — an accepted, small-drift-risk tradeoff rather than building a
+  shared coupon API for three hardcoded codes; if a code is ever added/
+  changed, update both places. Returns JSON (`{ok, booking_number}` or
+  `{ok: false, error}`) rather than redirecting on auth failure — a
+  redirect response can't be handled by `fetch()` the way an HTML page load
+  can, and this is called from JS, not a form submission.
+- **Booking creation requires login; browsing/cart do not.** Gated in
+  `booking_drawer.js` at the `[data-proceed-to-booking]` click — **before**
+  the drawer opens, not buried at the final Confirm step (filling all 5
+  steps only to be told "please sign in" would be a worse experience). An
+  anonymous user with cart items gets redirected to `account_login` with
+  `?next=` back to the booking page; the cart (`localStorage`) survives the
+  redirect since it isn't tied to the session.
+  `window.body.dataset.authenticated`/`data-login-url` are set in
+  `booking_base.html` from `request.user`/`{% url 'account_login' %}`.
+  `create_booking` itself also re-checks `request.user.is_authenticated`
+  (session could expire mid-flow) rather than relying solely on the
+  JS-level gate.
+- **`getCsrfToken()`** in `booking_drawer.js` reads the `csrftoken` cookie
+  Django's CSRF middleware already sets — Django's standard AJAX CSRF
+  pattern, sent back as the `X-CSRFToken` header on the `fetch()` POST.
+- **`GlamourBooking.getAppliedCouponCode()`** was added to `booking.js`'s
+  shared export (alongside the existing `getAppliedDiscountRate()`) so
+  `confirmBooking()` can send the actual coupon *code* string to the server
+  for it to re-validate/re-apply, not just the numeric rate.
+
+## Real catalog data (added 2026-08-01)
+
+The client's actual price list started arriving and replaced the fictional
+demo catalog (`catalog/migrations/0004_replace_demo_with_real_catalog.py`).
+**More real data batches are expected** — this is the first, not the last.
+
+- **Removed**: the 9 demo single-services + their 5 categories (hair, skin,
+  makeup, nails, spa — `hair-spa`, `glow-facial`, `bridal-makeup`,
+  `gel-manicure`, `thai-massage`, `keratin-smoothing`, `threading-brows`,
+  `classic-pedicure`, `head-shoulder-massage`).
+- **Kept, deliberately**: the `package` category + its 3 demo services
+  (`essential`/`signature`/`indulgence`). None of the real data received so
+  far includes any package/bundle service — per explicit user decision, the
+  demo packages stay until real package data exists, so the marketing
+  homepage's "Packages" section isn't left empty. **When real package data
+  arrives, replace these three specifically** (they're the one remaining
+  piece of fictional content).
+- **Added**: 6 new categories (Threading, Peel-Off Wax, Body Wax, Bikini
+  Wax, Basic Facial, Premium Facial), 38 services, 68 variants total.
+- **Body Wax and Bikini Wax are this catalog's first genuine multi-variant
+  services** — e.g. `body-wax-full-arms` has 5 variants (Honey/Chocolate/
+  Rica Wax, Chocolate/Rica Roll-On) at 5 different prices, exactly the case
+  `ServiceVariant` was built for (see "Catalog & Bookings models" above).
+  Only the cheapest (Honey Wax) is `is_default=True` and shows on the
+  catalog card — **there is still no variant-picker UI**, so a customer
+  currently can't choose Chocolate/Rica/Roll-On from the storefront even
+  though the data exists and is admin-editable. This is now a real, not
+  theoretical, gap — worth prioritizing if/when a multi-variant service
+  actually needs to sell its non-default variants.
+- **Fields NOT provided by the client, so estimated/defaulted** — check
+  these in admin and correct as real numbers become available:
+  - `duration_mins` for every Threading/Peel-Off Wax/Body Wax/Bikini Wax
+    service — the client's price list had no duration column for these.
+    Basic/Premium Facial durations ARE client-provided (exact).
+  - `photo`/`tone` — placeholder stock images reused from the existing
+    marketing photo set (see `PHOTOS`/`TONES` dicts in the migration),
+    **not real photos of this client's actual work**. Same "replace before
+    launch" status as every other placeholder in this file.
+  - `rating`/`reviews_count`/`popularity_score` — all `0`, not fabricated.
+    `catalog_card.html` and `templates/booking/components/
+    quick_view_modal.html`'s JS (`initQuickView()` in `booking.js`) both
+    hide the ★ rating badge entirely when `reviews_count` is falsy, instead
+    of showing "★0.0 (0)" on every real service. `featured_services.html`
+    (marketing) does the same, gated on `service.rating` being falsy (that
+    mock shape has no separate reviews_count field).
+- **Marketing homepage's Featured Services** (`mock_data.py::
+  get_featured_services()`) were replaced with 6 real services spanning the
+  new categories (one threading, two waxing, two facial, one premium
+  bridal facial) — ids match the corresponding `catalog.Service.slug`
+  exactly, preserving the "Book Now" → booking-cart handoff contract.
+  `get_service_categories()` (the marketing page's filter chips) was
+  simplified to `['All', 'Threading', 'Waxing', 'Facial']` — this is a
+  client-side-only convenience chip set, not required to mirror
+  `catalog.Category` slugs 1:1.
+- **Migration reversibility is partial by design**: `0004`'s reverse
+  function removes what it added but does **not** resurrect the deleted
+  demo services/categories — re-run migration `0002`'s logic by hand if the
+  demo catalog is ever needed again (unlikely, but noted in the migration's
+  own docstring too).
+
 ## Current state vs. future work (explicitly out of scope this phase)
 
-- No booking flow, no user auth, no payment integration — by design (see
-  project goal at the top of this file).
-- No Django models/migrations beyond the framework defaults — all content
-  is Python dicts in `mock_data.py`. Don't add models speculatively; add
-  them when the real API/admin-editable-content work actually starts.
+- Marketing site: no payment integration — by design (see project goal at
+  the top of this file). Auth now exists project-wide (see "Authentication"
+  above) but the marketing site itself has no login UI — only the booking
+  app's profile dropdown surfaces it.
+- Booking app: Phase 1 and 2 done (see above); catalog + bookings now
+  persist to real models too (see "Catalog & Bookings models"). No real
+  Maps/Razorpay wiring (by choice, not a gap — Phase 2 works without them),
+  no real chat/notifications backend, no wishlist page, no bookings
+  *dashboard UI* yet (Phase 3) — though the `Booking`/`BookingItem` data it
+  would read from already exists and is admin-manageable right now.
+- Marketing site (`mock_data.py`) still has no models — only the booking
+  app's catalog/bookings do (see "Catalog & Bookings models"). Don't
+  migrate marketing content to models speculatively; do it when the
+  marketing side actually needs admin-editable content too.
+- Real catalog data is partway migrated (see "Real catalog data" above) —
+  the demo `package` category/services are the one remaining piece of
+  fictional content, kept only because no real package data exists yet.
+  More real service batches are expected; each becomes its own data
+  migration following `0004`'s pattern.
 - No DRF app scaffolded yet (`djangorestframework` is commented out in
   `requirements.txt`) — uncomment and `pip install` when that work begins.

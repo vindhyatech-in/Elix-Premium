@@ -70,78 +70,95 @@ def get_value_pillars():
 
 
 def get_service_categories():
-    """Filter pills for Featured Services. Endpoint: GET /api/v1/services/categories/"""
-    return ['All', 'Hair', 'Skin', 'Makeup', 'Nails', 'Spa & Massage']
+    """
+    Filter pills for Featured Services. Endpoint: GET /api/v1/services/categories/
+
+    Simplified/friendly labels, not a 1:1 mirror of catalog.Category slugs —
+    this filter is purely a marketing-page, client-side convenience (see
+    featured_services.html's data-category chip matching), independent of
+    the real Category model the booking app's catalog uses.
+    """
+    return ['All', 'Threading', 'Waxing', 'Facial']
 
 
 def get_featured_services():
-    """Endpoint: GET /api/v1/services/featured/"""
+    """
+    Endpoint: GET /api/v1/services/featured/
+
+    Six real services (added 2026-08-01, replacing the fictional demo set)
+    picked to span the real catalog's categories — ids match `Service.slug`
+    in the `catalog` app exactly, since "Book Now" writes these ids straight
+    into the booking cart (see developed.md "Marketing → Booking cart
+    handoff" and "Real catalog data"). `rating` is intentionally `None` —
+    no fabricated ratings for a real business; featured_services.html hides
+    the star badge when falsy.
+    """
     return [
         {
-            'id': 'hair-spa',
-            'category': 'Hair',
-            'name': 'Signature Hair Spa',
-            'description': 'Deep-conditioning ritual with scalp therapy and keratin finish.',
-            'duration': '75 min',
-            'price': 1499,
-            'rating': 4.9,
-            'tone': 'espresso',
-            'photo': 'images/service-hair-spa.jpg',
-        },
-        {
-            'id': 'glow-facial',
-            'category': 'Skin',
-            'name': 'Radiance Glow Facial',
-            'description': 'Dermat-approved brightening facial with cold-roller finish.',
-            'duration': '60 min',
-            'price': 1799,
-            'rating': 4.8,
+            'id': 'threading-full-face-with-eyebrows',
+            'category': 'Threading',
+            'name': 'Full Face Threading (With Eyebrows)',
+            'description': 'Precision threading for a clean, defined look — brows included.',
+            'duration': '25 min',
+            'price': 239,
+            'rating': None,
             'tone': 'blush',
-            'photo': 'images/service-facial.jpg',
+            'photo': 'images/portfolio-5.jpg',
         },
         {
-            'id': 'bridal-makeup',
-            'category': 'Makeup',
-            'name': 'Editorial Bridal Makeup',
-            'description': 'HD airbrush makeup with a dedicated trial session included.',
-            'duration': '120 min',
-            'price': 8999,
-            'rating': 5.0,
-            'tone': 'gold',
-            'photo': 'images/service-bridal-makeup.jpg',
-        },
-        {
-            'id': 'gel-manicure',
-            'category': 'Nails',
-            'name': 'Gel Luxe Manicure',
-            'description': 'Long-wear gel finish with cuticle spa and hand massage.',
-            'duration': '45 min',
-            'price': 999,
-            'rating': 4.7,
+            'id': 'peel-off-wax-full-face',
+            'category': 'Waxing',
+            'name': 'Full Face Peel-Off Wax',
+            'description': 'Gentle peel-off wax for smooth, hair-free skin all over the face.',
+            'duration': '35 min',
+            'price': 389,
+            'rating': None,
             'tone': 'rose',
-            'photo': 'images/service-manicure.jpg',
+            'photo': 'images/portfolio-3.jpg',
         },
         {
-            'id': 'thai-massage',
-            'category': 'Spa & Massage',
-            'name': 'Thai Deep-Tissue Massage',
-            'description': 'Full-body therapeutic massage with aromatherapy oils.',
-            'duration': '90 min',
-            'price': 2299,
-            'rating': 4.9,
+            'id': 'body-wax-full-legs',
+            'category': 'Waxing',
+            'name': 'Full Legs Wax',
+            'description': 'Full-leg waxing with your choice of wax type, done at home.',
+            'duration': '45 min',
+            'price': 349,
+            'rating': None,
             'tone': 'espresso',
             'photo': 'images/service-massage.jpg',
         },
         {
-            'id': 'keratin-smoothing',
-            'category': 'Hair',
-            'name': 'Keratin Smoothing',
-            'description': 'Frizz-free, salon-smooth finish that lasts up to 4 months.',
-            'duration': '150 min',
-            'price': 5499,
-            'rating': 4.8,
+            'id': 'body-wax-full-body',
+            'category': 'Waxing',
+            'name': 'Full Body Wax',
+            'description': 'Complete full-body waxing ritual, from arms to legs to back.',
+            'duration': '90 min',
+            'price': 1100,
+            'rating': None,
+            'tone': 'espresso',
+            'photo': 'images/service-massage.jpg',
+        },
+        {
+            'id': 'facial-glow-vitamin-c',
+            'category': 'Facial',
+            'name': 'Glow Facial Vitamin C',
+            'description': 'Instant glow, nourishes & improves radiance.',
+            'duration': '70 min',
+            'price': 1249,
+            'rating': None,
             'tone': 'blush',
-            'photo': 'images/service-keratin.jpg',
+            'photo': 'images/service-facial.jpg',
+        },
+        {
+            'id': 'facial-o3-bridal',
+            'category': 'Facial',
+            'name': 'O3 Bridal Facial (Vitamin C)',
+            'description': 'Instant bridal glow, brightens skin — for your big day.',
+            'duration': '85 min',
+            'price': 2189,
+            'rating': None,
+            'tone': 'gold',
+            'photo': 'images/compare-facial-after.jpg',
         },
     ]
 
@@ -214,7 +231,8 @@ def get_how_it_works():
         {
             'step': '03',
             'title': 'Artist arrives, equipped',
-            'body': 'Tools sanitised on arrival, sealed products opened in front of you.',
+            'body': 'Confirm your artist with an OTP and live face verification, then '
+                     'watch tools sanitised and sealed products opened in front of you.',
             'icon': 'arrive',
         },
         {
@@ -247,7 +265,9 @@ def get_trust_badges():
     return [
         {
             'title': 'Identity Verified',
-            'body': 'Government ID and address verification for every beautician.',
+            'body': 'Government ID and address verification for every beautician, '
+                     'plus an OTP and live face verification before they start '
+                     'your service.',
         },
         {
             'title': 'Experience Assessed',

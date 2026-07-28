@@ -1,0 +1,22 @@
+<div class="sort-bar">
+  <p class="sort-bar__count"><strong data-result-count>0</strong> services &amp; packages</p>
+
+  <div class="sort-bar__controls">
+    <button type="button" class="btn btn--ghost btn--sm sort-bar__filter-btn" data-filters-toggle aria-controls="filter-sidebar" aria-expanded="false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="1.6" fill="currentColor"/><circle cx="16" cy="12" r="1.6" fill="currentColor"/><circle cx="10" cy="18" r="1.6" fill="currentColor"/></svg>
+      Filters
+    </button>
+
+    <div class="sort-bar__control">
+      <label for="sort-select" class="sr-only">Sort by</label>
+      <select id="sort-select" data-sort-select>
+        <option value="popularity">Most Popular</option>
+        <option value="newest">Newest</option>
+        <option value="price-asc">Price: Low to High</option>
+        <option value="price-desc">Price: High to Low</option>
+        <option value="rating">Highest Rated</option>
+        <option value="duration">Duration</option>
+      </select>
+    </div>
+  </div>
+</div>

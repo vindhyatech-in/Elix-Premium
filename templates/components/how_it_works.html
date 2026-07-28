@@ -9,7 +9,7 @@
       <div class="how-it-works__line" aria-hidden="true"><span class="how-it-works__line-fill" data-line-fill></span></div>
 
       {% for step in steps %}
-        <div class="how-it-works__step" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
+        <div class="how-it-works__step">
           <span class="how-it-works__dot" aria-hidden="true"></span>
           <span class="how-it-works__num">{{ step.step }}</span>
           <h3 class="how-it-works__title">{{ step.title }}</h3>

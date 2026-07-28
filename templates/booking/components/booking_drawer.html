@@ -1,0 +1,136 @@
+{# Phase 2: the actual booking flow, opened from the cart's "Proceed to #}
+{# Booking" button — a drawer, not a page. No beautician selection anywhere, #}
+{# by design (see developed.md "Service Booking App"). #}
+<div class="booking-drawer-backdrop" data-booking-backdrop></div>
+
+<aside class="booking-drawer" id="booking-drawer" data-booking-drawer role="dialog" aria-modal="true" aria-labelledby="booking-drawer-title" hidden>
+  <div class="booking-drawer__header">
+    <div>
+      <h2 id="booking-drawer-title">Complete Your Booking</h2>
+      <div class="booking-stepper" data-booking-stepper>
+        <span class="booking-stepper__step is-active" data-step-indicator="1">1</span>
+        <span class="booking-stepper__step" data-step-indicator="2">2</span>
+        <span class="booking-stepper__step" data-step-indicator="3">3</span>
+        <span class="booking-stepper__step" data-step-indicator="4">4</span>
+        <span class="booking-stepper__step" data-step-indicator="5">5</span>
+      </div>
+    </div>
+    <button type="button" class="booking-drawer__close" data-booking-close aria-label="Close booking">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <div class="booking-drawer__body">
+    <section class="booking-step is-active" data-booking-step="1" aria-label="Select address">
+      <h3>Select Address</h3>
+      <div class="address-list" data-address-list></div>
+      <button type="button" class="btn btn--ghost btn--sm" data-add-address-toggle>+ Add New Address</button>
+
+      <div class="address-form" data-address-form hidden>
+        <div id="booking-map" class="booking-map" data-booking-map></div>
+        <p class="address-form__hint">Click anywhere on the map to drop a pin at your location.</p>
+        <div class="field">
+          <label for="address-label">Label</label>
+          <input type="text" id="address-label" data-address-label placeholder="Home, Office…">
+        </div>
+        <div class="field">
+          <label for="address-text">Full Address</label>
+          <textarea id="address-text" data-address-text placeholder="House no., street, area, landmark…"></textarea>
+        </div>
+        <div class="field">
+          <label for="address-pincode">Pincode</label>
+          <input type="text" id="address-pincode" inputmode="numeric" maxlength="6" data-address-pincode placeholder="560001">
+        </div>
+        <div class="address-form__actions">
+          <button type="button" class="btn btn--ghost btn--sm" data-address-cancel>Cancel</button>
+          <button type="button" class="btn btn--primary btn--sm" data-address-save>Save Address</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="booking-step" data-booking-step="2" aria-label="Select date">
+      <h3>Select Date</h3>
+      <div class="booking-calendar" data-booking-calendar>
+        <div class="booking-calendar__header">
+          <button type="button" data-calendar-prev aria-label="Previous month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <strong data-calendar-label></strong>
+          <button type="button" data-calendar-next aria-label="Next month">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <div class="booking-calendar__weekdays">
+          <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+        </div>
+        <div class="booking-calendar__grid" data-calendar-grid></div>
+      </div>
+    </section>
+
+    <section class="booking-step" data-booking-step="3" aria-label="Booking type and time">
+      <h3>Booking Type</h3>
+      <div class="filter-segmented" data-booking-type role="radiogroup" aria-label="Booking type">
+        <button type="button" class="filter-segmented__btn is-active" data-booking-type-value="regular" role="radio" aria-checked="true">Regular</button>
+        <button type="button" class="filter-segmented__btn" data-booking-type-value="urgent" role="radio" aria-checked="false">Urgent</button>
+      </div>
+
+      <div class="slot-grid" data-regular-slots>
+        <button type="button" class="slot-card" data-slot-value="morning">
+          <strong>Morning</strong>
+          <span>8 AM – 12 PM</span>
+        </button>
+        <button type="button" class="slot-card" data-slot-value="afternoon">
+          <strong>Afternoon</strong>
+          <span>12 PM – 4 PM</span>
+        </button>
+        <button type="button" class="slot-card" data-slot-value="evening">
+          <strong>Evening</strong>
+          <span>4 PM – 8 PM</span>
+        </button>
+      </div>
+
+      <div class="urgent-time" data-urgent-time hidden>
+        <label for="urgent-time-input">Choose an exact time (today)</label>
+        <input type="time" id="urgent-time-input" data-urgent-time-input>
+      </div>
+    </section>
+
+    <section class="booking-step" data-booking-step="4" aria-label="Payment">
+      <h3>Payment</h3>
+      <div class="payment-options" data-payment-options role="radiogroup" aria-label="Payment method">
+        <button type="button" class="payment-card" data-payment-value="pay-now" role="radio" aria-checked="false">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <div><strong>Pay Now</strong><span>UPI, cards, netbanking</span></div>
+        </button>
+        <button type="button" class="payment-card" data-payment-value="pay-at-home" role="radio" aria-checked="false">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+          <div><strong>Pay At Home</strong><span>Cash or UPI to the artist</span></div>
+        </button>
+      </div>
+
+      <div class="payment-mock" data-payment-mock hidden>
+        <p>You'll be redirected to a secure checkout.</p>
+        <button type="button" class="btn btn--primary" data-pay-now-simulate>Pay <span data-pay-amount>₹0</span></button>
+        <p class="payment-mock__status" data-payment-status></p>
+      </div>
+    </section>
+
+    <section class="booking-step" data-booking-step="5" aria-label="Booking summary">
+      <h3>Booking Summary</h3>
+      <div class="booking-summary" data-booking-summary></div>
+    </section>
+
+    <section class="booking-confirmation" data-booking-confirmation hidden>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="8 12 11 15 16 9"/></svg>
+      <h3>Booking Confirmed!</h3>
+      <p>Your booking ID is <strong data-confirmation-id></strong>.</p>
+      <p>We'll send updates to your registered contact details.</p>
+      <button type="button" class="btn btn--primary" data-booking-done>Done</button>
+    </section>
+  </div>
+
+  <div class="booking-drawer__footer" data-booking-footer>
+    <button type="button" class="btn btn--ghost" data-booking-back disabled>Back</button>
+    <button type="button" class="btn btn--primary" data-booking-next>Next</button>
+  </div>
+</aside>

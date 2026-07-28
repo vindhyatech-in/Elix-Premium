@@ -1,0 +1,65 @@
+{# Popularity is intentionally not a separate filter control here — it's #}
+{# already covered by the Sort bar ("Most Popular"); a duplicate filter #}
+{# widget for the same signal would just add noise. #}
+<aside class="filter-sidebar" id="filter-sidebar" data-filter-sidebar aria-label="Filters">
+  <div class="filter-sidebar__header">
+    <strong>Filters</strong>
+    <button type="button" class="filter-sidebar__close" data-filters-close aria-label="Close filters">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <div class="filter-group">
+    <p class="filter-group__label">Type</p>
+    <div class="filter-segmented" data-filter-type role="radiogroup" aria-label="Service type">
+      <button type="button" class="filter-segmented__btn is-active" data-type-value="all" role="radio" aria-checked="true">All</button>
+      <button type="button" class="filter-segmented__btn" data-type-value="service" role="radio" aria-checked="false">Single Services</button>
+      <button type="button" class="filter-segmented__btn" data-type-value="package" role="radio" aria-checked="false">Packages</button>
+    </div>
+  </div>
+
+  <div class="filter-group">
+    <p class="filter-group__label">Category</p>
+    <div class="filter-checkbox-list" data-filter-categories>
+      {% for cat in booking_categories %}
+        <label class="filter-checkbox">
+          <input type="checkbox" value="{{ cat.slug }}" data-filter-category-checkbox>
+          <span>{{ cat.name }}</span>
+        </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="filter-group">
+    <p class="filter-group__label">Max Price <span data-price-value>₹10,000</span></p>
+    <input type="range" min="0" max="10000" step="100" value="10000" class="filter-range" data-filter-price>
+  </div>
+
+  <div class="filter-group">
+    <p class="filter-group__label">Max Duration <span data-duration-value>5h+</span></p>
+    <input type="range" min="0" max="300" step="15" value="300" class="filter-range" data-filter-duration>
+  </div>
+
+  <div class="filter-group">
+    <p class="filter-group__label">Minimum Rating</p>
+    <div class="filter-segmented" data-filter-rating role="radiogroup" aria-label="Minimum rating">
+      <button type="button" class="filter-segmented__btn is-active" data-rating-value="0" role="radio" aria-checked="true">Any</button>
+      <button type="button" class="filter-segmented__btn" data-rating-value="4" role="radio" aria-checked="false">4.0+</button>
+      <button type="button" class="filter-segmented__btn" data-rating-value="4.5" role="radio" aria-checked="false">4.5+</button>
+    </div>
+  </div>
+
+  <div class="filter-group">
+    <label class="filter-checkbox">
+      <input type="checkbox" data-filter-offers>
+      <span>On offer only</span>
+    </label>
+    <label class="filter-checkbox">
+      <input type="checkbox" data-filter-availability>
+      <span>Available today</span>
+    </label>
+  </div>
+
+  <button type="button" class="btn btn--ghost btn--sm filter-sidebar__clear" data-filters-clear>Clear Filters</button>
+</aside>
+<div class="filter-sidebar-backdrop" data-filters-backdrop></div>

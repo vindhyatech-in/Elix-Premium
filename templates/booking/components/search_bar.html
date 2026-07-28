@@ -1,0 +1,26 @@
+<div class="search-bar" data-search>
+  <svg class="search-bar__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+  <label for="booking-search" class="sr-only">Search services and packages</label>
+  <input type="search" id="booking-search" class="search-bar__input" placeholder="Search services, packages, categories…" data-search-input autocomplete="off">
+  <button type="button" class="search-bar__clear" data-search-clear aria-label="Clear search" hidden>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+
+  <div class="search-bar__panel" data-search-panel hidden>
+    <div class="search-bar__section" data-search-results hidden></div>
+
+    <div class="search-bar__section" data-search-recent hidden>
+      <p class="search-bar__label">Recent Searches</p>
+      <div class="search-bar__tags" data-recent-tags></div>
+    </div>
+
+    <div class="search-bar__section">
+      <p class="search-bar__label">Trending Searches</p>
+      <div class="search-bar__tags">
+        {% for term in trending_searches %}
+          <button type="button" class="search-bar__tag" data-search-tag="{{ term }}">{{ term }}</button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,37 @@
+<div class="floating-cart" data-floating-cart>
+  <button type="button" class="floating-cart__bubble" data-cart-toggle aria-expanded="false" aria-controls="floating-cart-panel" aria-label="Open cart, 0 items">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+    <span class="floating-cart__count" data-cart-bubble-count>0</span>
+  </button>
+
+  <div class="floating-cart__panel" id="floating-cart-panel" data-cart-panel>
+    <div class="floating-cart__header">
+      <strong>Your Cart</strong>
+      <button type="button" class="floating-cart__close" data-cart-close aria-label="Close cart">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="floating-cart__items" data-cart-items></div>
+    <p class="floating-cart__empty" data-cart-empty hidden>Your cart is empty — add a service or package to get started.</p>
+
+    <div class="floating-cart__coupon">
+      <label for="coupon-input" class="sr-only">Coupon code</label>
+      <input type="text" id="coupon-input" placeholder="Coupon code (try GLAM10)" data-coupon-input>
+      <button type="button" class="btn btn--ghost btn--sm" data-coupon-apply>Apply</button>
+    </div>
+    <p class="floating-cart__coupon-status" data-coupon-status></p>
+
+    <div class="floating-cart__summary">
+      <div class="floating-cart__row"><span>Subtotal</span><span data-cart-subtotal>₹0</span></div>
+      <div class="floating-cart__row floating-cart__row--discount" data-cart-discount-row hidden><span>Discount</span><span data-cart-discount>-₹0</span></div>
+      <div class="floating-cart__row floating-cart__row--total"><span>Total</span><span data-cart-total>₹0</span></div>
+      <p class="floating-cart__loyalty" data-cart-loyalty>Earn 0 loyalty points on this order</p>
+    </div>
+
+    <button type="button" class="btn btn--primary floating-cart__cta" data-proceed-to-booking disabled>
+      Proceed to Booking
+    </button>
+  </div>
+</div>
+<div class="floating-cart-backdrop" data-cart-backdrop></div>

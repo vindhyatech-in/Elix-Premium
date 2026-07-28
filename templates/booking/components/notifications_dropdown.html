@@ -1,0 +1,19 @@
+<div class="app-navbar__dropdown-panel app-navbar__dropdown-panel--wide" id="notifications-panel" data-dropdown-panel role="menu" aria-label="Notifications">
+  <div class="dropdown-panel__header">
+    <strong>Notifications</strong>
+  </div>
+  {% if notifications %}
+    {% for n in notifications %}
+      <div class="notif-item{% if not n.read %} notif-item--unread{% endif %}">
+        <span class="notif-item__dot" aria-hidden="true"></span>
+        <div class="notif-item__copy">
+          <strong>{{ n.title }}</strong>
+          <p>{{ n.body }}</p>
+          <time>{{ n.time_label }}</time>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="dropdown-panel__empty">You're all caught up.</p>
+  {% endif %}
+</div>

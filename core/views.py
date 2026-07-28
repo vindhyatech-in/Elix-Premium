@@ -13,7 +13,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_GET
 
-from . import mock_data
+from . import booking_data, mock_data
 
 
 def index(request):
@@ -35,6 +35,23 @@ def index(request):
     return render(request, 'index.html', context)
 
 
+def services_booking(request):
+    """
+    The Service Booking app (Phase 1: catalog browsing, search, filters,
+    sort, wishlist, cart — see developed.md "Service Booking App" for the
+    Phase 2/3 roadmap: booking drawer, real chat, notifications backend,
+    wishlist page, bookings dashboard).
+    """
+    context = {
+        'booking_categories': booking_data.get_booking_categories(),
+        'booking_offers': booking_data.get_booking_offers(),
+        'booking_catalog': booking_data.get_booking_catalog(),
+        'notifications': booking_data.get_notifications_mock(),
+        'trending_searches': booking_data.get_trending_searches(),
+    }
+    return render(request, 'booking/pages/service_booking.html', context)
+
+
 @require_GET
 def robots_txt(request):
     lines = [
@@ -54,6 +71,7 @@ def sitemap_xml(request):
     """
     urls = [
         {'loc': request.build_absolute_uri(reverse('index')), 'priority': '1.0', 'changefreq': 'weekly'},
+        {'loc': request.build_absolute_uri(reverse('services_booking')), 'priority': '0.9', 'changefreq': 'daily'},
     ]
     xml = render_to_string('sitemap.xml', {'urls': urls})
     return HttpResponse(xml, content_type='application/xml')

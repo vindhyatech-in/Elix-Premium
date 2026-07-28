@@ -1,0 +1,1204 @@
+/* ============================================================
+   SERVICE BOOKING APP — /services-booking/
+   Own bundle, not appended to the marketing CSS (see developed.md
+   "Service Booking App"). Imports tokens + reset only from the shared
+   design system, then everything below is app-shell/catalog specific.
+   Follows the same theme-aware token rules as the marketing site:
+   --surface-1/2/3, --text-body, --text-soft, --ink-muted, --accent-gold,
+   --border-hairline flip with [data-theme="dark"] automatically; gold CTAs
+   (--gradient-gold + --ink text) stay fixed, same as .btn--primary.
+   ============================================================ */
+@import 'variables.css';
+@import 'base.css';
+
+/* Several components below set `display: flex/grid` on elements that are
+   also toggled with the plain `hidden` attribute (cart rows, search panel
+   sections, empty states) — an authored `display` rule otherwise beats the
+   UA stylesheet's `[hidden] { display: none }` at equal specificity, which
+   silently makes `el.hidden = true` a no-op. This guarantees `hidden` always
+   wins, matching its actual HTML semantics. */
+[hidden] { display: none !important; }
+
+body.booking-app {
+  padding-top: 4.5rem;
+  background: var(--surface-1);
+  /* base.css sets `overflow-x: hidden` on body (shared with the marketing
+     site) — mixing a non-visible overflow-x with the default visible
+     overflow-y makes the browser compute overflow-y as `auto` per spec,
+     which turns body into a scroll-affecting box and silently breaks
+     `position: sticky` for descendants (confirmed: it broke both
+     .filter-sidebar and .catalog__toolbar's sticky behavior — neither
+     stayed in place on scroll, just scrolled away with the page). `clip`
+     hides horizontal overflow the same way without that side effect. */
+  overflow-x: clip;
+}
+
+.booking-main { min-height: 60vh; }
+
+/* ============================================================
+   APP NAVBAR (desktop)
+   ============================================================ */
+.app-navbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: var(--z-app-nav);
+  height: 4.5rem;
+  display: flex;
+  align-items: center;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-hairline);
+  box-shadow: var(--shadow-sm);
+}
+
+.app-navbar__inner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding-inline: var(--container-pad);
+}
+
+.app-navbar__logo {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-body);
+  white-space: nowrap;
+}
+
+.app-navbar__logo span { color: var(--accent-gold); font-style: italic; }
+
+.app-navbar__links { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
+
+.app-navbar__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-body);
+  padding: 0.5rem 0.25rem;
+  white-space: nowrap;
+}
+
+/* Search lives in the catalog content (.catalog__search, near the sort bar)
+   on every breakpoint, not in the navbar — see developed.md "Service
+   Booking App". .app-navbar__actions gets margin-left: auto below to fill
+   the gap that search used to occupy between the links and the actions. */
+
+.app-navbar__actions { display: flex; align-items: center; gap: var(--space-2xs); flex-shrink: 0; margin-left: auto; }
+
+.app-navbar__icon-btn { position: relative; color: var(--text-body); border-color: var(--border-hairline); }
+
+.app-navbar__badge-dot {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--gold-deep);
+  border: 2px solid var(--surface-2);
+}
+
+.app-navbar__avatar {
+  width: 2.5rem; height: 2.5rem;
+  border-radius: 50%;
+  background: var(--gradient-gold);
+  color: var(--ink);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.app-navbar__cart-btn { position: relative; }
+
+.app-navbar__cart-count {
+  position: absolute;
+  top: -4px; right: -4px;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding-inline: 0.2rem;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-theme="dark"] .app-navbar__cart-count { background: var(--gold-light); color: var(--ink); }
+
+.app-navbar__back { flex-shrink: 0; }
+.app-navbar__back span { display: inline; }
+
+/* --- Dropdowns (Categories / Offers / Notifications / Profile) --- */
+.app-navbar__dropdown { position: relative; }
+
+.app-navbar__dropdown-panel {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  min-width: 15rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 0.5rem;
+  z-index: var(--z-app-dropdown);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: opacity var(--dur-sm) var(--ease-soft), transform var(--dur-sm) var(--ease-soft), visibility var(--dur-sm);
+}
+
+.app-navbar__dropdown[data-dropdown].is-open .app-navbar__dropdown-panel {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.app-navbar__dropdown-panel--wide { min-width: 20rem; }
+
+.app-navbar__dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-body);
+  transition: background var(--dur-sm) var(--ease-soft);
+}
+
+.app-navbar__dropdown-item:hover { background: var(--surface-1); }
+
+.dropdown-panel__header {
+  padding: 0.5rem 0.85rem 0.75rem;
+  border-bottom: 1px solid var(--border-hairline);
+  margin-bottom: 0.4rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-panel__header span { font-size: var(--fs-xs); color: var(--ink-muted); }
+
+.dropdown-panel__empty { padding: 1rem 0.85rem; font-size: var(--fs-sm); color: var(--ink-muted); }
+
+.offer-item { display: flex; gap: 0.75rem; padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); }
+.offer-item:hover { background: var(--surface-1); }
+.offer-item__code {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 600;
+  color: var(--accent-gold);
+  font-size: var(--fs-sm);
+}
+.offer-item__copy strong { display: block; font-size: var(--fs-sm); color: var(--text-body); }
+.offer-item__copy p { font-size: var(--fs-xs); color: var(--ink-muted); margin-top: 0.15rem; }
+
+.notif-item { display: flex; gap: 0.6rem; padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); }
+.notif-item:hover { background: var(--surface-1); }
+.notif-item__dot {
+  flex-shrink: 0;
+  width: 8px; height: 8px;
+  margin-top: 0.4rem;
+  border-radius: 50%;
+  background: var(--border-hairline);
+}
+.notif-item--unread .notif-item__dot { background: var(--gold-deep); }
+.notif-item__copy strong { display: block; font-size: var(--fs-sm); color: var(--text-body); }
+.notif-item__copy p { font-size: var(--fs-xs); color: var(--ink-muted); margin-top: 0.1rem; }
+.notif-item__copy time { font-size: 0.7rem; color: var(--ink-muted); opacity: 0.8; }
+
+/* ============================================================
+   SEARCH BAR + autosuggest
+   ============================================================ */
+.search-bar { position: relative; }
+
+.search-bar__icon {
+  position: absolute;
+  left: 0.9rem; top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+
+.search-bar__input {
+  width: 100%;
+  padding: 0.7rem 2.5rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-1);
+  color: var(--text-body);
+  font-size: var(--fs-sm);
+}
+
+/* Suppress the browser's own built-in clear ("x") button on
+   input[type="search"] — it was rendering next to our custom
+   .search-bar__clear button, showing two overlapping "x" icons. */
+.search-bar__input::-webkit-search-cancel-button,
+.search-bar__input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+
+.search-bar__input:focus { border-color: var(--gold-deep); }
+
+.search-bar__clear {
+  position: absolute;
+  right: 0.6rem; top: 50%;
+  transform: translateY(-50%);
+  width: 1.75rem; height: 1.75rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted);
+}
+
+.search-bar__panel {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 0; right: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 0.75rem;
+  z-index: var(--z-app-dropdown);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.search-bar__section + .search-bar__section { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-hairline); }
+
+.search-bar__label { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-muted); margin-bottom: 0.5rem; }
+
+.search-bar__tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.search-bar__tag {
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface-1);
+  border: 1px solid var(--border-hairline);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-body);
+}
+.search-bar__tag:hover { border-color: var(--gold-deep); }
+
+.search-result {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+}
+.search-result:hover { background: var(--surface-1); }
+.search-result img { width: 2.75rem; height: 2.75rem; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
+.search-result__name { font-size: var(--fs-sm); font-weight: 600; color: var(--text-body); }
+.search-result__meta { font-size: var(--fs-xs); color: var(--ink-muted); }
+.search-bar__no-results { padding: 0.75rem 0.5rem; font-size: var(--fs-sm); color: var(--ink-muted); }
+
+/* ============================================================
+   BOTTOM NAV (mobile) + CHAT FAB
+   ============================================================ */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: var(--z-bottom-nav);
+  background: var(--surface-2);
+  border-top: 1px solid var(--border-hairline);
+  padding: 0.4rem 0.25rem calc(0.4rem + env(safe-area-inset-bottom));
+  align-items: stretch;
+  justify-content: space-between;
+}
+
+.bottom-nav__item {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.35rem 0.2rem;
+  color: var(--ink-muted);
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.bottom-nav__item.is-active { color: var(--accent-gold); }
+
+.bottom-nav__badge {
+  position: absolute;
+  top: 0; right: calc(50% - 1.1rem);
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding-inline: 0.2rem;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-fab {
+  position: fixed;
+  right: var(--space-md);
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  z-index: var(--z-fab);
+  width: 3.25rem; height: 3.25rem;
+  border-radius: 50%;
+  background: var(--gradient-gold);
+  color: var(--ink);
+  box-shadow: var(--shadow-gold);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  animation: chat-fab-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes chat-fab-pulse {
+  0%, 100% { box-shadow: var(--shadow-gold); }
+  50% { box-shadow: 0 0 0 10px rgba(169, 127, 55, 0.12), var(--shadow-gold); }
+}
+
+@media (prefers-reduced-motion: reduce) { .chat-fab { animation: none; } }
+
+/* ============================================================
+   CATALOG LAYOUT
+   ============================================================ */
+/* No top padding — .catalog__toolbar is sticky and should sit flush against
+   the navbar both before and after it locks into its stuck position; its
+   own padding-block already gives it breathing room. */
+.catalog { padding: 0 var(--container-pad) var(--space-3xl); max-width: var(--container-width); margin-inline: auto; }
+
+.catalog__layout { display: flex; align-items: flex-start; gap: var(--space-lg); }
+
+.catalog__main { flex: 1; min-width: 0; }
+
+/* ============================================================
+   FILTER SIDEBAR
+   ============================================================ */
+.filter-sidebar {
+  flex-shrink: 0;
+  width: 17rem;
+  position: sticky;
+  top: 5.5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  max-height: calc(100vh - 6.5rem);
+  overflow-y: auto;
+}
+
+.filter-sidebar__header { display: none; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm); }
+
+.filter-group { padding-block: var(--space-sm); border-bottom: 1px solid var(--border-hairline); }
+.filter-group:first-child { padding-top: 0; }
+.filter-group:last-of-type { border-bottom: none; }
+
+.filter-group__label {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  margin-bottom: 0.6rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.filter-group__label span { color: var(--accent-gold); font-weight: 700; text-transform: none; letter-spacing: normal; }
+
+.filter-checkbox-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.filter-checkbox { display: flex; align-items: center; gap: 0.5rem; font-size: var(--fs-sm); color: var(--text-body); cursor: pointer; }
+.filter-checkbox input { accent-color: var(--gold-deep); width: 1rem; height: 1rem; }
+
+.filter-range { width: 100%; accent-color: var(--gold-deep); }
+
+.filter-segmented { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.filter-segmented__btn {
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-hairline);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-body);
+}
+.filter-segmented__btn.is-active { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+[data-theme="dark"] .filter-segmented__btn.is-active { background: var(--gold-light); color: var(--ink); border-color: var(--gold-light); }
+
+.filter-sidebar__clear { width: 100%; margin-top: var(--space-sm); }
+.filter-sidebar__close { display: none; }
+
+.filter-sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-app-dropdown) - 1);
+  background: rgba(22, 18, 15, 0.55);
+}
+
+/* ============================================================
+   CATALOG TOOLBAR — search + result count + Filters/Sort, grouped into one
+   sticky, compact row so it stays reachable while scrolling the grid
+   instead of scrolling away with the rest of the page content.
+   ============================================================ */
+.catalog__toolbar {
+  position: sticky;
+  top: 4.5rem; /* flush against .app-navbar's height */
+  z-index: calc(var(--z-app-nav) - 1);
+  background: var(--surface-1);
+  padding-block: var(--space-xs);
+  margin-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* Search lives here (all breakpoints), not the navbar */
+.catalog__search { margin-bottom: 0; }
+.catalog__search .search-bar__panel { max-width: 32rem; }
+.catalog__search .search-bar__input { padding-block: 0.55rem; }
+
+/* ============================================================
+   SORT BAR
+   ============================================================ */
+.sort-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.sort-bar__count { font-size: var(--fs-sm); color: var(--ink-muted); }
+.sort-bar__count strong { color: var(--text-body); }
+
+.sort-bar__controls { display: flex; align-items: center; gap: var(--space-sm); }
+
+/* Desktop already has the filter sidebar permanently visible — this button
+   is a mobile-only second entry point to the same off-canvas panel the
+   bottom nav's "Categories" icon opens (see initMobileFilters() in
+   booking.js). Hidden here, shown in the mobile breakpoint below. */
+.sort-bar__filter-btn { display: none; align-items: center; gap: 0.4rem; }
+
+.sort-bar__control select {
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-2);
+  color: var(--text-body);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+/* Choices.js — restyle to match the token system instead of its default look */
+.choices__inner {
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border-hairline) !important;
+  border-radius: var(--radius-sm) !important;
+  min-height: 0 !important;
+  padding: 0.5rem 0.9rem !important;
+}
+.choices__list--dropdown, .choices__list[aria-expanded] {
+  background: var(--surface-2) !important;
+  border-color: var(--border-hairline) !important;
+  border-radius: var(--radius-sm) !important;
+  z-index: var(--z-app-dropdown) !important;
+}
+.choices__list--dropdown .choices__item--selectable.is-highlighted { background: var(--surface-1) !important; }
+.choices__inner, .choices__list--dropdown .choices__item { color: var(--text-body) !important; font-size: var(--fs-sm) !important; }
+
+/* ============================================================
+   CATALOG GRID + CARDS
+   ============================================================ */
+.catalog__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+
+.catalog__grid.is-hidden { display: none; }
+.catalog__empty { text-align: center; padding: var(--space-2xl) 0; color: var(--ink-muted); }
+
+.catalog-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur-sm) var(--ease-soft), box-shadow var(--dur-sm) var(--ease-soft);
+}
+
+.catalog-card:hover { box-shadow: var(--shadow-md); }
+.catalog-card.is-hidden { display: none; }
+
+.catalog-card__media { position: relative; aspect-ratio: 4 / 3; overflow: hidden; }
+.catalog-card__media img { width: 100%; height: 100%; object-fit: cover; transition: transform var(--dur-lg) var(--ease-soft); }
+.catalog-card:hover .catalog-card__media img { transform: scale(1.06); }
+
+.catalog-card__badges { position: absolute; top: 0.75rem; left: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.4rem; max-width: calc(100% - 3.5rem); }
+.catalog-card__badge {
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.92);
+  color: var(--ink);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.catalog-card__badge--offer { background: var(--gradient-gold); color: var(--ink); }
+
+.catalog-card__wishlist {
+  position: absolute;
+  top: 0.75rem; right: 0.75rem;
+  width: 2.25rem; height: 2.25rem;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.92);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--dur-sm) var(--ease-soft);
+}
+.catalog-card__wishlist:hover { transform: scale(1.1); }
+.catalog-card__wishlist[aria-pressed="true"] { color: var(--rose); }
+.catalog-card__wishlist[aria-pressed="true"] svg { fill: currentColor; }
+
+.catalog-card__unavailable {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 0.4rem;
+  text-align: center;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--cream);
+  background: rgba(22, 18, 15, 0.75);
+}
+
+.catalog-card__quickview {
+  position: absolute;
+  left: 0.75rem; bottom: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-pill);
+  background: rgba(22, 18, 15, 0.75);
+  color: var(--cream);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity var(--dur-sm) var(--ease-soft), transform var(--dur-sm) var(--ease-soft);
+}
+.catalog-card:hover .catalog-card__quickview, .catalog-card:focus-within .catalog-card__quickview { opacity: 1; transform: translateY(0); }
+
+.catalog-card__body { padding: var(--space-sm) var(--space-md) var(--space-md); }
+.catalog-card__category { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-gold); }
+.catalog-card__name { font-family: var(--font-display); font-size: 1.1rem; margin-top: 0.2rem; color: var(--text-body); }
+.catalog-card__desc { font-size: var(--fs-sm); color: var(--ink-muted); margin-top: 0.3rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.catalog-card__meta { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.6rem; font-size: var(--fs-xs); color: var(--ink-muted); }
+.catalog-card__meta .stars { font-size: var(--fs-xs); color: var(--gold-deep); }
+.catalog-card__dot { opacity: 0.6; }
+
+.catalog-card__footer { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-sm); gap: var(--space-sm); }
+.catalog-card__price-now { font-size: 1.05rem; font-weight: 700; color: var(--text-body); }
+.catalog-card__price-mrp { font-size: var(--fs-xs); color: var(--ink-muted); text-decoration: line-through; margin-left: 0.35rem; }
+
+/* ============================================================
+   SKELETON LOADING
+   ============================================================ */
+.skeleton-card { border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-2); border: 1px solid var(--border-hairline); }
+.skeleton-card__media { aspect-ratio: 4 / 3; background: var(--surface-1); }
+.skeleton-card__line { height: 0.75rem; margin: 0.9rem var(--space-md) 0; border-radius: var(--radius-sm); background: var(--surface-1); }
+.skeleton-card__line--title { height: 1rem; width: 70%; }
+.skeleton-card__line--short { width: 40%; margin-bottom: var(--space-md); }
+
+.skeleton-card__media, .skeleton-card__line {
+  position: relative;
+  overflow: hidden;
+}
+.skeleton-card__media::after, .skeleton-card__line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+[data-theme="dark"] .skeleton-card__media::after, [data-theme="dark"] .skeleton-card__line::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+}
+@keyframes skeleton-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skeleton-card__media::after, .skeleton-card__line::after { animation: none; } }
+
+/* ============================================================
+   QUICK VIEW MODAL
+   ============================================================ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-app-modal);
+  background: rgba(22, 18, 15, 0.6);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-md) var(--ease-soft);
+}
+.modal-backdrop.is-open { opacity: 1; pointer-events: auto; }
+
+.quick-view-modal {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -46%);
+  width: min(90vw, 720px);
+  max-height: 85vh;
+  overflow-y: auto;
+  z-index: calc(var(--z-app-modal) + 1);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-md) var(--ease-soft), transform var(--dur-md) var(--ease-soft), visibility var(--dur-md);
+}
+.quick-view-modal.is-open { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(-50%, -50%); }
+
+.quick-view-modal__close {
+  position: absolute;
+  top: 0.75rem; right: 0.75rem;
+  width: 2.25rem; height: 2.25rem;
+  border-radius: 50%;
+  background: var(--surface-1);
+  color: var(--text-body);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.quick-view-modal__media { flex: 0 0 42%; }
+.quick-view-modal__media img { width: 100%; height: 100%; object-fit: cover; }
+
+.quick-view-modal__body { flex: 1; min-width: 0; padding: var(--space-lg); }
+.quick-view-modal__category { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-gold); }
+.quick-view-modal__body h3 { font-family: var(--font-display); font-size: 1.6rem; margin-top: 0.3rem; color: var(--text-body); }
+.quick-view-modal__desc { color: var(--ink-muted); margin-top: var(--space-sm); }
+.quick-view-modal__meta { display: flex; align-items: center; gap: 0.4rem; margin-top: var(--space-sm); font-size: var(--fs-sm); color: var(--ink-muted); }
+.quick-view-modal__meta .stars { color: var(--gold-deep); }
+.quick-view-modal__badges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: var(--space-sm); }
+.quick-view-modal__badges span { padding: 0.3rem 0.7rem; border-radius: var(--radius-pill); background: var(--surface-1); font-size: 0.7rem; font-weight: 700; color: var(--text-body); }
+.quick-view-modal__footer { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-lg); gap: var(--space-sm); }
+.quick-view-modal__price span:first-child { font-size: 1.4rem; font-weight: 700; color: var(--text-body); }
+.quick-view-modal__price span:last-child { font-size: var(--fs-sm); color: var(--ink-muted); text-decoration: line-through; margin-left: 0.5rem; }
+
+/* ============================================================
+   FLOATING CART
+   ============================================================ */
+.floating-cart { position: fixed; right: var(--space-md); bottom: var(--space-md); z-index: var(--z-cart); }
+
+.floating-cart__bubble {
+  width: 3.5rem; height: 3.5rem;
+  border-radius: 50%;
+  background: var(--gradient-gold);
+  color: var(--ink);
+  box-shadow: var(--shadow-gold);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.floating-cart__count {
+  position: absolute;
+  top: -4px; right: -4px;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding-inline: 0.25rem;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.floating-cart__panel {
+  position: absolute;
+  right: 0; bottom: calc(100% + 1rem);
+  width: min(90vw, 380px);
+  max-height: 75vh;
+  overflow-y: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-md);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px) scale(0.98);
+  transform-origin: bottom right;
+  transition: opacity var(--dur-md) var(--ease-soft), transform var(--dur-md) var(--ease-soft), visibility var(--dur-md);
+}
+
+.floating-cart.is-open .floating-cart__panel { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+
+.floating-cart__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm); }
+.floating-cart__close { width: 1.75rem; height: 1.75rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-muted); }
+
+.floating-cart__items { display: flex; flex-direction: column; gap: var(--space-sm); max-height: 15rem; overflow-y: auto; }
+.floating-cart__empty { font-size: var(--fs-sm); color: var(--ink-muted); text-align: center; padding: var(--space-md) 0; }
+
+.cart-line { display: flex; gap: 0.6rem; align-items: center; }
+.cart-line img { width: 3rem; height: 3rem; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
+.cart-line__info { flex: 1; min-width: 0; }
+.cart-line__name { font-size: var(--fs-sm); font-weight: 600; color: var(--text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cart-line__price { font-size: var(--fs-xs); color: var(--ink-muted); }
+.cart-line__qty { display: flex; align-items: center; gap: 0.4rem; }
+.cart-line__qty button { width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 1px solid var(--border-hairline); color: var(--text-body); }
+.cart-line__remove { color: var(--ink-muted); }
+
+.floating-cart__coupon { display: flex; gap: 0.4rem; margin-top: var(--space-md); }
+.floating-cart__coupon input {
+  flex: 1;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-1);
+  color: var(--text-body);
+  font-size: var(--fs-sm);
+}
+.floating-cart__coupon-status { font-size: var(--fs-xs); margin-top: 0.35rem; min-height: 1em; color: var(--gold-deep); }
+
+.floating-cart__summary { margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border-hairline); }
+.floating-cart__row { display: flex; justify-content: space-between; font-size: var(--fs-sm); color: var(--text-body); padding-block: 0.2rem; }
+.floating-cart__row--total { font-weight: 700; font-size: 1rem; }
+.floating-cart__row--discount span:last-child { color: var(--gold-deep); }
+.floating-cart__loyalty { font-size: var(--fs-xs); color: var(--ink-muted); margin-top: 0.3rem; }
+
+.floating-cart__cta { width: 100%; margin-top: var(--space-sm); }
+.floating-cart__cta:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+.floating-cart-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-cart) - 1);
+  background: rgba(22, 18, 15, 0.4);
+}
+
+/* ============================================================
+   CHAT PANEL
+   ============================================================ */
+.chat-panel {
+  position: fixed;
+  right: var(--space-md);
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  z-index: var(--z-cart);
+  width: min(90vw, 340px);
+  height: min(70vh, 460px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px) scale(0.98);
+  transform-origin: bottom right;
+  transition: opacity var(--dur-md) var(--ease-soft), transform var(--dur-md) var(--ease-soft), visibility var(--dur-md);
+}
+.chat-panel.is-open { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+
+.chat-panel__header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--border-hairline); }
+.chat-panel__header strong { display: block; font-size: var(--fs-sm); color: var(--text-body); }
+.chat-panel__header span { font-size: 0.7rem; color: var(--ink-muted); }
+.chat-panel__close { width: 1.75rem; height: 1.75rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-muted); }
+
+.chat-panel__messages { flex: 1; overflow-y: auto; padding: var(--space-md); display: flex; flex-direction: column; gap: 0.6rem; }
+
+.chat-bubble { max-width: 85%; padding: 0.6rem 0.85rem; border-radius: var(--radius-md); font-size: var(--fs-sm); line-height: 1.4; }
+.chat-bubble--bot { align-self: flex-start; background: var(--surface-1); color: var(--text-body); border-bottom-left-radius: 0.25rem; }
+.chat-bubble--user { align-self: flex-end; background: var(--gradient-gold); color: var(--ink); border-bottom-right-radius: 0.25rem; }
+.chat-bubble a { text-decoration: underline; }
+
+.chat-panel__form { display: flex; gap: 0.5rem; padding: var(--space-sm) var(--space-md); border-top: 1px solid var(--border-hairline); }
+.chat-panel__form input {
+  flex: 1;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-1);
+  color: var(--text-body);
+  font-size: var(--fs-sm);
+}
+.chat-panel__form .btn-icon { background: var(--gradient-gold); color: var(--ink); border: none; flex-shrink: 0; }
+
+/* ============================================================
+   TOASTS
+   ============================================================ */
+.toast-stack {
+  position: fixed;
+  left: 50%;
+  bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+  width: max-content;
+  max-width: 90vw;
+}
+
+.toast {
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--cream);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity var(--dur-sm) var(--ease-soft), transform var(--dur-sm) var(--ease-soft);
+}
+[data-theme="dark"] .toast { background: var(--gold-light); color: var(--ink); }
+.toast.is-visible { opacity: 1; transform: translateY(0); }
+
+/* ============================================================
+   BUTTON RIPPLE (micro-interaction, applies to any [data-ripple])
+   ============================================================ */
+[data-ripple] { position: relative; overflow: hidden; }
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  transform: scale(0);
+  animation: ripple-expand 0.6s ease-out;
+  pointer-events: none;
+}
+@keyframes ripple-expand { to { transform: scale(2.5); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ripple { display: none; } }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1180px) {
+  .catalog__grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 1023px) {
+  body.booking-app { padding-top: 3.75rem; padding-bottom: calc(4rem + env(safe-area-inset-bottom)); }
+
+  .app-navbar { height: 3.75rem; }
+  .catalog__toolbar { top: 3.75rem; }
+  .app-navbar__links, .app-navbar__link[data-filter-category="package"] { display: none; }
+
+  .app-navbar__actions .app-navbar__cart-btn,
+  .app-navbar__actions .app-navbar__dropdown--profile,
+  .app-navbar__actions .app-navbar__icon-btn:not([data-dropdown-trigger]) { display: none; }
+  .app-navbar__back span { display: none; }
+
+  .bottom-nav { display: flex; }
+  .chat-fab { display: inline-flex; }
+
+  /* The bottom nav's own Cart icon already opens this same panel (both share
+     [data-cart-toggle]) — the floating bubble would just duplicate it and
+     visually collide with the chat FAB in the same corner. */
+  .floating-cart__bubble { display: none; }
+
+  .catalog { padding-inline: var(--space-sm); }
+  .catalog__layout { flex-direction: column; }
+
+  .filter-sidebar {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    left: auto;
+    width: min(85vw, 320px);
+    max-height: none;
+    border-radius: 0;
+    z-index: var(--z-app-dropdown);
+    transform: translateX(100%);
+    transition: transform var(--dur-md) var(--ease-premium);
+  }
+  .filter-sidebar.is-open { transform: translateX(0); }
+  .filter-sidebar__header { display: flex; }
+  .filter-sidebar__close { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; color: var(--text-body); }
+
+  .filter-sidebar-backdrop.is-open { display: block; }
+
+  .sort-bar__filter-btn { display: inline-flex; }
+
+  .catalog__grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-sm); }
+  .quick-view-modal { flex-direction: column; width: min(92vw, 420px); }
+  .quick-view-modal__media { flex: 0 0 auto; aspect-ratio: 4/3; }
+
+  .floating-cart { bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+}
+
+@media (max-width: 640px) {
+  .catalog__grid { grid-template-columns: 1fr; gap: 0.75rem; }
+  .floating-cart__panel, .chat-panel { width: 92vw; }
+
+  /* Count + Filters + Sort all crowded one row at this width — give the
+     count its own line and let Filters/Sort share the row below it
+     (Filters/Sort first, count second — reordered visually via `order`
+     without changing the source order desktop's inline layout relies on). */
+  .sort-bar { flex-wrap: wrap; row-gap: 0.5rem; }
+  .sort-bar__count { flex: 1 1 100%; order: 2; }
+  .sort-bar__controls { flex: 1 1 100%; justify-content: space-between; order: 1; }
+
+  /* Full-width stacked cards (4:3 photo + all meta) ran too tall in a single
+     column. A left-image list-row keeps the photo prominent and Add to Cart
+     reachable with a thumb, while the body grows tall enough for a real
+     description — the image stretches to match via flex align-items:stretch
+     (aspect-ratio is turned off below so it doesn't fight that stretch). */
+  .catalog-card { display: flex; flex-direction: row; }
+
+  .catalog-card__media { width: 8rem; flex: 0 0 8rem; aspect-ratio: auto; }
+  .catalog-card:hover .catalog-card__media img { transform: none; }
+
+  .catalog-card__badges { top: 0.35rem; left: 0.35rem; max-width: calc(100% - 0.7rem); gap: 0.25rem; }
+  .catalog-card__badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
+  .catalog-card__badges .catalog-card__badge:nth-child(n+2) { display: none; }
+
+  .catalog-card__wishlist { top: 0.35rem; right: 0.35rem; width: 1.6rem; height: 1.6rem; }
+  .catalog-card__wishlist svg { width: 13px; height: 13px; }
+
+  /* Quick View can't rely on :hover on a touch screen, so it's promoted to
+     an always-visible circular icon button next to the wishlist heart
+     instead of the desktop hover-reveal pill. */
+  .catalog-card__quickview {
+    left: auto; bottom: auto;
+    top: 0.35rem; right: 2.15rem;
+    width: 1.6rem; height: 1.6rem;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--ink);
+    opacity: 1;
+    transform: none;
+  }
+  .catalog-card__quickview svg { width: 13px; height: 13px; }
+  .catalog-card__quickview-label { display: none; }
+
+  .catalog-card__unavailable { padding: 0.3rem; font-size: 0.6rem; line-height: 1.15; }
+
+  .catalog-card__body { flex: 1; min-width: 0; padding: 0.65rem 0.75rem; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem; }
+  .catalog-card__category { font-size: 0.65rem; }
+  .catalog-card__name { font-size: 0.95rem; margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .catalog-card__desc { font-size: 0.75rem; margin-top: 0.1rem; }
+  .catalog-card__meta { margin-top: 0.15rem; font-size: 0.7rem; }
+  .catalog-card__footer { margin-top: 0.4rem; }
+  .catalog-card__price-now { font-size: 1rem; }
+  .catalog-card__footer .btn--sm { padding: 0.35rem 0.7rem; font-size: 0.75rem; }
+}
+
+/* ============================================================
+   BOOKING DRAWER (Phase 2) — address, calendar, slots, payment, summary
+   ============================================================ */
+/* Deliberately NOT named .drawer-backdrop — that class already exists in
+   components.css (the marketing mobile-nav drawer) with a hardcoded
+   `z-index: 999990 !important`, which silently broke this element's
+   stacking (it rendered above the booking drawer itself, swallowing clicks
+   meant for the map inside it). Real bug, found via CDP click-coordinate
+   tracing — see developed.md "Service Booking App" before reusing a
+   "generic-sounding" class name from components.css on this page. */
+.booking-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-drawer) - 1);
+  background: rgba(22, 18, 15, 0.6);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-md) var(--ease-soft);
+}
+.booking-drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+
+.booking-drawer {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: min(92vw, 480px);
+  z-index: var(--z-drawer);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform var(--dur-md) var(--ease-premium);
+  box-shadow: var(--shadow-lg);
+}
+.booking-drawer.is-open { transform: translateX(0); }
+
+.booking-drawer__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border-hairline);
+  flex-shrink: 0;
+}
+.booking-drawer__header h2 { font-family: var(--font-display); font-size: 1.2rem; color: var(--text-body); }
+.booking-drawer__close {
+  width: 2rem; height: 2rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+.booking-stepper { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
+.booking-stepper__step {
+  width: 1.75rem; height: 1.75rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  background: var(--surface-1);
+  color: var(--ink-muted);
+  border: 1px solid var(--border-hairline);
+}
+.booking-stepper__step.is-active { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+[data-theme="dark"] .booking-stepper__step.is-active { background: var(--gold-light); color: var(--ink); border-color: var(--gold-light); }
+.booking-stepper__step.is-complete { background: var(--accent-gold); color: var(--ink); border-color: var(--accent-gold); }
+
+.booking-drawer__body { flex: 1; overflow-y: auto; padding: var(--space-md); }
+.booking-step { display: none; }
+.booking-step.is-active { display: block; }
+.booking-step h3 { font-family: var(--font-display); font-size: 1.2rem; margin-bottom: var(--space-sm); color: var(--text-body); }
+
+/* --- Step 1: address --- */
+.address-list { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: var(--space-sm); }
+.address-list__empty { font-size: var(--fs-sm); color: var(--ink-muted); }
+.address-card {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-1);
+}
+.address-card strong { display: block; font-size: var(--fs-sm); color: var(--text-body); }
+.address-card p { font-size: var(--fs-xs); color: var(--ink-muted); margin-top: 0.2rem; }
+.address-card.is-selected { border-color: var(--gold-deep); background: var(--surface-2); box-shadow: 0 0 0 2px var(--gold-deep) inset; }
+
+.address-form { margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border-hairline); }
+.booking-map { height: 220px; border-radius: var(--radius-md); overflow: hidden; margin-bottom: 0.5rem; border: 1px solid var(--border-hairline); }
+.address-form__hint { font-size: var(--fs-xs); color: var(--ink-muted); margin-bottom: var(--space-sm); }
+.address-form__actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: var(--space-sm); }
+
+/* --- Step 2: calendar --- */
+.booking-calendar__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm); }
+.booking-calendar__header button { width: 2rem; height: 2rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--text-body); }
+.booking-calendar__header button:hover { background: var(--surface-1); }
+.booking-calendar__header strong { font-family: var(--font-display); color: var(--text-body); }
+.booking-calendar__weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: var(--fs-xs); color: var(--ink-muted); margin-bottom: 0.4rem; }
+.booking-calendar__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.3rem; }
+.booking-calendar__day {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-sm);
+  color: var(--text-body);
+}
+.booking-calendar__day:hover:not(:disabled) { background: var(--surface-1); }
+.booking-calendar__day.is-selected { background: var(--ink); color: var(--cream); }
+[data-theme="dark"] .booking-calendar__day.is-selected { background: var(--gold-light); color: var(--ink); }
+.booking-calendar__day.is-past, .booking-calendar__day:disabled { color: var(--border-hairline); cursor: not-allowed; }
+.booking-calendar__day--blank { visibility: hidden; }
+
+/* --- Step 3: booking type / slots --- */
+.slot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-top: var(--space-md); }
+.slot-card {
+  padding: 0.85rem 0.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-1);
+  text-align: center;
+}
+.slot-card strong { display: block; font-size: var(--fs-sm); color: var(--text-body); }
+.slot-card span { font-size: var(--fs-xs); color: var(--ink-muted); }
+.slot-card.is-selected { border-color: var(--gold-deep); background: var(--surface-2); box-shadow: 0 0 0 2px var(--gold-deep) inset; }
+
+.urgent-time { margin-top: var(--space-md); }
+.urgent-time label { display: block; font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); margin-bottom: 0.4rem; }
+.urgent-time input[type="time"] { padding: 0.6rem 0.9rem; border-radius: var(--radius-sm); border: 1px solid var(--border-hairline); background: var(--surface-1); color: var(--text-body); font-size: var(--fs-sm); }
+
+/* --- Step 4: payment --- */
+.payment-options { display: flex; flex-direction: column; gap: 0.6rem; }
+.payment-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-1);
+  text-align: left;
+  color: var(--text-body);
+}
+.payment-card svg { flex-shrink: 0; color: var(--accent-gold); }
+.payment-card strong { display: block; font-size: var(--fs-sm); }
+.payment-card span { font-size: var(--fs-xs); color: var(--ink-muted); }
+.payment-card.is-selected { border-color: var(--gold-deep); box-shadow: 0 0 0 2px var(--gold-deep) inset; }
+
+.payment-mock { margin-top: var(--space-md); padding: var(--space-md); border-radius: var(--radius-md); background: var(--surface-1); text-align: center; }
+.payment-mock p { font-size: var(--fs-sm); color: var(--ink-muted); margin-bottom: var(--space-sm); }
+.payment-mock__status { margin-top: var(--space-sm); font-weight: 600; color: var(--gold-deep); min-height: 1.2em; }
+
+/* --- Step 5: summary --- */
+.booking-summary__row { margin-bottom: var(--space-sm); }
+.booking-summary__row strong { display: block; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); margin-bottom: 0.2rem; }
+.booking-summary__row p { font-size: var(--fs-sm); color: var(--text-body); }
+.booking-summary__items { margin: var(--space-sm) 0; padding-block: var(--space-sm); border-top: 1px solid var(--border-hairline); border-bottom: 1px solid var(--border-hairline); }
+.booking-summary__item { display: flex; justify-content: space-between; font-size: var(--fs-sm); color: var(--text-body); padding-block: 0.25rem; }
+.booking-summary__totals { margin-top: var(--space-sm); }
+
+/* --- Confirmation --- */
+.booking-confirmation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 60vh;
+  padding: var(--space-xl);
+  gap: 0.5rem;
+}
+.booking-confirmation svg { color: var(--gold-deep); margin-bottom: var(--space-sm); }
+.booking-confirmation h3 { font-family: var(--font-display); font-size: 1.5rem; color: var(--text-body); }
+.booking-confirmation p { font-size: var(--fs-sm); color: var(--ink-muted); }
+.booking-confirmation strong { color: var(--accent-gold); }
+.booking-confirmation .btn { margin-top: var(--space-md); }
+
+/* --- Footer --- */
+.booking-drawer__footer { display: flex; gap: var(--space-sm); padding: var(--space-md); border-top: 1px solid var(--border-hairline); flex-shrink: 0; }
+.booking-drawer__footer .btn { flex: 1; }
+.booking-drawer__footer .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+@media (max-width: 640px) {
+  .booking-drawer { width: 100vw; }
+  .slot-grid { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+  .slot-card { padding: 0.6rem 0.3rem; }
+}

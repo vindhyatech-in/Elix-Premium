@@ -25,14 +25,14 @@
           <div class="service-card__body">
             <div class="service-card__top">
               <h3 class="service-card__name">{{ service.name }}</h3>
-              <span class="stars" aria-label="Rated {{ service.rating }} out of 5">★ {{ service.rating }}</span>
+              {% if service.rating %}<span class="stars" aria-label="Rated {{ service.rating }} out of 5">★ {{ service.rating }}</span>{% endif %}
             </div>
             <p class="service-card__desc">{{ service.description }}</p>
             <div class="service-card__meta">
               <span>{{ service.duration }}</span>
               <span class="service-card__price">₹{{ service.price }}</span>
             </div>
-            <a href="#contact" class="btn btn--ghost btn--sm service-card__cta">Enquire Now</a>
+            <a href="{% url 'services_booking' %}?open_cart=1" class="btn btn--ghost btn--sm service-card__cta" data-add-to-booking-cart data-catalog-id="{{ service.id }}">Book Now</a>
           </div>
         </article>
       {% endfor %}

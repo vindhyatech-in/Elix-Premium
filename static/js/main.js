@@ -329,6 +329,39 @@
   }
 
   /* ---------------------------------------------------------
+   * "Book Now" / "Choose <package>" CTAs (Featured Services, Packages) —
+   * add the item straight to the Service Booking app's cart and hand off
+   * to /services-booking/, instead of just linking to the contact form.
+   * Writes the exact same localStorage shape booking.js's cart expects
+   * ([{id, qty}] under 'glamour_cart') — the marketing and booking pages
+   * are separate bundles (see developed.md), so this is a small, self-
+   * contained duplicate of booking.js's addItem() rather than a shared
+   * import. Service/package `id`s in mock_data.py were chosen to match
+   * core/booking_data.py's catalog ids 1:1, which is what makes this work
+   * without a lookup step. The `?open_cart=1` query param on the link
+   * (added in the templates) tells booking.js to auto-open the mini-cart
+   * on arrival — see its initFloatingCart().
+   * ------------------------------------------------------- */
+  function initMarketingBookButtons() {
+    const buttons = document.querySelectorAll('[data-add-to-booking-cart]');
+    if (!buttons.length) return;
+
+    buttons.forEach((link) => {
+      link.addEventListener('click', () => {
+        const id = link.dataset.catalogId;
+        if (!id) return;
+        let cart = [];
+        try { cart = JSON.parse(localStorage.getItem('glamour_cart')) || []; } catch (e) { cart = []; }
+        const line = cart.find((l) => l.id === id);
+        if (line) line.qty += 1; else cart.push({ id, qty: 1 });
+        localStorage.setItem('glamour_cart', JSON.stringify(cart));
+        // No preventDefault — the <a href> navigation to /services-booking/
+        // proceeds normally right after this synchronous write.
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------
    * Cursor glow (desktop pointer only)
    * ------------------------------------------------------- */
   function initCursorGlow() {
@@ -351,6 +384,7 @@
     initServiceFilters();
     initAccordion();
     initLeadForms();
+    initMarketingBookButtons();
     initCursorGlow();
   });
 })();

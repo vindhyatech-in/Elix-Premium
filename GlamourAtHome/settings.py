@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 
+from decouple import config
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -38,8 +40,20 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    # django-allauth — see "Authentication" in developed.md. django.contrib.sites
+    # is a hard requirement of allauth (it associates SocialApps with a Site).
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.apple',
+
     # Local apps
     'core',
+    'accounts',
+    'catalog',
+    'bookings',
 ]
 
 MIDDLEWARE = [
@@ -50,6 +64,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'GlamourAtHome.urls'
@@ -74,6 +89,16 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'GlamourAtHome.wsgi.application'
+
+# django.contrib.sites — required by allauth.
+SITE_ID = 1
+
+# Django's default ModelBackend still needed for the Django admin;
+# allauth's backend adds email-based login on top of it.
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
 
 
 # Database
@@ -154,4 +179,65 @@ SOCIAL_LINKS = {
 APP_LINKS = {
     'android': 'https://play.google.com/store/apps/details?id=com.glamourathome.app',
     'ios': 'https://apps.apple.com/app/glamour-at-home/id0000000000',
+}
+
+# ---------------------------------------------------------------------------
+# Service Booking app (/services-booking/) — Phase 2 integration keys.
+# Read from .env (gitignored; see .env.example), default to '' so Phase 1
+# (catalog/cart) runs with zero setup. Not consumed by any view yet — Phase 2
+# (booking drawer: Google Maps address step, Razorpay payment step) is what
+# will read these. See developed.md "Service Booking App" section.
+# ---------------------------------------------------------------------------
+GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
+RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID', default='')
+RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='')
+
+# ---------------------------------------------------------------------------
+# Authentication (django-allauth) — see developed.md "Authentication".
+# Email-based login/signup (no username field), password reset via email,
+# plus Google/Apple social login. Google/Apple credentials below follow the
+# exact same "reserved .env slot, default empty, wire up later" pattern as
+# GOOGLE_MAPS_API_KEY/RAZORPAY_KEY_ID above — the buttons render now, actual
+# sign-in only works once real values are dropped into .env.
+# ---------------------------------------------------------------------------
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+# Sends a verification email on signup but does NOT block login on it —
+# keeps local testing (console email backend) unblocked. Tighten to
+# 'mandatory' once real email delivery + the "please verify" UX are wanted.
+ACCOUNT_EMAIL_VERIFICATION = 'optional'
+ACCOUNT_RATE_LIMITS = False  # dev-friendly; revisit before any real deploy
+
+LOGIN_REDIRECT_URL = '/services-booking/'
+LOGOUT_REDIRECT_URL = '/services-booking/'
+LOGIN_URL = '/accounts/login/'
+
+# Prints emails (password reset, optional verification) to the runserver
+# console instead of actually sending — see developed.md for the real-SMTP swap.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = SITE_EMAIL
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': config('GOOGLE_OAUTH_CLIENT_ID', default=''),
+            'secret': config('GOOGLE_OAUTH_CLIENT_SECRET', default=''),
+            'key': '',
+        },
+        'SCOPE': ['profile', 'email'],
+    },
+    'apple': {
+        'APP': {
+            'client_id': config('APPLE_OAUTH_CLIENT_ID', default=''),  # Services ID
+            'secret': config('APPLE_OAUTH_TEAM_ID', default=''),       # Team ID
+            'key': config('APPLE_OAUTH_KEY_ID', default=''),           # Key ID
+            'settings': {
+                # Contents of the .p8 private key file downloaded once from
+                # Apple — used to sign the JWT client-secret allauth generates
+                # per request. 'certificate_key' at the top level of APP also
+                # works but is deprecated in favor of nesting it here.
+                'certificate_key': config('APPLE_OAUTH_PRIVATE_KEY', default=''),
+            },
+        },
+    },
 }

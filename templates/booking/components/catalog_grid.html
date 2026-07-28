@@ -1,0 +1,37 @@
+{% load glamour_extras %}
+{{ booking_catalog|json_script:"catalog-data" }}
+
+<section class="catalog" id="catalog" data-api="/api/v1/services/" aria-label="Service catalog">
+  <div class="catalog__layout">
+    {% include 'booking/components/filter_sidebar.html' %}
+
+    <div class="catalog__main">
+      <div class="catalog__toolbar" data-catalog-toolbar>
+        <div class="catalog__search">
+          {% include 'booking/components/search_bar.html' %}
+        </div>
+
+        {% include 'booking/components/sort_bar.html' %}
+      </div>
+
+      <div class="catalog__grid" data-catalog-skeleton>
+        {% for _ in 8|times %}
+          <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton-card__media"></div>
+            <div class="skeleton-card__line skeleton-card__line--title"></div>
+            <div class="skeleton-card__line"></div>
+            <div class="skeleton-card__line skeleton-card__line--short"></div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="catalog__grid" data-catalog-grid hidden>
+        {% for item in booking_catalog %}
+          {% include 'booking/components/catalog_card.html' with item=item %}
+        {% endfor %}
+      </div>
+
+      <p class="catalog__empty" data-catalog-empty hidden>No services match your filters. Try clearing a few.</p>
+    </div>
+  </div>
+</section>

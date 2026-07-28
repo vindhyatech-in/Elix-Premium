@@ -1,0 +1,20 @@
+{% extends 'booking/layouts/booking_base.html' %}
+{% load static %}
+
+{% block title %}Book a Service — {{ SITE.name }}{% endblock %}
+
+{% block content %}
+  {% include 'booking/components/app_navbar.html' %}
+
+  <main id="main-content" class="booking-main">
+    {% include 'booking/components/catalog_grid.html' %}
+  </main>
+
+  {% include 'booking/components/bottom_nav.html' %}
+  {% include 'booking/components/chat_panel.html' %}
+  {% include 'booking/components/quick_view_modal.html' %}
+  {% include 'booking/components/floating_cart.html' %}
+  {% include 'booking/components/booking_drawer.html' %}
+
+  <div class="toast-stack" data-toast-stack aria-live="polite" aria-atomic="true"></div>
+{% endblock %}

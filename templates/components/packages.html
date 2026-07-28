@@ -21,7 +21,7 @@
               <li>{{ feature }}</li>
             {% endfor %}
           </ul>
-          <a href="#contact" class="btn {% if package.featured %}btn--primary{% else %}btn--ghost{% endif %}">Choose {{ package.name }}</a>
+          <a href="{% url 'services_booking' %}?open_cart=1" class="btn {% if package.featured %}btn--primary{% else %}btn--ghost{% endif %}" data-add-to-booking-cart data-catalog-id="{{ package.id }}">Choose {{ package.name }}</a>
         </article>
       {% endfor %}
     </div>

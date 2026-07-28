@@ -98,6 +98,19 @@
   --z-preloader: 900;
   --z-cursor: 800;
   --z-modal: 700;
+
+  /* Service Booking app (booking.css) — appended rather than reusing the
+     marketing z-indexes above, since the app shell's stacking (sticky nav +
+     bottom nav + dropdowns + cart + modal + toasts, all above one another
+     in a defined order) is independent of the landing page's. */
+  --z-app-nav: 600;
+  --z-app-dropdown: 650;
+  --z-bottom-nav: 600;
+  --z-fab: 620;
+  --z-cart: 680;
+  --z-app-modal: 750;
+  --z-drawer: 760; /* booking drawer (Phase 2) — sits above the quick-view modal */
+  --z-toast: 950;
 }
 
 /* ============================================================

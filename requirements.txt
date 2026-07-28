@@ -1,7 +1,10 @@
 Django==6.0.7
+python-decouple==3.8   # reads .env for the booking app's Maps/Razorpay keys (see .env.example)
+django-allauth[socialaccount]==65.18.0   # authentication: email/password + Google/Apple (see developed.md "Authentication")
+reportlab==5.0.0
+pillow==12.3.0
 
 # --- Future, once the REST API layer is built (see developed.md) ---
 # djangorestframework
 # django-cors-headers
-# Pillow          # image handling once real photography/media models exist
 # qrcode          # server-generated App Store/Play Store QR codes

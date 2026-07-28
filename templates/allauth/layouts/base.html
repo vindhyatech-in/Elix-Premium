@@ -1,0 +1,47 @@
+{% load static %}<!doctype html>
+<html lang="en-IN">
+<head>
+  <script>
+    // Same no-flash theme technique as base.html/booking_base.html — auth
+    // pages share the same design tokens/dark-mode preference.
+    (function () {
+      var stored = localStorage.getItem('theme');
+      var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block head_title %}Account{% endblock head_title %} — {{ SITE.name }}</title>
+
+  <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+  {% block extra_head %}{% endblock extra_head %}
+</head>
+<body class="auth-page">
+  {% block body %}
+    <div class="auth-shell">
+      <a href="{% url 'index' %}" class="auth-shell__logo">Glamour<span>At</span>Home</a>
+
+      {% if messages %}
+        <div class="auth-messages">
+          {% for message in messages %}<p class="auth-message">{{ message }}</p>{% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="auth-card">
+        {% block content %}{% endblock content %}
+      </div>
+
+      <a href="{% url 'services_booking' %}" class="auth-shell__back">← Back to Glamour At Home</a>
+    </div>
+  {% endblock body %}
+  {% block extra_body %}{% endblock extra_body %}
+</body>
+</html>

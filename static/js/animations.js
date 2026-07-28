@@ -195,6 +195,30 @@
   }
 
   /* ---------------------------------------------------------
+   * "How It Works" — steps reveal one by one as the track
+   * scrolls into view, instead of appearing all at once.
+   * ------------------------------------------------------- */
+  function initHowItWorksReveal() {
+    const track = document.querySelector('[data-hiw-track]');
+    const steps = document.querySelectorAll('.how-it-works__step');
+    if (!track || !steps.length || !hasGSAP || !window.ScrollTrigger || prefersReducedMotion) return;
+
+    gsap.set(steps, { opacity: 0, y: 36 });
+    gsap.to(steps, {
+      opacity: 1,
+      y: 0,
+      duration: 0.7,
+      ease: 'power3.out',
+      stagger: 0.15,
+      scrollTrigger: {
+        trigger: track,
+        start: 'top 80%',
+        once: true,
+      },
+    });
+  }
+
+  /* ---------------------------------------------------------
    * "How It Works" — scroll-scrubbed connecting line
    * ------------------------------------------------------- */
   function initTimelineLine() {
@@ -255,6 +279,7 @@
     initHeroReveal();
     initCounters();
     initWhyUsSticky();
+    initHowItWorksReveal();
     initTimelineLine();
     initCompareSliders();
     initCardTilt();
