@@ -52,7 +52,7 @@ def get_booking_catalog():
     Endpoint: GET /api/v1/services/ + GET /api/v1/packages/ (merged).
 
     Single services and packages are unified into one list so search/filter/
-    sort/cart/wishlist can treat every item generically — each is tagged
+    sort/cart can treat every item generically — each is tagged
     `kind: 'service' | 'package'`. Queries the real catalog models (see
     module docstring) but keeps the exact list-of-dicts shape templates/JS
     have always consumed — `core/views.py` and every template/JS consumer
@@ -83,6 +83,16 @@ def get_booking_catalog():
         variant = service.default_variant
         if not variant:
             continue
+        # Built from the prefetched `variants` queryset (filtered/sorted in
+        # Python, not a fresh `.filter()` call) so this doesn't cost an
+        # extra query per service on top of the one `default_variant`
+        # already makes. Lets the quick-view modal offer every price point
+        # instead of only ever showing/adding the one `default_variant`
+        # picks — see developed.md "Catalog & Bookings models".
+        all_variants = sorted(
+            (v for v in service.variants.all() if v.is_active),
+            key=lambda v: (v.sort_order, v.id),
+        )
         catalog.append({
             'id': service.slug,
             'kind': service.kind,
@@ -101,6 +111,19 @@ def get_booking_catalog():
             'photo': service.photo,
             'discount_pct': variant.discount_pct,
             'duration_label': variant.duration_label,
+            'variants': [
+                {
+                    'id': v.id,
+                    'label': v.label or v.duration_label,
+                    'price': float(v.price),
+                    'mrp': float(v.mrp) if v.mrp else None,
+                    'duration_mins': v.duration_mins,
+                    'duration_label': v.duration_label,
+                    'discount_pct': v.discount_pct,
+                    'is_default': v.id == variant.id,
+                }
+                for v in all_variants
+            ],
         })
     return catalog
 

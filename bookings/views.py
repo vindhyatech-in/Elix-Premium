@@ -71,17 +71,28 @@ def create_booking(request):
     if booking_type == 'urgent' and not exact_time:
         return JsonResponse({'ok': False, 'error': 'Select a time.'}, status=400)
 
-    # Resolve cart -> real ServiceVariant prices server-side.
+    # Resolve cart -> real ServiceVariant prices server-side. A line's
+    # variantId (set once the quick-view variant picker exists — see
+    # developed.md "Catalog & Bookings models") picks a specific
+    # ServiceVariant; omitted/blank (packages, or a line added from the
+    # marketing page, which has no picker) falls back to the service's
+    # default variant, same as before variants were selectable.
     line_items = []
     subtotal = Decimal('0')
     for line in cart:
         slug = line.get('id')
+        variant_id = line.get('variantId')
         try:
             qty = max(1, int(line.get('qty') or 1))
         except (TypeError, ValueError):
             return JsonResponse({'ok': False, 'error': 'Invalid cart quantity.'}, status=400)
         service = Service.objects.filter(slug=slug, is_active=True).first()
-        variant = service.default_variant if service else None
+        if not service:
+            return JsonResponse({'ok': False, 'error': f'"{slug}" is no longer available.'}, status=400)
+        if variant_id:
+            variant = service.variants.filter(id=variant_id, is_active=True).first()
+        else:
+            variant = service.default_variant
         if not variant:
             return JsonResponse({'ok': False, 'error': f'"{slug}" is no longer available.'}, status=400)
         line_items.append((variant, qty))
@@ -117,7 +128,7 @@ def create_booking(request):
         BookingItem(
             booking=booking,
             service_variant=variant,
-            name_snapshot=variant.service.name,
+            name_snapshot=f'{variant.service.name} — {variant.label}' if variant.label else variant.service.name,
             price_snapshot=variant.price,
             duration_snapshot=variant.duration_mins,
             quantity=qty,

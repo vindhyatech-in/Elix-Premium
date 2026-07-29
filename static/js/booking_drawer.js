@@ -245,13 +245,25 @@
     });
 
     /* --- Payment --- */
+    // A cart line's variantId (see initFloatingCart's addItem() in
+    // booking.js) picks a specific ServiceVariant's price/duration instead
+    // of the catalog item's flat (default-variant) fields — falls back to
+    // the item's own price when unset (packages, or lines added from the
+    // marketing page, never carry a variantId).
+    function lineVariant(item, line) {
+      if (line.variantId === undefined || line.variantId === null || line.variantId === '') return null;
+      return (item.variants || []).find((v) => v.id === Number(line.variantId)) || null;
+    }
+
     function cartTotal() {
       const cart = GB.getCart();
       const catalog = GB.getCatalog();
       let subtotal = 0;
       cart.forEach((line) => {
         const item = catalog.find((i) => i.id === line.id);
-        if (item) subtotal += item.price * line.qty;
+        if (!item) return;
+        const variant = lineVariant(item, line);
+        subtotal += (variant ? variant.price : item.price) * line.qty;
       });
       const rate = GB.getAppliedDiscountRate();
       const discount = Math.round(subtotal * rate);
@@ -314,7 +326,13 @@
       const itemsHtml = cart.map((line) => {
         const item = catalog.find((i) => i.id === line.id);
         if (!item) return '';
-        return `<div class="booking-summary__item"><span>${escapeHtml(item.name)} × ${line.qty}</span><span>${GB.formatCurrency(item.price * line.qty)}</span></div>`;
+        const variant = lineVariant(item, line);
+        const price = variant ? variant.price : item.price;
+        // Only worth naming the variant when it was an actual choice among
+        // several — see the matching comment in booking.js's cart render().
+        const hasRealVariants = item.variants && item.variants.length > 1;
+        const name = variant && variant.label && hasRealVariants ? `${item.name} — ${variant.label}` : item.name;
+        return `<div class="booking-summary__item"><span>${escapeHtml(name)} × ${line.qty}</span><span>${GB.formatCurrency(price * line.qty)}</span></div>`;
       }).join('');
 
       el.innerHTML = `

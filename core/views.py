@@ -38,9 +38,9 @@ def index(request):
 def services_booking(request):
     """
     The Service Booking app (Phase 1: catalog browsing, search, filters,
-    sort, wishlist, cart — see developed.md "Service Booking App" for the
+    sort, cart — see developed.md "Service Booking App" for the
     Phase 2/3 roadmap: booking drawer, real chat, notifications backend,
-    wishlist page, bookings dashboard).
+    bookings dashboard).
     """
     context = {
         'booking_categories': booking_data.get_booking_categories(),

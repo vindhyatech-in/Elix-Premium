@@ -8,7 +8,7 @@
  * hero navbar/drawer, carousels, accordion, lead forms) no-ops harmlessly
  * here since those elements don't exist on this page.
  *
- * State (cart/wishlist/recent searches) persists to localStorage — there's
+ * State (cart/recent searches) persists to localStorage — there's
  * no backend/auth yet (see developed.md "Service Booking App", Phase 2/3).
  */
 (function () {
@@ -19,12 +19,22 @@
   const STATIC_URL = document.body.dataset.staticUrl || '/static/';
 
   const CART_KEY = 'glamour_cart';
-  const WISHLIST_KEY = 'glamour_wishlist';
   const RECENT_SEARCH_KEY = 'glamour_recent_searches';
   const COUPONS = { GLAM10: 0.10, WEEKDAY15: 0.15, BUNDLE20: 0.20 };
 
   let currentSearchQuery = '';
   let appliedCoupon = null; // module-level so booking_drawer.js's summary total can match the mini-cart's
+  // Set by initQuickView() once it runs; initFloatingCart()'s Add to Cart
+  // handler calls openQuickViewItem() directly for multi-variant items
+  // rather than simulating a click on the card's [data-quick-view] button
+  // — that simulated click was itself getting intercepted by
+  // initQuickViewTouchPeek()'s capture-phase listener on touch devices
+  // (it lives inside .catalog-card__media, so the "first tap just reveals
+  // the pill" logic swallowed it instead of letting the modal open).
+  // closeQuickView() lets that same handler auto-close the modal once its
+  // own Add to Cart click has actually added the item.
+  let openQuickViewItem = null;
+  let closeQuickView = null;
 
   /* ---------------------------------------------------------
    * Small shared utilities
@@ -118,8 +128,8 @@
   }
 
   /* ---------------------------------------------------------
-   * "Coming soon" stubs — Bookings, Wishlist page, Addresses,
-   * Proceed to Booking, etc. Not built until Phase 2/3.
+   * "Coming soon" stubs — Bookings, Addresses, etc. Not built
+   * until Phase 2/3.
    * ------------------------------------------------------- */
   function initComingSoonStubs() {
     document.body.addEventListener('click', (e) => {
@@ -169,12 +179,11 @@
   }
 
   /* ---------------------------------------------------------
-   * Mobile off-canvas filter sidebar — two entry points share this one
-   * panel: the bottom nav's "Categories" icon and the sort bar's "Filters"
-   * button (both carry [data-filters-toggle]), intentionally redundant
-   * since the sort-bar one is far more discoverable than an icon labelled
-   * "Categories" secretly opening the full filter set (price/rating/
-   * duration/etc., not just categories) — see developed.md.
+   * Mobile off-canvas filter sidebar, opened by the sort bar's
+   * "Filters" button ([data-filters-toggle]). The bottom nav used to
+   * have a second, redundant "Categories" entry point for this same
+   * panel — removed since the sort-bar button is the more discoverable
+   * of the two (see developed.md).
    * ------------------------------------------------------- */
   function initMobileFilters() {
     const toggles = document.querySelectorAll('[data-filters-toggle]');
@@ -287,7 +296,11 @@
     priceRange?.addEventListener('input', () => {
       const val = Number(priceRange.value);
       priceValueEl.textContent = val >= 10000 ? '₹10,000+' : formatCurrency(val);
+      // Update the gold-fill gradient on the range track
+      const pct = (val / 10000) * 100;
+      priceRange.style.setProperty('--range-pct', `${pct}%`);
       applyCatalogState();
+      updateFilterBadge();
     });
 
     const durationRange = sidebar.querySelector('[data-filter-duration]');
@@ -295,7 +308,11 @@
     durationRange?.addEventListener('input', () => {
       const val = Number(durationRange.value);
       durationValueEl.textContent = val >= 300 ? '5h+' : formatDuration(val);
+      // Update the gold-fill gradient on the range track
+      const pct = (val / 300) * 100;
+      durationRange.style.setProperty('--range-pct', `${pct}%`);
       applyCatalogState();
+      updateFilterBadge();
     });
 
     function wireSegmented(selector) {
@@ -308,36 +325,77 @@
           btn.classList.add('is-active');
           btn.setAttribute('aria-checked', 'true');
           applyCatalogState();
+          updateFilterBadge();
         });
       });
     }
     wireSegmented('[data-filter-type]');
     wireSegmented('[data-filter-rating]');
 
-    sidebar.querySelector('[data-filter-offers]')?.addEventListener('change', applyCatalogState);
-    sidebar.querySelector('[data-filter-availability]')?.addEventListener('change', applyCatalogState);
+    sidebar.querySelector('[data-filter-offers]')?.addEventListener('change', () => { applyCatalogState(); updateFilterBadge(); });
+    sidebar.querySelector('[data-filter-availability]')?.addEventListener('change', () => { applyCatalogState(); updateFilterBadge(); });
 
     document.querySelector('[data-filters-clear]')?.addEventListener('click', () => {
       sidebar.querySelectorAll('[data-filter-category-checkbox]').forEach((cb) => { cb.checked = false; });
       sidebar.querySelector('[data-filter-offers]').checked = false;
       sidebar.querySelector('[data-filter-availability]').checked = false;
-      if (priceRange) { priceRange.value = 10000; priceValueEl.textContent = '₹10,000+'; }
-      if (durationRange) { durationRange.value = 300; durationValueEl.textContent = '5h+'; }
+      if (priceRange) { priceRange.value = 10000; priceValueEl.textContent = '₹10,000+'; priceRange.style.setProperty('--range-pct', '100%'); }
+      if (durationRange) { durationRange.value = 300; durationValueEl.textContent = '5h+'; durationRange.style.setProperty('--range-pct', '100%'); }
       [sidebar.querySelector('[data-filter-type]'), sidebar.querySelector('[data-filter-rating]')].forEach((group) => {
         const buttons = group?.querySelectorAll('.filter-segmented__btn') || [];
         buttons.forEach((b, i) => { b.classList.toggle('is-active', i === 0); b.setAttribute('aria-checked', String(i === 0)); });
       });
       applyCatalogState();
+      updateFilterBadge();
     });
+  }
+
+  /* Count active filter selections and show/hide the badge on the Filters
+   * button. Called after every filter clear / applyCatalogState that comes
+   * from a filter change. */
+  function updateFilterBadge() {
+    const badge = document.querySelector('[data-filter-badge]');
+    if (!badge) return;
+    const state = getFilterState();
+    let count = 0;
+    if (state.type !== 'all') count++;
+    count += state.categories.length;
+    if (state.maxPrice < 10000) count++;
+    if (state.maxDuration < 300) count++;
+    if (state.minRating > 0) count++;
+    if (state.offersOnly) count++;
+    if (state.availableOnly) count++;
+    badge.textContent = count || '';
+    badge.classList.toggle('is-visible', count > 0);
   }
 
   function initSort() {
     const select = document.querySelector('[data-sort-select]');
-    if (!select) return;
-    if (window.Choices) {
-      new Choices(select, { searchEnabled: false, itemSelectText: '', shouldSort: false, allowHTML: false });
-    }
-    select.addEventListener('change', applyCatalogState);
+    const pills = document.querySelectorAll('[data-sort-pill]');
+    if (!select && !pills.length) return;
+
+    // Choices.js is no longer used (replaced by pill buttons), but keep the
+    // guard so the old CDN tag doesn't error if still present in base template.
+    // if (window.Choices) { new Choices(select, { ... }); }
+
+    pills.forEach((pill) => {
+      pill.addEventListener('click', () => {
+        // Update pill active state
+        pills.forEach((p) => p.classList.remove('is-active'));
+        pill.classList.add('is-active');
+        // Sync hidden select so getFilterState() keeps working unchanged
+        if (select) {
+          select.value = pill.dataset.sortPill;
+          select.dispatchEvent(new Event('change'));
+        } else {
+          applyCatalogState();
+        }
+      });
+    });
+
+    // Keep hidden select as fallback change driver for any code that
+    // calls select.dispatchEvent('change') directly
+    select?.addEventListener('change', applyCatalogState);
   }
 
   // "Packages" nav shortcut + Categories dropdown items both drive the same
@@ -460,25 +518,63 @@
   }
 
   /* ---------------------------------------------------------
-   * Wishlist — localStorage-persisted set of catalog ids
+   * "Read more" for catalog card descriptions — trims the text word by
+   * word (binary search) until it fits the 2-line box (see
+   * .catalog-card__desc's max-height/line-height in booking.css), then
+   * appends "Read more" as the last inline node of that same paragraph,
+   * so it reads as a continuation of the sentence rather than a separate
+   * element below it. It carries [data-quick-view] itself (see
+   * catalog_card.html on the paragraph), so clicking it opens the same
+   * Quick View modal as the photo.
    * ------------------------------------------------------- */
-  function initWishlist() {
-    const wishlist = new Set(readJSON(WISHLIST_KEY, []));
+  function initDescReadMore() {
+    const descs = document.querySelectorAll('[data-catalog-desc]');
+    if (!descs.length) return;
 
-    function sync(btn) {
-      btn.setAttribute('aria-pressed', String(wishlist.has(btn.dataset.catalogId)));
+    function truncate(desc) {
+      const full = desc.dataset.fullDesc;
+      desc.textContent = full;
+      if (desc.scrollHeight <= desc.clientHeight + 1) return; // fits as-is, no button needed
+
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'catalog-card__desc-more';
+      more.dataset.quickView = '';
+      more.dataset.catalogId = desc.dataset.catalogId;
+      more.textContent = 'Read more';
+
+      // "Read more" itself takes up inline space, so it has to be part of
+      // each trial's fit test below — trimming only the description text
+      // and appending the button afterwards risks pushing the button past
+      // the 2-line box, where overflow:hidden would clip it invisibly.
+      const words = full.split(' ');
+      function setTrial(n) {
+        desc.textContent = `${words.slice(0, n).join(' ')}… `;
+        desc.appendChild(more);
+      }
+
+      let low = 0;
+      let high = words.length;
+      while (low < high) {
+        const mid = Math.ceil((low + high) / 2);
+        setTrial(mid);
+        if (desc.scrollHeight <= desc.clientHeight + 1) low = mid;
+        else high = mid - 1;
+      }
+      setTrial(low);
     }
-    document.querySelectorAll('[data-wishlist-toggle]').forEach(sync);
 
-    document.body.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-wishlist-toggle]');
-      if (!btn) return;
-      const id = btn.dataset.catalogId;
-      if (wishlist.has(id)) { wishlist.delete(id); showToast('Removed from wishlist'); }
-      else { wishlist.add(id); showToast('Added to wishlist'); }
-      localStorage.setItem(WISHLIST_KEY, JSON.stringify(Array.from(wishlist)));
-      document.querySelectorAll(`[data-wishlist-toggle][data-catalog-id="${id}"]`).forEach(sync);
-    });
+    function check() { descs.forEach(truncate); }
+
+    check();
+    // The catalog grid is still hidden behind the loading skeleton at
+    // DOMContentLoaded time (see initSkeletonReveal) — a hidden element's
+    // scrollHeight/clientHeight are both 0, so this first check() always
+    // finds "no overflow". Re-run once the grid is actually revealed, and
+    // again on resize since a breakpoint change can change how much text
+    // fits in 2 lines.
+    document.addEventListener('glamour:catalog-revealed', check);
+    window.addEventListener('resize', debounce(check, 200));
   }
 
   /* ---------------------------------------------------------
@@ -490,19 +586,18 @@
     const backdrop = document.querySelector('[data-modal-backdrop]');
     if (!modal || !backdrop) return;
 
-    function open(item) {
-      modal.querySelector('[data-qv-photo]').src = `${STATIC_URL}${item.photo}`;
-      modal.querySelector('[data-qv-photo]').alt = item.name;
-      modal.querySelector('[data-qv-category]').textContent = item.category.charAt(0).toUpperCase() + item.category.slice(1);
-      modal.querySelector('[data-qv-name]').textContent = item.name;
-      modal.querySelector('[data-qv-desc]').textContent = item.description;
+    // Reflects whichever variant is currently selected — duration/price/
+    // discount badge and the Add to Cart button's target variant all
+    // follow it. For a single-variant (or variant-less, e.g. package)
+    // item this just mirrors the flat item.price/duration_label fields.
+    function selectVariant(item, variant) {
       const hasReviews = !!item.reviews_count;
       modal.querySelector('[data-qv-rating]').textContent = hasReviews ? `★ ${item.rating}` : '';
       modal.querySelector('[data-qv-rating]').hidden = !hasReviews;
       modal.querySelector('[data-qv-reviews]').textContent = hasReviews ? `(${item.reviews_count} reviews)` : '';
       modal.querySelector('[data-qv-reviews]').hidden = !hasReviews;
       modal.querySelector('[data-qv-dot]').hidden = !hasReviews;
-      modal.querySelector('[data-qv-duration]').textContent = item.duration_label;
+      modal.querySelector('[data-qv-duration]').textContent = variant.duration_label;
 
       const badgesEl = modal.querySelector('[data-qv-badges]');
       badgesEl.innerHTML = '';
@@ -511,15 +606,53 @@
         span.textContent = b;
         badgesEl.appendChild(span);
       });
-      if (item.discount_pct) {
+      if (variant.discount_pct) {
         const span = document.createElement('span');
-        span.textContent = `${item.discount_pct}% OFF`;
+        span.textContent = `${variant.discount_pct}% OFF`;
         badgesEl.appendChild(span);
       }
 
-      modal.querySelector('[data-qv-price]').textContent = formatCurrency(item.price);
-      modal.querySelector('[data-qv-mrp]').textContent = item.mrp ? formatCurrency(item.mrp) : '';
+      modal.querySelector('[data-qv-price]').textContent = formatCurrency(variant.price);
+      modal.querySelector('[data-qv-mrp]').textContent = variant.mrp ? formatCurrency(variant.mrp) : '';
+      modal.querySelector('[data-qv-add-to-cart]').dataset.variantId = variant.id ?? '';
+
+      modal.querySelectorAll('.quick-view-modal__variant-pill').forEach((pill) => {
+        pill.classList.toggle('is-active', Number(pill.dataset.variantId) === variant.id);
+      });
+    }
+
+    function renderVariants(item) {
+      const wrap = modal.querySelector('[data-qv-variants]');
+      const list = modal.querySelector('[data-qv-variant-list]');
+      const variants = item.variants || [];
+      list.innerHTML = '';
+
+      if (variants.length < 2) { wrap.hidden = true; return; }
+      wrap.hidden = false;
+      variants.forEach((v) => {
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'quick-view-modal__variant-pill';
+        pill.dataset.variantId = v.id;
+        pill.innerHTML = `<span class="variant-pill__label">${escapeHtml(v.label)}</span><span class="variant-pill__price">${formatCurrency(v.price)}</span>`;
+        pill.addEventListener('click', () => selectVariant(item, v));
+        list.appendChild(pill);
+      });
+    }
+
+    function open(item) {
+      modal.querySelector('[data-qv-photo]').src = `${STATIC_URL}${item.photo}`;
+      modal.querySelector('[data-qv-photo]').alt = item.name;
+      modal.querySelector('[data-qv-category]').textContent = item.category.charAt(0).toUpperCase() + item.category.slice(1);
+      modal.querySelector('[data-qv-name]').textContent = item.name;
+      modal.querySelector('[data-qv-desc]').textContent = item.description;
       modal.querySelector('[data-qv-add-to-cart]').dataset.catalogId = item.id;
+
+      renderVariants(item);
+      const variants = item.variants || [];
+      const defaultVariant = variants.find((v) => v.is_default) || variants[0]
+        || { id: null, price: item.price, mrp: item.mrp, duration_label: item.duration_label, discount_pct: item.discount_pct };
+      selectVariant(item, defaultVariant);
 
       modal.hidden = false;
       backdrop.hidden = false;
@@ -544,6 +677,41 @@
     modal.querySelector('[data-modal-close]')?.addEventListener('click', close);
     backdrop.addEventListener('click', close);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('is-open')) close(); });
+
+    openQuickViewItem = open;
+    closeQuickView = close;
+  }
+
+  /* ---------------------------------------------------------
+   * Touch fallback for the Quick View pill — it only ever reveals on
+   * :hover (see .catalog-card__quickview in booking.css), which real
+   * touchscreens never trigger. On coarse/no-hover pointers, the first
+   * tap on the photo just reveals the pill (mirrors what a mouse hover
+   * would show); tapping the now-visible pill itself opens the modal.
+   * Runs in the capture phase so it can intercept the tap before
+   * initQuickView()'s bubble-phase click handler above sees it.
+   * ------------------------------------------------------- */
+  function initQuickViewTouchPeek() {
+    if (isFinePointer) return;
+
+    document.body.addEventListener('click', (e) => {
+      const media = e.target.closest('.catalog-card__media');
+      if (!media) {
+        document.querySelectorAll('.catalog-card.is-peeking').forEach((c) => c.classList.remove('is-peeking'));
+        return;
+      }
+      const card = media.closest('.catalog-card');
+      if (!card) return;
+
+      const alreadyPeeking = card.classList.contains('is-peeking');
+      const onQuickViewBtn = !!e.target.closest('[data-quick-view]');
+      if (onQuickViewBtn && alreadyPeeking) return; // let this tap open the modal normally
+
+      e.preventDefault();
+      e.stopPropagation();
+      document.querySelectorAll('.catalog-card.is-peeking').forEach((c) => { if (c !== card) c.classList.remove('is-peeking'); });
+      card.classList.toggle('is-peeking', !alreadyPeeking);
+    }, true);
   }
 
   /* ---------------------------------------------------------
@@ -565,6 +733,23 @@
     const proceedBtn = document.querySelector('[data-proceed-to-booking]');
     if (!root || !itemsEl) return;
 
+    // Cart lines match on (id, variantId) together, not just id — the same
+    // service with two different variants selected (e.g. Honey Wax +
+    // Chocolate Wax, both "Full Arms") are two separate lines, not one.
+    // variantId is normalized to `null` (never undefined) so a line added
+    // before variants existed, or one added from the marketing page (which
+    // has no variant picker and always sends a bare {id, qty}), matches
+    // consistently against the item's default variant.
+    function normalizedVariantId(v) { return v === undefined || v === null || v === '' ? null : Number(v); }
+    function findVariant(item, variantId) {
+      return (item.variants || []).find((v) => v.id === variantId) || null;
+    }
+    function lineKey(id, variantId) { return `${id}::${variantId === null ? '' : variantId}`; }
+    function parseLineKey(key) {
+      const sep = key.lastIndexOf('::');
+      return { id: key.slice(0, sep), variantId: normalizedVariantId(key.slice(sep + 2) || null) };
+    }
+
     function render() {
       const cart = getCart();
       const catalog = getCatalog();
@@ -575,23 +760,33 @@
       cart.forEach((line) => {
         const item = catalog.find((i) => i.id === line.id);
         if (!item) return;
+        const variantId = normalizedVariantId(line.variantId);
+        const variant = findVariant(item, variantId);
+        const price = variant ? variant.price : item.price;
+        // Only worth naming the variant when it was an actual choice among
+        // several — catalog.py falls back to duration_label ("3h") for a
+        // single-variant service's blank label, which would otherwise show
+        // a meaningless "(3h)" suffix on things like packages.
+        const hasRealVariants = item.variants && item.variants.length > 1;
+        const name = variant && variant.label && hasRealVariants ? `${item.name} — ${variant.label}` : item.name;
+        const key = lineKey(item.id, variantId);
         count += line.qty;
-        subtotal += item.price * line.qty;
+        subtotal += price * line.qty;
 
         const row = document.createElement('div');
         row.className = 'cart-line';
         row.innerHTML = `
           <img src="${STATIC_URL}${item.photo}" alt="">
           <div class="cart-line__info">
-            <p class="cart-line__name">${escapeHtml(item.name)}</p>
-            <p class="cart-line__price">${formatCurrency(item.price)} × ${line.qty}</p>
+            <p class="cart-line__name">${escapeHtml(name)}</p>
+            <p class="cart-line__price">${formatCurrency(price)} × ${line.qty}</p>
           </div>
           <div class="cart-line__qty">
-            <button type="button" data-cart-decrement="${item.id}" aria-label="Decrease quantity">−</button>
+            <button type="button" data-cart-decrement="${key}" aria-label="Decrease quantity">−</button>
             <span>${line.qty}</span>
-            <button type="button" data-cart-increment="${item.id}" aria-label="Increase quantity">+</button>
+            <button type="button" data-cart-increment="${key}" aria-label="Increase quantity">+</button>
           </div>
-          <button type="button" class="cart-line__remove" data-cart-remove="${item.id}" aria-label="Remove ${escapeHtml(item.name)}">
+          <button type="button" class="cart-line__remove" data-cart-remove="${key}" aria-label="Remove ${escapeHtml(name)}">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
           </button>`;
         itemsEl.appendChild(row);
@@ -619,26 +814,36 @@
       if (proceedBtn) proceedBtn.disabled = cart.length === 0;
     }
 
-    function addItem(id) {
+    // Does NOT open the cart panel — a toast is enough confirmation that
+    // the add worked. The panel now only opens for an explicit cart-icon
+    // click, or the marketing-page ?open_cart=1 handoff below; it used to
+    // pop open on every single Add to Cart click anywhere in the app,
+    // which was disruptive when adding several items in a row.
+    function addItem(id, variantId) {
+      variantId = normalizedVariantId(variantId);
       const cart = getCart();
-      const line = cart.find((l) => l.id === id);
-      if (line) line.qty += 1; else cart.push({ id, qty: 1 });
+      const line = cart.find((l) => l.id === id && normalizedVariantId(l.variantId) === variantId);
+      if (line) line.qty += 1; else cart.push({ id, variantId, qty: 1 });
       saveCart(cart);
       const item = getCatalog().find((i) => i.id === id);
-      showToast(item ? `${item.name} added to cart` : 'Added to cart');
-      open();
+      const variant = item ? findVariant(item, variantId) : null;
+      const hasRealVariants = item && item.variants && item.variants.length > 1;
+      const label = variant && variant.label && hasRealVariants ? ` (${variant.label})` : '';
+      showToast(item ? `${item.name}${label} added to cart` : 'Added to cart');
     }
 
-    function changeQty(id, delta) {
+    function changeQty(key, delta) {
+      const { id, variantId } = parseLineKey(key);
       const cart = getCart();
-      const line = cart.find((l) => l.id === id);
+      const line = cart.find((l) => l.id === id && normalizedVariantId(l.variantId) === variantId);
       if (!line) return;
       line.qty += delta;
-      saveCart(line.qty <= 0 ? cart.filter((l) => l.id !== id) : cart);
+      saveCart(line.qty <= 0 ? cart.filter((l) => l !== line) : cart);
     }
 
-    function removeItem(id) {
-      saveCart(getCart().filter((l) => l.id !== id));
+    function removeItem(key) {
+      const { id, variantId } = parseLineKey(key);
+      saveCart(getCart().filter((l) => !(l.id === id && normalizedVariantId(l.variantId) === variantId)));
     }
 
     function open() {
@@ -685,10 +890,38 @@
     });
 
     document.body.addEventListener('click', (e) => {
-      const addBtn = e.target.closest('[data-add-to-cart], [data-qv-add-to-cart]');
+      // Quick View's own Add to Cart already has a variant picker right
+      // there in the modal — data-variant-id (kept in sync by
+      // initQuickView's selectVariant()) is whichever pill is selected.
+      // Closes the modal afterwards — the toast from addItem() is enough
+      // confirmation, and leaving it open reads as if the click did nothing.
+      const qvBtn = e.target.closest('[data-qv-add-to-cart]');
+      if (qvBtn) {
+        const id = qvBtn.dataset.catalogId;
+        if (id) addItem(id, qvBtn.dataset.variantId || null);
+        closeQuickView?.();
+        return;
+      }
+
+      const addBtn = e.target.closest('[data-add-to-cart]');
       if (!addBtn) return;
       const id = addBtn.dataset.catalogId;
-      if (id) addItem(id);
+      if (!id) return;
+      const item = getCatalog().find((i) => i.id === id);
+      const variants = (item && item.variants) || [];
+      if (variants.length > 1) {
+        // The card has no room for a picker — hand off to Quick View
+        // instead of silently adding whichever variant happens to be
+        // default. Calls openQuickViewItem() directly rather than
+        // simulating a click on the card's [data-quick-view] button —
+        // that button lives inside .catalog-card__media, where
+        // initQuickViewTouchPeek()'s capture-phase listener intercepts the
+        // first tap on touch devices as a "reveal the pill" gesture and
+        // never lets the click reach Quick View's own open handler.
+        if (item) openQuickViewItem?.(item);
+        return;
+      }
+      addItem(id, variants[0] ? variants[0].id : null);
     });
 
     // booking_drawer.js clears the cart via window.GlamourBooking.saveCart([])
@@ -775,6 +1008,10 @@
       applyCatalogState();
       initCardTilt();
       if (window.AOS) AOS.refresh();
+      // Anything that measured card layout (e.g. initDescReadMore's
+      // scrollHeight check) would have seen a hidden, zero-size grid if it
+      // ran before this point — let it know the grid is actually visible now.
+      document.dispatchEvent(new Event('glamour:catalog-revealed'));
     };
 
     if (prefersReducedMotion) { reveal(); return; }
@@ -807,13 +1044,15 @@
     initSort();
     initNavCategoryShortcuts();
     initSearch();
-    initWishlist();
     initQuickView();
+    initQuickViewTouchPeek();
+    initDescReadMore();
     initFloatingCart();
     initChatFab();
     initComingSoonStubs();
     initRipple();
     initSkeletonReveal();
+    updateFilterBadge();
 
     // Small shared surface for booking_drawer.js (Phase 2) — keeps "catalog
     // browsing" (this file) and "booking flow" (booking_drawer.js) as

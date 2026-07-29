@@ -2,21 +2,35 @@
   <p class="sort-bar__count"><strong data-result-count>0</strong> services &amp; packages</p>
 
   <div class="sort-bar__controls">
+    {# Mobile-only Filters button (sidebar is permanently visible on desktop) #}
     <button type="button" class="btn btn--ghost btn--sm sort-bar__filter-btn" data-filters-toggle aria-controls="filter-sidebar" aria-expanded="false">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="1.6" fill="currentColor"/><circle cx="16" cy="12" r="1.6" fill="currentColor"/><circle cx="10" cy="18" r="1.6" fill="currentColor"/></svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="1.6" fill="currentColor"/><circle cx="16" cy="12" r="1.6" fill="currentColor"/><circle cx="10" cy="18" r="1.6" fill="currentColor"/></svg>
       Filters
+      {# Active-filter count badge — shown/hidden + populated by JS #}
+      <span class="sort-bar__filter-badge" data-filter-badge aria-hidden="true"></span>
     </button>
 
-    <div class="sort-bar__control">
-      <label for="sort-select" class="sr-only">Sort by</label>
-      <select id="sort-select" data-sort-select>
-        <option value="popularity">Most Popular</option>
-        <option value="newest">Newest</option>
-        <option value="price-asc">Price: Low to High</option>
-        <option value="price-desc">Price: High to Low</option>
-        <option value="rating">Highest Rated</option>
-        <option value="duration">Duration</option>
-      </select>
+    {% comment %}Sort pill buttons — replace the native <select> for a premium feel.
+       data-sort-value maps to the same keys SORTERS uses in booking.js.
+       The hidden <select> below keeps getFilterState() working unchanged
+       (it reads [data-sort-select].value); JS clicks sync the value there.{% endcomment %}
+    <div class="sort-pills" role="group" aria-label="Sort by">
+      <button type="button" class="sort-pill is-active" data-sort-pill="popularity">Most Popular</button>
+      <button type="button" class="sort-pill" data-sort-pill="newest">Newest</button>
+      <button type="button" class="sort-pill" data-sort-pill="price-asc">Price ↑</button>
+      <button type="button" class="sort-pill" data-sort-pill="price-desc">Price ↓</button>
+      <button type="button" class="sort-pill" data-sort-pill="rating">Top Rated</button>
+      <button type="button" class="sort-pill" data-sort-pill="duration">Duration</button>
     </div>
+
+    {# Hidden select kept as single source of truth read by getFilterState() #}
+    <select id="sort-select" data-sort-select class="sr-only" aria-hidden="true" tabindex="-1">
+      <option value="popularity">Most Popular</option>
+      <option value="newest">Newest</option>
+      <option value="price-asc">Price: Low to High</option>
+      <option value="price-desc">Price: High to Low</option>
+      <option value="rating">Highest Rated</option>
+      <option value="duration">Duration</option>
+    </select>
   </div>
 </div>

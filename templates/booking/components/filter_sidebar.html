@@ -1,7 +1,7 @@
 {# Popularity is intentionally not a separate filter control here — it's #}
-{# already covered by the Sort bar ("Most Popular"); a duplicate filter #}
-{# widget for the same signal would just add noise. #}
-<aside class="filter-sidebar" id="filter-sidebar" data-filter-sidebar aria-label="Filters">
+{# already covered by the Sort bar ("Most Popular"); a duplicate filter    #}
+{# widget for the same signal would just add noise.                        #}
+<aside class="filter-sidebar" id="filter-sidebar" data-filter-sidebar aria-label="Filters" data-lenis-prevent>
   <div class="filter-sidebar__header">
     <strong>Filters</strong>
     <button type="button" class="filter-sidebar__close" data-filters-close aria-label="Close filters">
@@ -9,8 +9,14 @@
     </button>
   </div>
 
+  {# ── Type ──────────────────────────────────── #}
   <div class="filter-group">
-    <p class="filter-group__label">Type</p>
+    <p class="filter-group__label">
+      <span class="filter-group__label-inner">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Type
+      </span>
+    </p>
     <div class="filter-segmented" data-filter-type role="radiogroup" aria-label="Service type">
       <button type="button" class="filter-segmented__btn is-active" data-type-value="all" role="radio" aria-checked="true">All</button>
       <button type="button" class="filter-segmented__btn" data-type-value="service" role="radio" aria-checked="false">Single Services</button>
@@ -18,30 +24,63 @@
     </div>
   </div>
 
+  {# ── Category ──────────────────────────────── #}
   <div class="filter-group">
-    <p class="filter-group__label">Category</p>
+    <p class="filter-group__label">
+      <span class="filter-group__label-inner">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        Category
+      </span>
+    </p>
     <div class="filter-checkbox-list" data-filter-categories>
       {% for cat in booking_categories %}
         <label class="filter-checkbox">
           <input type="checkbox" value="{{ cat.slug }}" data-filter-category-checkbox>
+          <span class="filter-checkbox__box">
+            <span class="filter-checkbox__check"></span>
+          </span>
           <span>{{ cat.name }}</span>
         </label>
       {% endfor %}
     </div>
   </div>
 
+  {# ── Max Price ─────────────────────────────── #}
   <div class="filter-group">
-    <p class="filter-group__label">Max Price <span data-price-value>₹10,000</span></p>
-    <input type="range" min="0" max="10000" step="100" value="10000" class="filter-range" data-filter-price>
+    <p class="filter-group__label">
+      <span class="filter-group__label-inner">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Max Price
+      </span>
+      <span data-price-value>₹10,000+</span>
+    </p>
+    <div class="filter-range-wrap">
+      <input type="range" min="0" max="10000" step="100" value="10000" class="filter-range" data-filter-price>
+    </div>
   </div>
 
+  {# ── Max Duration ──────────────────────────── #}
   <div class="filter-group">
-    <p class="filter-group__label">Max Duration <span data-duration-value>5h+</span></p>
-    <input type="range" min="0" max="300" step="15" value="300" class="filter-range" data-filter-duration>
+    <p class="filter-group__label">
+      <span class="filter-group__label-inner">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Max Duration
+      </span>
+      <span data-duration-value>5h+</span>
+    </p>
+    <div class="filter-range-wrap">
+      <input type="range" min="0" max="300" step="15" value="300" class="filter-range" data-filter-duration>
+    </div>
   </div>
 
+  {# ── Minimum Rating ────────────────────────── #}
   <div class="filter-group">
-    <p class="filter-group__label">Minimum Rating</p>
+    <p class="filter-group__label">
+      <span class="filter-group__label-inner">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Minimum Rating
+      </span>
+    </p>
     <div class="filter-segmented" data-filter-rating role="radiogroup" aria-label="Minimum rating">
       <button type="button" class="filter-segmented__btn is-active" data-rating-value="0" role="radio" aria-checked="true">Any</button>
       <button type="button" class="filter-segmented__btn" data-rating-value="4" role="radio" aria-checked="false">4.0+</button>
@@ -49,17 +88,33 @@
     </div>
   </div>
 
+  {# ── Extras ────────────────────────────────── #}
   <div class="filter-group">
+    <p class="filter-group__label">
+      <span class="filter-group__label-inner">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Extras
+      </span>
+    </p>
     <label class="filter-checkbox">
       <input type="checkbox" data-filter-offers>
+      <span class="filter-checkbox__box">
+        <span class="filter-checkbox__check"></span>
+      </span>
       <span>On offer only</span>
     </label>
-    <label class="filter-checkbox">
+    <label class="filter-checkbox" style="margin-top: 0.25rem;">
       <input type="checkbox" data-filter-availability>
+      <span class="filter-checkbox__box">
+        <span class="filter-checkbox__check"></span>
+      </span>
       <span>Available today</span>
     </label>
   </div>
 
-  <button type="button" class="btn btn--ghost btn--sm filter-sidebar__clear" data-filters-clear>Clear Filters</button>
+  <button type="button" class="btn btn--ghost btn--sm filter-sidebar__clear" data-filters-clear>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+    Clear Filters
+  </button>
 </aside>
 <div class="filter-sidebar-backdrop" data-filters-backdrop></div>

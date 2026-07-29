@@ -932,3 +932,93 @@ demo catalog (`catalog/migrations/0004_replace_demo_with_real_catalog.py`).
   migration following `0004`'s pattern.
 - No DRF app scaffolded yet (`djangorestframework` is commented out in
   `requirements.txt`) — uncomment and `pip install` when that work begins.
+
+## Premium UI Upgrade — Navbar, Search, Filter & Sort (added 2026-07-29)
+
+All visual and interaction upgrades stay within the existing design token
+system (`variables.css`) and break zero existing JS hooks (`data-*`
+attributes, `id`s, ARIA). Both the booking app's UI components and their
+backing CSS were updated together; no template structure changes were needed
+for the marketing navbar (it already had `backdrop-filter` on `.is-scrolled`).
+
+### Booking app navbar (`app_navbar.html` + `booking.css`)
+
+- **Frosted glass**: `background` is now `rgba(255,255,255,0.82)` +
+  `backdrop-filter: blur(18px) saturate(180%)` — the navbar shows
+  translucent page content beneath it instead of a flat opaque `--surface-2`.
+  Dark-mode uses `rgba(36,30,25,0.82)`.
+- **Scroll compression** (`initAppNavbarScroll()` in `booking.js`):
+  `window.scrollY > 48` → `[data-scrolled]` attribute added to `#app-navbar`.
+  CSS transitions `height` from `4.5rem → 3.75rem` and tightens the
+  background opacity and shadow. Logo font-size also subtly reduces.
+- **Nav link hover underlines**: `::after` pseudo-element with a gold gradient
+  `scaleX(0 → 1)` on hover/`.is-active`.
+- **Icon-button hover lift**: `color → --accent-gold`, `border-color → --gold`,
+  `box-shadow` gold ring, `translateY(-1px)` — same premium affordance as the
+  marketing site's card hovers.
+- **Avatar gold ring glow**: `border: 2px solid transparent` → `border-color:
+  --gold` + `box-shadow` ring on hover.
+- **Notification badge pulse**: `badge-pulse` keyframe animation on
+  `.app-navbar__badge-dot` — subtle glow pulse to draw attention.
+- **Cart count pop**: `.app-navbar__cart-count.is-updated` runs a `cart-pop`
+  scale keyframe whenever the cart is updated.
+
+### Search bar (`search_bar.html` + `booking.css`)
+
+- **Gold glow focus ring**: `box-shadow: 0 0 0 4px rgba(201,161,90,0.15)`
+  on the input when focused — replaces the basic `border-color` change.
+- **Icon morph on focus**: `.search-bar:focus-within .search-bar__icon`
+  scales `1.1×` and shifts to `var(--gold-deep)`.
+- **Slide-in panel**: `search-panel-in` keyframe (`opacity 0→1`,
+  `translateY(-6px → 0)`) on the autosuggest panel appearance.
+- **Result row slide**: `search-result:hover` translates `translateX(3px)`
+  + shows a CSS chevron arrow `::after` pseudo-element.
+- **Tag hover**: tag chips animate `border-color`, `color`, `background`
+  on hover for interactive feedback.
+
+### Sort bar (`sort_bar.html` + `booking.css` + `booking.js`)
+
+- **Sort pills replace the native `<select>`**: six `<button
+  data-sort-pill="…">` pill buttons (Most Popular | Newest | Price ↑ | Price
+  ↓ | Top Rated | Duration) replace the old `<select id="sort-select">`.
+  - The hidden `<select data-sort-select class="sr-only">` is preserved so
+    `getFilterState()` continues reading `.value` unchanged — the
+    `initSort()` click handler in `booking.js` syncs the pill's
+    `dataset.sortPill` into it before dispatching `'change'`.
+  - Choices.js is no longer initialized (the pill UI supersedes it); the
+    guard is kept as a no-op comment so the CDN tag (if still present in
+    the base template) doesn't error.
+  - Active pill: `--gradient-gold` background + `box-shadow: 0 4px 14px
+    rgba(169,127,55,0.3)` + `translateY(-1px)`.
+  - On mobile (≤640px): `.sort-pills { flex-wrap: nowrap }` and
+    `.sort-bar__controls { overflow-x: auto }` — pills scroll horizontally
+    instead of wrapping.
+- **Active filter count badge** (`data-filter-badge` in `sort_bar.html`):
+  `updateFilterBadge()` in `booking.js` counts every non-default filter
+  selection (type ≠ all, categories, price, duration, rating, offers,
+  availability) and shows a gold `--gradient-gold` badge bubble on the mobile
+  Filters button. The badge pops in with a `badge-pop` keyframe.
+
+### Filter sidebar (`filter_sidebar.html` + `booking.css`)
+
+- **SVG icons per group label**: each `filter-group__label` now has a
+  `filter-group__label-inner` flex wrapper with an inline SVG icon (grid
+  for Type, tag for Category, currency for Price, clock for Duration, star
+  for Rating, checkbox for Extras) styled `color: var(--accent-gold)`.
+- **Custom checkboxes** (`.filter-checkbox__box` + `.filter-checkbox__check`):
+  native `<input type="checkbox">` hidden via `appearance: none`; a custom
+  box `div` shows a gold-gradient fill + ink checkmark tick on `:checked`.
+  A CSS fallback (`:not(:has(~ .filter-checkbox__box))`) keeps offer/
+  availability toggles working if `.filter-checkbox__box` isn't present.
+- **Premium range slider**: `appearance: none` on the `<input type="range">`;
+  custom thumb (`--gradient-gold`, white border, gold shadow, scale on hover);
+  custom track uses a CSS `linear-gradient` with `--range-pct` CSS variable
+  that `booking.js` updates on every `input` event, giving a live gold-fill
+  left of the thumb.
+- **Filter group header**: mobile slide-in header now shows an italic Fraunces
+  "Filters" heading + border-bottom.
+- **Clear Filters button**: gold outline (`border-color: --gold`), trash SVG
+  icon, subtle gold background on hover. When clicked, range `--range-pct`
+  is also reset to `100%` alongside the value reset.
+- **Backdrop blur**: `.filter-sidebar-backdrop` gains `backdrop-filter:
+  blur(3px)` to subtly focus attention on the open sidebar.

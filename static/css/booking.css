@@ -36,7 +36,7 @@ body.booking-app {
 .booking-main { min-height: 60vh; }
 
 /* ============================================================
-   APP NAVBAR (desktop)
+   APP NAVBAR (desktop) — frosted glass, scroll compression
    ============================================================ */
 .app-navbar {
   position: fixed;
@@ -45,9 +45,17 @@ body.booking-app {
   height: 4.5rem;
   display: flex;
   align-items: center;
-  background: var(--surface-2);
+  /* Frosted glass: transparent base + backdrop blur for premium translucency.
+     background must be semi-transparent for backdrop-filter to be visible. */
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
   border-bottom: 1px solid var(--border-hairline);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 0 rgba(22, 18, 15, 0.04), var(--shadow-sm);
+}
+
+[data-theme="dark"] .app-navbar {
+  background: rgba(36, 30, 25, 0.82);
 }
 
 .app-navbar__inner {
@@ -64,6 +72,7 @@ body.booking-app {
   font-weight: 600;
   color: var(--text-body);
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
 .app-navbar__logo span { color: var(--accent-gold); font-style: italic; }
@@ -77,9 +86,27 @@ body.booking-app {
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-body);
-  padding: 0.5rem 0.25rem;
+  padding: 0.5rem 0.35rem;
   white-space: nowrap;
+  position: relative;
+  /* Animated underline indicator */
+  transition: color var(--dur-sm) var(--ease-soft);
 }
+.app-navbar__link::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--gradient-gold);
+  border-radius: var(--radius-pill);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform var(--dur-sm) var(--ease-premium);
+}
+.app-navbar__link:hover::after,
+.app-navbar__link.is-active::after { transform: scaleX(1); }
+.app-navbar__link:hover,
+.app-navbar__link.is-active { color: var(--accent-gold); }
 
 /* Search lives in the catalog content (.catalog__search, near the sort bar)
    on every breakpoint, not in the navbar — see developed.md "Service
@@ -88,7 +115,21 @@ body.booking-app {
 
 .app-navbar__actions { display: flex; align-items: center; gap: var(--space-2xs); flex-shrink: 0; margin-left: auto; }
 
-.app-navbar__icon-btn { position: relative; color: var(--text-body); border-color: var(--border-hairline); }
+.app-navbar__icon-btn {
+  position: relative;
+  color: var(--text-body);
+  border-color: var(--border-hairline);
+  transition: color var(--dur-sm) var(--ease-soft),
+              border-color var(--dur-sm) var(--ease-soft),
+              box-shadow var(--dur-sm) var(--ease-soft),
+              transform var(--dur-sm) var(--ease-soft);
+}
+.app-navbar__icon-btn:hover {
+  color: var(--accent-gold);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 161, 90, 0.15);
+  transform: translateY(-1px);
+}
 
 .app-navbar__badge-dot {
   position: absolute;
@@ -97,7 +138,14 @@ body.booking-app {
   border-radius: 50%;
   background: var(--gold-deep);
   border: 2px solid var(--surface-2);
+  /* Subtle pulse to attract attention */
+  animation: badge-pulse 2.5s ease-in-out infinite;
 }
+@keyframes badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(169, 127, 55, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(169, 127, 55, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .app-navbar__badge-dot { animation: none; } }
 
 .app-navbar__avatar {
   width: 2.5rem; height: 2.5rem;
@@ -109,6 +157,15 @@ body.booking-app {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border: 2px solid transparent;
+  transition: border-color var(--dur-sm) var(--ease-soft),
+              box-shadow var(--dur-sm) var(--ease-soft),
+              transform var(--dur-sm) var(--ease-soft);
+}
+.app-navbar__avatar:hover {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 161, 90, 0.2);
+  transform: translateY(-1px);
 }
 
 .app-navbar__cart-btn { position: relative; }
@@ -127,6 +184,16 @@ body.booking-app {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* Shimmer on update — triggered by .is-updated class added/removed via JS */
+  transition: transform 0.2s var(--ease-premium);
+}
+.app-navbar__cart-count.is-updated {
+  animation: cart-pop 0.35s var(--ease-premium);
+}
+@keyframes cart-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.5); }
+  100% { transform: scale(1); }
 }
 
 [data-theme="dark"] .app-navbar__cart-count { background: var(--gold-light); color: var(--ink); }
@@ -216,26 +283,38 @@ body.booking-app {
 .notif-item__copy time { font-size: 0.7rem; color: var(--ink-muted); opacity: 0.8; }
 
 /* ============================================================
-   SEARCH BAR + autosuggest
+   SEARCH BAR + autosuggest — premium pill with gold glow focus
    ============================================================ */
 .search-bar { position: relative; }
 
 .search-bar__icon {
   position: absolute;
-  left: 0.9rem; top: 50%;
+  left: 1rem; top: 50%;
   transform: translateY(-50%);
   color: var(--ink-muted);
   pointer-events: none;
+  transition: color var(--dur-sm) var(--ease-soft),
+              transform var(--dur-sm) var(--ease-premium);
+}
+
+/* Icon subtly scales+shifts to a warmer color on focus */
+.search-bar:focus-within .search-bar__icon {
+  color: var(--gold-deep);
+  transform: translateY(-50%) scale(1.1);
 }
 
 .search-bar__input {
   width: 100%;
-  padding: 0.7rem 2.5rem;
+  padding: 0.75rem 2.75rem 0.75rem 2.6rem;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border-hairline);
-  background: var(--surface-1);
+  border: 1.5px solid var(--border-hairline);
+  background: var(--surface-2);
   color: var(--text-body);
   font-size: var(--fs-sm);
+  font-family: var(--font-body);
+  transition: border-color var(--dur-sm) var(--ease-soft),
+              box-shadow var(--dur-sm) var(--ease-soft),
+              background var(--dur-sm) var(--ease-soft);
 }
 
 /* Suppress the browser's own built-in clear ("x") button on
@@ -244,11 +323,20 @@ body.booking-app {
 .search-bar__input::-webkit-search-cancel-button,
 .search-bar__input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
 
-.search-bar__input:focus { border-color: var(--gold-deep); }
+.search-bar__input:focus {
+  outline: none;
+  border-color: var(--gold-deep);
+  background: var(--surface-2);
+  /* Gold glow focus ring — premium feel, not a raw outline */
+  box-shadow: 0 0 0 4px rgba(201, 161, 90, 0.15),
+              0 2px 8px rgba(169, 127, 55, 0.1) inset;
+}
+
+.search-bar__input::placeholder { color: var(--ink-muted); }
 
 .search-bar__clear {
   position: absolute;
-  right: 0.6rem; top: 50%;
+  right: 0.65rem; top: 50%;
   transform: translateY(-50%);
   width: 1.75rem; height: 1.75rem;
   border-radius: 50%;
@@ -256,49 +344,108 @@ body.booking-app {
   align-items: center;
   justify-content: center;
   color: var(--ink-muted);
+  transition: color var(--dur-sm) var(--ease-soft),
+              background var(--dur-sm) var(--ease-soft);
 }
+.search-bar__clear:hover { color: var(--text-body); background: var(--surface-3); }
 
 .search-bar__panel {
   position: absolute;
-  top: calc(100% + 0.6rem);
+  top: calc(100% + 0.5rem);
   left: 0; right: 0;
   background: var(--surface-2);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
-  padding: 0.75rem;
+  padding: 0.85rem;
   z-index: var(--z-app-dropdown);
   max-height: 70vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Slide-in from above */
+  animation: search-panel-in var(--dur-sm) var(--ease-premium) both;
+}
+@keyframes search-panel-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) { .search-bar__panel { animation: none; } }
+
+.search-bar__section + .search-bar__section {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-hairline);
 }
 
-.search-bar__section + .search-bar__section { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-hairline); }
+.search-bar__label {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-muted);
+  margin-bottom: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
 
-.search-bar__label { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-muted); margin-bottom: 0.5rem; }
-
-.search-bar__tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.search-bar__tags { display: flex; flex-wrap: wrap; gap: 0.45rem; }
 .search-bar__tag {
-  padding: 0.4rem 0.85rem;
+  padding: 0.35rem 0.85rem;
   border-radius: var(--radius-pill);
   background: var(--surface-1);
   border: 1px solid var(--border-hairline);
   font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--text-body);
+  transition: border-color var(--dur-sm) var(--ease-soft),
+              color var(--dur-sm) var(--ease-soft),
+              background var(--dur-sm) var(--ease-soft);
 }
-.search-bar__tag:hover { border-color: var(--gold-deep); }
+.search-bar__tag:hover {
+  border-color: var(--gold-deep);
+  color: var(--accent-gold);
+  background: var(--surface-2);
+}
 
 .search-result {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem;
+  padding: 0.5rem 0.6rem;
   border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--dur-sm) var(--ease-soft),
+              transform var(--dur-sm) var(--ease-soft);
 }
-.search-result:hover { background: var(--surface-1); }
-.search-result img { width: 2.75rem; height: 2.75rem; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
+.search-result:hover {
+  background: var(--surface-1);
+  transform: translateX(3px);
+}
+.search-result img {
+  width: 2.75rem; height: 2.75rem;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  /* Thin gold ring on the thumbnail */
+  box-shadow: 0 0 0 1px var(--border-hairline);
+}
+.search-result__info { flex: 1; min-width: 0; }
 .search-result__name { font-size: var(--fs-sm); font-weight: 600; color: var(--text-body); }
-.search-result__meta { font-size: var(--fs-xs); color: var(--ink-muted); }
+.search-result__meta { font-size: var(--fs-xs); color: var(--ink-muted); margin-top: 0.1rem; }
+/* Chevron arrow on each result row */
+.search-result::after {
+  content: '';
+  display: block;
+  width: 0.4rem; height: 0.7rem;
+  border-right: 1.5px solid var(--border-hairline);
+  border-top: 1.5px solid var(--border-hairline);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--dur-sm) var(--ease-soft);
+}
+.search-result:hover::after { opacity: 1; }
 .search-bar__no-results { padding: 0.75rem 0.5rem; font-size: var(--fs-sm); color: var(--ink-muted); }
 
 /* ============================================================
@@ -346,17 +493,20 @@ body.booking-app {
   justify-content: center;
 }
 
+/* Stacked above the floating cart bubble (same right offset, cart's height
+   + a gap higher) so both floating actions are reachable from anywhere on
+   the page, same affordance the cart already gets on desktop. */
 .chat-fab {
   position: fixed;
   right: var(--space-md);
-  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  bottom: calc(var(--space-md) + 3.5rem + 0.75rem);
   z-index: var(--z-fab);
   width: 3.25rem; height: 3.25rem;
   border-radius: 50%;
   background: var(--gradient-gold);
   color: var(--ink);
   box-shadow: var(--shadow-gold);
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   animation: chat-fab-pulse 2.8s ease-in-out infinite;
@@ -382,7 +532,7 @@ body.booking-app {
 .catalog__main { flex: 1; min-width: 0; }
 
 /* ============================================================
-   FILTER SIDEBAR
+   FILTER SIDEBAR — premium icons, custom controls, active badge
    ============================================================ */
 .filter-sidebar {
   flex-shrink: 0;
@@ -395,46 +545,182 @@ body.booking-app {
   padding: var(--space-md);
   max-height: calc(100vh - 6.5rem);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Elevated card feel */
+  box-shadow: var(--shadow-sm);
 }
 
-.filter-sidebar__header { display: none; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm); }
+.filter-sidebar__header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-hairline);
+}
+.filter-sidebar__header strong {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-style: italic;
+  color: var(--text-body);
+}
 
-.filter-group { padding-block: var(--space-sm); border-bottom: 1px solid var(--border-hairline); }
+.filter-group {
+  padding-block: var(--space-sm);
+  border-bottom: 1px solid var(--border-hairline);
+}
 .filter-group:first-child { padding-top: 0; }
 .filter-group:last-of-type { border-bottom: none; }
 
+/* Label row: icon + label text + value badge on the right */
 .filter-group__label {
   font-size: var(--fs-xs);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   color: var(--ink-muted);
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.65rem;
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 0.4rem;
 }
+.filter-group__label-inner { display: flex; align-items: center; gap: 0.4rem; }
+.filter-group__label svg { flex-shrink: 0; color: var(--accent-gold); }
 
+/* Dynamic value (price, duration) on the right of the label */
 .filter-group__label span { color: var(--accent-gold); font-weight: 700; text-transform: none; letter-spacing: normal; }
 
+/* Custom checkbox — hides native, shows styled box */
 .filter-checkbox-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.filter-checkbox { display: flex; align-items: center; gap: 0.5rem; font-size: var(--fs-sm); color: var(--text-body); cursor: pointer; }
-.filter-checkbox input { accent-color: var(--gold-deep); width: 1rem; height: 1rem; }
+.filter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: var(--fs-sm);
+  color: var(--text-body);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.4rem;
+  margin: 0 -0.4rem;
+  transition: background var(--dur-sm) var(--ease-soft);
+}
+.filter-checkbox:hover { background: var(--surface-1); }
+.filter-checkbox input[type="checkbox"] { appearance: none; -webkit-appearance: none; }
+.filter-checkbox .filter-checkbox__box {
+  width: 1.1rem; height: 1.1rem;
+  flex-shrink: 0;
+  border-radius: 0.3rem;
+  border: 1.5px solid var(--border-hairline);
+  background: var(--surface-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color var(--dur-sm) var(--ease-soft),
+              background var(--dur-sm) var(--ease-soft);
+}
+.filter-checkbox input:checked + .filter-checkbox__box {
+  background: var(--gradient-gold);
+  border-color: var(--gold-deep);
+}
+.filter-checkbox__check {
+  /* Gold checkmark tick as inline SVG embedded via background */
+  display: none;
+  width: 0.55rem; height: 0.55rem;
+  border-right: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+.filter-checkbox input:checked ~ .filter-checkbox__box .filter-checkbox__check,
+.filter-checkbox input:checked + .filter-checkbox__box .filter-checkbox__check { display: block; }
 
-.filter-range { width: 100%; accent-color: var(--gold-deep); }
+/* Native fallback for any toggle checkbox not wrapped with .filter-checkbox__box */
+.filter-checkbox input:not(:has(~ .filter-checkbox__box)) { accent-color: var(--gold-deep); width: 1rem; height: 1rem; }
+
+/* Premium range slider */
+.filter-range-wrap { position: relative; }
+.filter-range {
+  width: 100%;
+  height: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: linear-gradient(
+    to right,
+    var(--gold-deep) 0%,
+    var(--gold-deep) var(--range-pct, 100%),
+    var(--border-hairline) var(--range-pct, 100%)
+  );
+  border-radius: var(--radius-pill);
+  outline: none;
+  cursor: pointer;
+}
+.filter-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.1rem; height: 1.1rem;
+  border-radius: 50%;
+  background: var(--gradient-gold);
+  border: 2px solid var(--white);
+  box-shadow: 0 1px 6px rgba(169, 127, 55, 0.4);
+  cursor: pointer;
+  transition: transform var(--dur-sm) var(--ease-premium),
+              box-shadow var(--dur-sm) var(--ease-soft);
+}
+.filter-range::-webkit-slider-thumb:hover,
+.filter-range:focus::-webkit-slider-thumb {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 4px rgba(201, 161, 90, 0.2), 0 1px 6px rgba(169, 127, 55, 0.4);
+}
+.filter-range::-moz-range-thumb {
+  width: 1.1rem; height: 1.1rem;
+  border-radius: 50%;
+  background: var(--gradient-gold);
+  border: 2px solid var(--white);
+  box-shadow: 0 1px 6px rgba(169, 127, 55, 0.4);
+  cursor: pointer;
+}
 
 .filter-segmented { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .filter-segmented__btn {
-  padding: 0.4rem 0.75rem;
+  padding: 0.38rem 0.75rem;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-hairline);
   font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--text-body);
+  transition: background var(--dur-sm) var(--ease-soft),
+              color var(--dur-sm) var(--ease-soft),
+              border-color var(--dur-sm) var(--ease-soft),
+              transform var(--dur-sm) var(--ease-soft);
 }
-.filter-segmented__btn.is-active { background: var(--ink); color: var(--cream); border-color: var(--ink); }
-[data-theme="dark"] .filter-segmented__btn.is-active { background: var(--gold-light); color: var(--ink); border-color: var(--gold-light); }
+.filter-segmented__btn:hover { border-color: var(--gold); transform: translateY(-1px); }
+.filter-segmented__btn.is-active {
+  background: var(--ink);
+  color: var(--cream);
+  border-color: var(--ink);
+}
+[data-theme="dark"] .filter-segmented__btn.is-active {
+  background: var(--gold-light);
+  color: var(--ink);
+  border-color: var(--gold-light);
+}
 
-.filter-sidebar__clear { width: 100%; margin-top: var(--space-sm); }
+/* "Clear Filters" — gold outline, trash icon, full-width */
+.filter-sidebar__clear {
+  width: 100%;
+  margin-top: var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  color: var(--accent-gold);
+  border-color: var(--gold);
+  transition: background var(--dur-sm) var(--ease-soft),
+              color var(--dur-sm) var(--ease-soft);
+}
+.filter-sidebar__clear:hover {
+  background: rgba(201, 161, 90, 0.08);
+}
 .filter-sidebar__close { display: none; }
 
 .filter-sidebar-backdrop {
@@ -443,6 +729,8 @@ body.booking-app {
   inset: 0;
   z-index: calc(var(--z-app-dropdown) - 1);
   background: rgba(22, 18, 15, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 
 /* ============================================================
@@ -469,7 +757,7 @@ body.booking-app {
 .catalog__search .search-bar__input { padding-block: 0.55rem; }
 
 /* ============================================================
-   SORT BAR
+   SORT BAR — pill button group replaces native select
    ============================================================ */
 .sort-bar {
   display: flex;
@@ -479,42 +767,84 @@ body.booking-app {
 }
 
 .sort-bar__count { font-size: var(--fs-sm); color: var(--ink-muted); }
-.sort-bar__count strong { color: var(--text-body); }
+.sort-bar__count strong { color: var(--text-body); font-weight: 700; }
 
-.sort-bar__controls { display: flex; align-items: center; gap: var(--space-sm); }
+.sort-bar__controls { display: flex; align-items: center; gap: var(--space-2xs); flex-wrap: wrap; }
 
-/* Desktop already has the filter sidebar permanently visible — this button
-   is a mobile-only second entry point to the same off-canvas panel the
-   bottom nav's "Categories" icon opens (see initMobileFilters() in
-   booking.js). Hidden here, shown in the mobile breakpoint below. */
-.sort-bar__filter-btn { display: none; align-items: center; gap: 0.4rem; }
+/* Desktop: filter sidebar is permanently visible — this button is
+   mobile-only (see initMobileFilters() in booking.js). Hidden here,
+   shown in the mobile breakpoint below. */
+.sort-bar__filter-btn {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  position: relative; /* for the active-count badge */
+}
 
-.sort-bar__control select {
-  padding: 0.55rem 0.9rem;
-  border-radius: var(--radius-sm);
+/* Active filter count badge on the Filters button */
+.sort-bar__filter-badge {
+  display: none;
+  position: absolute;
+  top: -5px; right: -5px;
+  min-width: 1rem;
+  height: 1rem;
+  padding-inline: 0.2rem;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-gold);
+  color: var(--ink);
+  font-size: 0.6rem;
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  animation: badge-pop 0.3s var(--ease-premium);
+}
+.sort-bar__filter-badge.is-visible { display: inline-flex; }
+@keyframes badge-pop {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+
+/* Sort pill buttons — replace the native <select> */
+.sort-pills {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.sort-pill {
+  padding: 0.38rem 0.85rem;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border-hairline);
   background: var(--surface-2);
-  color: var(--text-body);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: 600;
+  color: var(--text-body);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-sm) var(--ease-soft),
+              color var(--dur-sm) var(--ease-soft),
+              border-color var(--dur-sm) var(--ease-soft),
+              transform var(--dur-sm) var(--ease-soft),
+              box-shadow var(--dur-sm) var(--ease-soft);
 }
-
-/* Choices.js — restyle to match the token system instead of its default look */
-.choices__inner {
-  background: var(--surface-2) !important;
-  border: 1px solid var(--border-hairline) !important;
-  border-radius: var(--radius-sm) !important;
-  min-height: 0 !important;
-  padding: 0.5rem 0.9rem !important;
+.sort-pill:hover {
+  border-color: var(--gold);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(201, 161, 90, 0.15);
 }
-.choices__list--dropdown, .choices__list[aria-expanded] {
-  background: var(--surface-2) !important;
-  border-color: var(--border-hairline) !important;
-  border-radius: var(--radius-sm) !important;
-  z-index: var(--z-app-dropdown) !important;
+.sort-pill.is-active {
+  background: var(--gradient-gold);
+  border-color: transparent;
+  color: var(--ink);
+  box-shadow: 0 4px 14px rgba(169, 127, 55, 0.3);
+  transform: translateY(-1px);
 }
-.choices__list--dropdown .choices__item--selectable.is-highlighted { background: var(--surface-1) !important; }
-.choices__inner, .choices__list--dropdown .choices__item { color: var(--text-body) !important; font-size: var(--fs-sm) !important; }
+[data-theme="dark"] .sort-pill { background: var(--surface-2); }
+[data-theme="dark"] .sort-pill.is-active {
+  background: var(--gradient-gold);
+  color: var(--ink);
+}
 
 /* ============================================================
    CATALOG GRID + CARDS
@@ -556,22 +886,6 @@ body.booking-app {
 }
 .catalog-card__badge--offer { background: var(--gradient-gold); color: var(--ink); }
 
-.catalog-card__wishlist {
-  position: absolute;
-  top: 0.75rem; right: 0.75rem;
-  width: 2.25rem; height: 2.25rem;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.92);
-  color: var(--ink);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform var(--dur-sm) var(--ease-soft);
-}
-.catalog-card__wishlist:hover { transform: scale(1.1); }
-.catalog-card__wishlist[aria-pressed="true"] { color: var(--rose); }
-.catalog-card__wishlist[aria-pressed="true"] svg { fill: currentColor; }
-
 .catalog-card__unavailable {
   position: absolute;
   left: 0; right: 0; bottom: 0;
@@ -599,12 +913,58 @@ body.booking-app {
   transform: translateY(6px);
   transition: opacity var(--dur-sm) var(--ease-soft), transform var(--dur-sm) var(--ease-soft);
 }
-.catalog-card:hover .catalog-card__quickview, .catalog-card:focus-within .catalog-card__quickview { opacity: 1; transform: translateY(0); }
+/* .is-peeking is the touch-device stand-in for :hover — see
+   initQuickViewTouchPeek() in booking.js — since touchscreens never
+   trigger :hover, tapping the photo toggles this class instead. */
+.catalog-card:hover .catalog-card__quickview,
+.catalog-card:focus-within .catalog-card__quickview,
+.catalog-card.is-peeking .catalog-card__quickview { opacity: 1; transform: translateY(0); }
 
 .catalog-card__body { padding: var(--space-sm) var(--space-md) var(--space-md); }
 .catalog-card__category { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-gold); }
 .catalog-card__name { font-family: var(--font-display); font-size: 1.1rem; margin-top: 0.2rem; color: var(--text-body); }
-.catalog-card__desc { font-size: var(--fs-sm); color: var(--ink-muted); margin-top: 0.3rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* line-height set explicitly (not just inherited) so the `2 * 1em` max-height
+   below — and booking.js's word-by-word truncation, which measures against
+   this same box — both agree on what "2 lines" means at this font-size.
+   Plain max-height + overflow instead of -webkit-line-clamp because the
+   "Read more" trigger needs to render as real inline text immediately after
+   the visible words, inside this same paragraph — line-clamp's automatic
+   ellipsis has no way to keep trailing markup like that un-clipped. */
+.catalog-card__desc {
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  color: var(--ink-muted);
+  margin-top: 0.3rem;
+  max-height: calc(1.4em * 2);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+/* Appended by booking.js's initDescReadMore() as the last inline node of
+   .catalog-card__desc (only when the full text didn't fit in 2 lines) —
+   reads as a natural continuation of the truncated sentence rather than a
+   separate element floating below it. */
+/* Browsers force <button> to a used display of inline-block regardless of
+   `display: inline` here, so its default UA padding (~1px 6px) makes it
+   taller than a plain line of text — inflating whichever line it lands on
+   and throwing off booking.js's height-based fit test (it would back off
+   truncating far more than necessary to avoid a false "overflow"). Zeroing
+   padding/border/margin brings its box height back down to line-height, so
+   it contributes the same per-line height as the surrounding text. */
+.catalog-card__desc-more {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  line-height: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  color: var(--accent-gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+.catalog-card__desc-more:hover { color: var(--gold-deep); }
 
 .catalog-card__meta { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.6rem; font-size: var(--fs-xs); color: var(--ink-muted); }
 .catalog-card__meta .stars { font-size: var(--fs-xs); color: var(--gold-deep); }
@@ -662,6 +1022,7 @@ body.booking-app {
   width: min(90vw, 720px);
   max-height: 85vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   z-index: calc(var(--z-app-modal) + 1);
   background: var(--surface-2);
   border-radius: var(--radius-lg);
@@ -698,6 +1059,29 @@ body.booking-app {
 .quick-view-modal__meta .stars { color: var(--gold-deep); }
 .quick-view-modal__badges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: var(--space-sm); }
 .quick-view-modal__badges span { padding: 0.3rem 0.7rem; border-radius: var(--radius-pill); background: var(--surface-1); font-size: 0.7rem; font-weight: 700; color: var(--text-body); }
+
+.quick-view-modal__variants { margin-top: var(--space-md); }
+.quick-view-modal__variants-label { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); margin-bottom: 0.5rem; }
+.quick-view-modal__variant-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.quick-view-modal__variant-pill {
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-1);
+  text-align: left;
+  line-height: 1.3;
+}
+.quick-view-modal__variant-pill:hover { border-color: var(--gold); }
+.quick-view-modal__variant-pill .variant-pill__label { display: block; font-size: var(--fs-sm); font-weight: 600; color: var(--text-body); }
+.quick-view-modal__variant-pill .variant-pill__price { display: block; font-size: var(--fs-xs); color: var(--ink-muted); margin-top: 0.1rem; }
+.quick-view-modal__variant-pill.is-active {
+  border-color: transparent;
+  background: var(--gradient-gold);
+  box-shadow: 0 4px 14px rgba(169, 127, 55, 0.3);
+}
+.quick-view-modal__variant-pill.is-active .variant-pill__label,
+.quick-view-modal__variant-pill.is-active .variant-pill__price { color: var(--ink); }
+
 .quick-view-modal__footer { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-lg); gap: var(--space-sm); }
 .quick-view-modal__price span:first-child { font-size: 1.4rem; font-weight: 700; color: var(--text-body); }
 .quick-view-modal__price span:last-child { font-size: var(--fs-sm); color: var(--ink-muted); text-decoration: line-through; margin-left: 0.5rem; }
@@ -741,6 +1125,7 @@ body.booking-app {
   width: min(90vw, 380px);
   max-height: 75vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--surface-2);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-lg);
@@ -758,7 +1143,7 @@ body.booking-app {
 .floating-cart__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-sm); }
 .floating-cart__close { width: 1.75rem; height: 1.75rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-muted); }
 
-.floating-cart__items { display: flex; flex-direction: column; gap: var(--space-sm); max-height: 15rem; overflow-y: auto; }
+.floating-cart__items { display: flex; flex-direction: column; gap: var(--space-sm); max-height: 15rem; overflow-y: auto; overscroll-behavior: contain; }
 .floating-cart__empty { font-size: var(--fs-sm); color: var(--ink-muted); text-align: center; padding: var(--space-md) 0; }
 
 .cart-line { display: flex; gap: 0.6rem; align-items: center; }
@@ -828,7 +1213,7 @@ body.booking-app {
 .chat-panel__header span { font-size: 0.7rem; color: var(--ink-muted); }
 .chat-panel__close { width: 1.75rem; height: 1.75rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-muted); }
 
-.chat-panel__messages { flex: 1; overflow-y: auto; padding: var(--space-md); display: flex; flex-direction: column; gap: 0.6rem; }
+.chat-panel__messages { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-md); display: flex; flex-direction: column; gap: 0.6rem; }
 
 .chat-bubble { max-width: 85%; padding: 0.6rem 0.85rem; border-radius: var(--radius-md); font-size: var(--fs-sm); line-height: 1.4; }
 .chat-bubble--bot { align-self: flex-start; background: var(--surface-1); color: var(--text-body); border-bottom-left-radius: 0.25rem; }
@@ -908,13 +1293,33 @@ body.booking-app {
   .catalog__toolbar { top: 3.75rem; }
   .app-navbar__links, .app-navbar__link[data-filter-category="package"] { display: none; }
 
+  /* Hide the navbar's own avatar trigger, not the whole .app-navbar__dropdown
+     wrapper around it — the bottom nav's Profile button shares this same
+     #profile-panel (see initDropdowns() in booking.js), and that panel lives
+     inside this wrapper in the DOM. Hiding the wrapper itself would trap the
+     panel inside a display:none ancestor, silently making it unopenable from
+     the bottom nav no matter what class JS toggles on it. */
   .app-navbar__actions .app-navbar__cart-btn,
-  .app-navbar__actions .app-navbar__dropdown--profile,
-  .app-navbar__actions .app-navbar__icon-btn:not([data-dropdown-trigger]) { display: none; }
+  .app-navbar__actions .app-navbar__avatar { display: none; }
+
+  /* On mobile the only visible trigger for this panel is the bottom nav's
+     Profile button, so anchor the panel there (fixed, opening upward from
+     the bottom) instead of the desktop behavior of dropping down from the
+     navbar wrapper it happens to live inside — which sits up at the top of
+     the screen, far from the button that actually opens it. Cleared above
+     the chat FAB's own footprint (bottom 4.75rem + its 3.25rem height +
+     a gap) so the two don't overlap when both are on screen. */
+  #profile-panel {
+    position: fixed;
+    top: auto;
+    right: var(--space-md);
+    bottom: calc(8.5rem + env(safe-area-inset-bottom));
+    transform: translateY(12px);
+  }
   .app-navbar__back span { display: none; }
 
   .bottom-nav { display: flex; }
-  .chat-fab { display: inline-flex; }
+  .chat-fab { bottom: calc(4.75rem + env(safe-area-inset-bottom)); }
 
   /* The bottom nav's own Cart icon already opens this same panel (both share
      [data-cart-toggle]) — the floating bubble would just duplicate it and
@@ -922,7 +1327,15 @@ body.booking-app {
   .floating-cart__bubble { display: none; }
 
   .catalog { padding-inline: var(--space-sm); }
-  .catalog__layout { flex-direction: column; }
+  /* .catalog__layout's align-items: flex-start (desktop) keeps the sidebar
+     top-aligned with the main content in a ROW layout — but once this
+     switches the flex direction to column, "flex-start" applies to the
+     cross axis instead, which is now horizontal. That stopped .catalog__main
+     from stretching to the full available width, sizing it to its content's
+     own fit-content width instead — the catalog grid (and every card in it)
+     rendered ~160px too wide, silently clipped by body's overflow-x:clip
+     rather than visibly broken, which is why it went unnoticed until now. */
+  .catalog__layout { flex-direction: column; align-items: stretch; }
 
   .filter-sidebar {
     position: fixed;
@@ -945,7 +1358,16 @@ body.booking-app {
 
   .catalog__grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-sm); }
   .quick-view-modal { flex-direction: column; width: min(92vw, 420px); }
-  .quick-view-modal__media { flex: 0 0 auto; aspect-ratio: 4/3; }
+  /* aspect-ratio: 4/3 here was letting the media stretch to whatever height
+     the flex-column layout felt like giving it — measured as tall as 538px
+     on a 358px-wide modal for a short-description item (should have been
+     ~269px), because a flex item's `aspect-ratio` doesn't reliably resolve
+     against a stretched cross-size in every engine. A fixed explicit
+     height sidesteps that entirely: every photo crops to the exact same
+     size regardless of the item, and it stops the image alone from pushing
+     short-content items (like a plain "Chin" threading service) into
+     needing to scroll to see the price/Add to Cart. */
+  .quick-view-modal__media { flex: 0 0 auto; height: 13rem; aspect-ratio: auto; }
 
   .floating-cart { bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
 }
@@ -960,7 +1382,37 @@ body.booking-app {
      without changing the source order desktop's inline layout relies on). */
   .sort-bar { flex-wrap: wrap; row-gap: 0.5rem; }
   .sort-bar__count { flex: 1 1 100%; order: 2; }
-  .sort-bar__controls { flex: 1 1 100%; justify-content: space-between; order: 1; }
+  /* flex-wrap: nowrap overrides the base rule's `wrap` — otherwise the
+     Filters button and the sort-pills group split onto their own separate
+     lines the moment they don't both fit, undoing the "share one row"
+     layout this whole block is trying to build. The scrolling itself lives
+     on .sort-pills alone (below), not here — Filters stays fixed/visible
+     while only the pills scroll underneath it. */
+  /* min-width: 0 here too — .sort-bar__controls is itself a flex item (in
+     .sort-bar), and without it, it inherits the same "grow to fit content"
+     default as .sort-pills did, just one level up: it'd size itself to fit
+     Filters + all 6 unwrapped pills (~638px) rather than shrinking to the
+     358px .sort-bar actually has, undoing .sort-pills' own min-width:0. */
+  .sort-bar__controls { flex: 1 1 100%; min-width: 0; flex-wrap: nowrap; justify-content: flex-start; order: 1; gap: var(--space-2xs); }
+  /* Filters must never be squeezed by the flex-shrink competing with
+     .sort-pills for space — without this it was the one giving up width,
+     shrinking its own icon down to 0 rather than the text (which resists
+     shrinking below its nowrap minimum). */
+  .sort-bar__filter-btn { flex-shrink: 0; }
+  .sort-bar__filter-btn svg { flex-shrink: 0; }
+
+  /* Only the pills scroll horizontally on narrow screens — Filters is a
+     sibling, not part of this scroll area, so it can't scroll out of view
+     with them. flex:1/min-width:0 lets this take exactly the remaining
+     width next to Filters rather than pushing the row wider. */
+  .sort-pills {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none; /* Firefox */
+  }
+  .sort-pills::-webkit-scrollbar { display: none; } /* Chrome/Safari — still scrolls via touch/drag */
 
   /* Full-width stacked cards (4:3 photo + all meta) ran too tall in a single
      column. A left-image list-row keeps the photo prominent and Add to Cart
@@ -975,27 +1427,6 @@ body.booking-app {
   .catalog-card__badges { top: 0.35rem; left: 0.35rem; max-width: calc(100% - 0.7rem); gap: 0.25rem; }
   .catalog-card__badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
   .catalog-card__badges .catalog-card__badge:nth-child(n+2) { display: none; }
-
-  .catalog-card__wishlist { top: 0.35rem; right: 0.35rem; width: 1.6rem; height: 1.6rem; }
-  .catalog-card__wishlist svg { width: 13px; height: 13px; }
-
-  /* Quick View can't rely on :hover on a touch screen, so it's promoted to
-     an always-visible circular icon button next to the wishlist heart
-     instead of the desktop hover-reveal pill. */
-  .catalog-card__quickview {
-    left: auto; bottom: auto;
-    top: 0.35rem; right: 2.15rem;
-    width: 1.6rem; height: 1.6rem;
-    padding: 0;
-    border-radius: 50%;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.9);
-    color: var(--ink);
-    opacity: 1;
-    transform: none;
-  }
-  .catalog-card__quickview svg { width: 13px; height: 13px; }
-  .catalog-card__quickview-label { display: none; }
 
   .catalog-card__unavailable { padding: 0.3rem; font-size: 0.6rem; line-height: 1.15; }
 
@@ -1082,7 +1513,7 @@ body.booking-app {
 [data-theme="dark"] .booking-stepper__step.is-active { background: var(--gold-light); color: var(--ink); border-color: var(--gold-light); }
 .booking-stepper__step.is-complete { background: var(--accent-gold); color: var(--ink); border-color: var(--accent-gold); }
 
-.booking-drawer__body { flex: 1; overflow-y: auto; padding: var(--space-md); }
+.booking-drawer__body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-md); }
 .booking-step { display: none; }
 .booking-step.is-active { display: block; }
 .booking-step h3 { font-family: var(--font-display); font-size: 1.2rem; margin-bottom: var(--space-sm); color: var(--text-body); }
