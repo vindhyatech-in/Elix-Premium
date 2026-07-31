@@ -45,16 +45,32 @@ body.booking-app {
   height: 4.5rem;
   display: flex;
   align-items: center;
-  /* Frosted glass: transparent base + backdrop blur for premium translucency.
-     background must be semi-transparent for backdrop-filter to be visible. */
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
   border-bottom: 1px solid var(--border-hairline);
   box-shadow: 0 1px 0 rgba(22, 18, 15, 0.04), var(--shadow-sm);
 }
 
-[data-theme="dark"] .app-navbar {
+/* Frosted glass lives on a ::before, not .app-navbar itself — a
+   backdrop-filter (like transform/filter) on an element makes IT the
+   containing block for any `position: fixed` descendant, instead of the
+   real viewport. #profile-panel is fixed-positioned on mobile (see its
+   rule below) and is a DOM descendant of this navbar (via
+   profile_dropdown.html, included here for the desktop dropdown-relative
+   layout) — with backdrop-filter directly on .app-navbar, that panel's
+   `bottom: 8.5rem` was resolving against this 4.5rem-tall header instead
+   of the viewport, landing it entirely off-screen above the page. A
+   pseudo-element gets the exact same visual blur without being an
+   ancestor of that panel in the way that matters. */
+.app-navbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+}
+
+[data-theme="dark"] .app-navbar::before {
   background: rgba(36, 30, 25, 0.82);
 }
 
@@ -1632,4 +1648,72 @@ body.booking-app {
   .booking-drawer { width: 100vw; }
   .slot-grid { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
   .slot-card { padding: 0.6rem 0.3rem; }
+}
+
+/* ============================================================
+   BOOKINGS DASHBOARD — /services-booking/bookings/
+   ============================================================ */
+.bookings-dashboard { max-width: 800px; margin-inline: auto; padding: var(--space-xl) var(--container-pad) var(--space-3xl); }
+
+.bookings-dashboard__header { margin-bottom: var(--space-lg); }
+.bookings-dashboard__header h1 { font-family: var(--font-display); font-size: 1.8rem; color: var(--text-body); }
+.bookings-dashboard__header p { color: var(--ink-muted); margin-top: 0.2rem; }
+
+.bookings-dashboard__tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: var(--space-lg); }
+
+.bookings-dashboard__list { display: flex; flex-direction: column; gap: var(--space-md); }
+
+.bookings-dashboard__tab-empty { text-align: center; padding: var(--space-2xl) 0; color: var(--ink-muted); }
+
+.bookings-dashboard__empty {
+  text-align: center;
+  padding: var(--space-3xl) var(--space-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  color: var(--ink-muted);
+}
+.bookings-dashboard__empty .btn { margin-top: var(--space-md); }
+
+.booking-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+}
+.booking-card.is-hidden { display: none; }
+
+.booking-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-sm); padding-bottom: var(--space-sm); border-bottom: 1px solid var(--border-hairline); }
+.booking-card__number { font-weight: 700; color: var(--text-body); letter-spacing: 0.02em; }
+.booking-card__date { font-size: var(--fs-sm); color: var(--ink-muted); margin-top: 0.15rem; }
+
+.booking-card__status {
+  flex-shrink: 0;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.booking-card__status--upcoming { background: var(--gradient-gold); color: var(--ink); }
+.booking-card__status--completed { background: var(--ink); color: var(--cream); }
+[data-theme="dark"] .booking-card__status--completed { background: var(--gold-light); color: var(--ink); }
+.booking-card__status--cancelled { background: rgba(199, 141, 134, 0.18); color: var(--rose); }
+
+.booking-card__items { padding-block: var(--space-sm); display: flex; flex-direction: column; gap: 0.4rem; border-bottom: 1px solid var(--border-hairline); }
+.booking-card__item { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-sm); color: var(--text-body); }
+
+.booking-card__footer { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-sm); padding-top: var(--space-sm); }
+.booking-card__address { display: flex; align-items: flex-start; gap: 0.4rem; font-size: var(--fs-xs); color: var(--ink-muted); max-width: 60%; }
+.booking-card__address svg { flex-shrink: 0; margin-top: 0.15rem; color: var(--accent-gold); }
+.booking-card__total { text-align: right; font-size: var(--fs-xs); color: var(--ink-muted); }
+.booking-card__total strong { display: block; font-size: 1.05rem; color: var(--text-body); }
+
+.booking-card__rebook { margin-top: var(--space-sm); width: 100%; }
+
+@media (max-width: 640px) {
+  .booking-card__footer { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .booking-card__address { max-width: 100%; }
+  .booking-card__total { text-align: left; }
 }

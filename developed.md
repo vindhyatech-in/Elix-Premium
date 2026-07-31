@@ -1,3 +1,4 @@
+
 # developed.md — project brain
 
 Read this first. It's written so an agent (or a new dev) can get full context
@@ -33,13 +34,13 @@ page only; don't assume it applies to the booking app.
   asset — don't add the `<script>` tag until there's an actual asset to load.
 
 ### Why no Tailwind
+
 Tailwind's CDN "play" build has no purge (ships everything, slow) and a real
 Tailwind build needs a Node toolchain, which conflicts with "no build step,
 just `runserver`". A bespoke token-based CSS system (`variables.css` →
 `base.css` → `components.css` → `sections.css` → `animations.css` →
 `responsive.css`, all pulled in via `main.css` `@import`) gave full control
-over the "no template-looking sections" requirement and keeps `pip install
-&& runserver` as the only setup step. If this project later adopts a JS
+over the "no template-looking sections" requirement and keeps `pip install && runserver` as the only setup step. If this project later adopts a JS
 framework/build pipeline, Tailwind becomes reasonable again — until then,
 don't reintroduce it without also solving the build-step problem.
 
@@ -50,6 +51,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 python manage.py runserver
 ```
+
 No migrations are required to view the page (only Django's built-in auth/admin
 tables exist). Verified working: `/`, `/robots.txt`, `/sitemap.xml`, and all
 static assets return 200 (last checked 2026-07-24).
@@ -167,22 +169,22 @@ insert a section, re-check its neighbors don't collide on background color.
 
 ## Section map (order on the page)
 
-| # | Section | Template | Context var(s) | Mock data source |
-|---|---|---|---|---|
-| 1 | Hero | `components/hero.html` | `hero` | `get_hero()` |
-| 2 | Why Glamour At Home | `components/why_us.html` | `value_pillars` (as `pillars`) | `get_value_pillars()` |
-| 3 | Featured Services | `components/featured_services.html` | `service_categories`, `featured_services` | `get_service_categories()`, `get_featured_services()` |
-| 4 | Beauty Packages | `components/packages.html` | `packages` | `get_packages()` |
-| 5 | How It Works | `components/how_it_works.html` | `how_it_works` (as `steps`) | `get_how_it_works()` |
-| 6 | Why Customers Trust Us | `components/trust.html` | `trust_points`, `trust_badges` | `get_trust_points()`, `get_trust_badges()` |
-| 7 | Meet Our Beauticians | `components/beauticians.html` | `beauticians` (as `artists`) | `get_beauticians()` |
-| 8 | Customer Stories | `components/testimonials.html` | `testimonials` (as `stories`) | `get_testimonials()` |
-| 9 | Gallery | `components/gallery.html` | `gallery` | `get_gallery()` |
-| 10 | Beauty Tips | `components/beauty_tips.html` | `beauty_tips` (as `tips`) | `get_beauty_tips()` |
-| 11 | Download App | `components/download_app.html` | (uses global `SITE.apps`) | — |
-| 12 | FAQs | `components/faqs.html` | `faqs` | `get_faqs()` |
-| 13 | Contact | `components/contact.html` | (uses global `SITE`) | — |
-| 14 | Footer | `partials/footer.html` | (uses global `SITE`) | — |
+| #  | Section                | Template                              | Context var(s)                                | Mock data source                                          |
+| -- | ---------------------- | ------------------------------------- | --------------------------------------------- | --------------------------------------------------------- |
+| 1  | Hero                   | `components/hero.html`              | `hero`                                      | `get_hero()`                                            |
+| 2  | Why Glamour At Home    | `components/why_us.html`            | `value_pillars` (as `pillars`)            | `get_value_pillars()`                                   |
+| 3  | Featured Services      | `components/featured_services.html` | `service_categories`, `featured_services` | `get_service_categories()`, `get_featured_services()` |
+| 4  | Beauty Packages        | `components/packages.html`          | `packages`                                  | `get_packages()`                                        |
+| 5  | How It Works           | `components/how_it_works.html`      | `how_it_works` (as `steps`)               | `get_how_it_works()`                                    |
+| 6  | Why Customers Trust Us | `components/trust.html`             | `trust_points`, `trust_badges`            | `get_trust_points()`, `get_trust_badges()`            |
+| 7  | Meet Our Beauticians   | `components/beauticians.html`       | `beauticians` (as `artists`)              | `get_beauticians()`                                     |
+| 8  | Customer Stories       | `components/testimonials.html`      | `testimonials` (as `stories`)             | `get_testimonials()`                                    |
+| 9  | Gallery                | `components/gallery.html`           | `gallery`                                   | `get_gallery()`                                         |
+| 10 | Beauty Tips            | `components/beauty_tips.html`       | `beauty_tips` (as `tips`)                 | `get_beauty_tips()`                                     |
+| 11 | Download App           | `components/download_app.html`      | (uses global`SITE.apps`)                    | —                                                        |
+| 12 | FAQs                   | `components/faqs.html`              | `faqs`                                      | `get_faqs()`                                            |
+| 13 | Contact                | `components/contact.html`           | (uses global`SITE`)                         | —                                                        |
+| 14 | Footer                 | `partials/footer.html`              | (uses global`SITE`)                         | —                                                        |
 
 Each section root element has a `data-api="/api/v1/..."` attribute matching
 its mock function's docstring — grep for `data-api` to find every future
@@ -259,10 +261,9 @@ item to the Service Booking app's cart and hand off to
 
 ## Design system
 
-- **Palette** (`static/css/variables.css`): warm espresso ink (`--ink
-  #16120f`) + ivory (`--cream #faf6ef`) + champagne gold (`--gold #c9a15a`)
-  + blush (`--blush #e9c8c2`). Gold = trust/luxury accent, used sparingly
-  (CTAs, active states, numerals) — not a background color.
+- **Palette** (`static/css/variables.css`): warm espresso ink (`--ink #16120f`) + ivory (`--cream #faf6ef`) + champagne gold (`--gold #c9a15a`)
+  - blush (`--blush #e9c8c2`). Gold = trust/luxury accent, used sparingly
+    (CTAs, active states, numerals) — not a background color.
 - **Type**: `Fraunces` (editorial serif, headings/display — italic used for
   emphasis via `<em>`) + `Inter` (body/UI), both loaded from Google Fonts in
   `partials/meta.html`. Fluid sizing via `clamp()` tokens (`--fs-display-xl`
@@ -274,8 +275,7 @@ item to the Service Booking app's cart and hand off to
   was an explicit requirement, don't collapse sections into a shared
   "content card grid" pattern when extending.
 - **Accessibility**: skip-link, `:focus-visible` outlines, `aria-*` on
-  interactive widgets (accordion, filters, carousels), `prefers-reduced-
-  motion` disables/shortens all custom JS animation (canvas, GSAP, counters)
+  interactive widgets (accordion, filters, carousels), `prefers-reduced- motion` disables/shortens all custom JS animation (canvas, GSAP, counters)
   — check this media query before adding new motion.
 
 ## Dark mode / theming (added 2026-07-25)
@@ -439,8 +439,11 @@ cart + booking flow), not a scroll-page. Built in three phases; **Phase 1
 and Phase 2 exist so far**.
 
 - **Phase 1 (built):** app shell (desktop sticky nav + mobile bottom nav +
-  chat FAB), full catalog browsing — search, filters, sort, quick view,
-  wishlist — and a persistent localStorage-backed cart.
+  chat FAB), full catalog browsing — search, filters, sort, quick view —
+  and a persistent localStorage-backed cart. (The wishlist feature
+  originally listed here was removed entirely on 2026-08-01 — services are
+  booked immediately in this app, not saved for later, so it didn't fit
+  the product; grep this file's history if it's ever needed again.)
 - **Phase 2 (built, 2026-07-28):** the 5-step booking drawer (address →
   date → booking type/time → payment → summary/confirm), opened from the
   cart's "Proceed to Booking" button. **Built deliberately without real
@@ -449,9 +452,15 @@ and Phase 2 exist so far**.
   map instead of Google Maps, and payment is a simulated checkout instead
   of real Razorpay. This is not a temporary stopgap; see the dedicated
   subsection below before "upgrading" either.
-- **Phase 3 (not built):** full chat (AI/Support/FAQ tabs — Phase 1 only has
-  a scripted single-reply preview), real notifications backend, a wishlist
-  page, and a bookings dashboard (upcoming/completed/cancelled/rebook/review).
+- **Phase 3 (partial — bookings dashboard added 2026-08-01):** a real
+  bookings dashboard at `/services-booking/bookings/` (see "Bookings
+  dashboard" below). Still not built: full chat (AI/Support/FAQ tabs —
+  Phase 1 only has a scripted single-reply preview) and a real
+  notifications backend (still `get_notifications_mock()`). A "wishlist
+  page" was on this list in earlier versions of this roadmap — no longer
+  applicable, since the wishlist feature itself was removed (see Phase 1
+  note above). "Review" (leaving a review on a completed booking) was also
+  never built — there's no `Review` model; out of scope until asked for.
 
 ### Architecture
 
@@ -535,9 +544,7 @@ and Phase 2 exist so far**.
   plus `static/js/booking_drawer.js` (own file, not folded into `booking.js`
   — "catalog browsing" and "booking flow" stay separate concerns, same
   rationale as the existing `main.js` vs `animations.js` split).
-- **Shared surface**: `booking.js` exposes `window.GlamourBooking = {
-  getCart, saveCart, getCatalog, formatCurrency, showToast,
-  getAppliedDiscountRate }` at the end of its `DOMContentLoaded` handler.
+- **Shared surface**: `booking.js` exposes `window.GlamourBooking = { getCart, saveCart, getCatalog, formatCurrency, showToast, getAppliedDiscountRate }` at the end of its `DOMContentLoaded` handler.
   `booking_drawer.js` reads/clears the cart and reads the mini-cart's
   applied-coupon discount rate through this instead of duplicating cart
   logic. `saveCart()` dispatches a `glamour:cart-changed` window event
@@ -603,8 +610,7 @@ are isolated enough to swap without touching the rest of the drawer.
 Several components toggle visibility with the plain `hidden` HTML attribute
 (cart rows, search-panel sections, empty states) while also being styled
 with an authored `display: flex/grid` rule for when they ARE visible. An
-authored `display` rule beats the browser's built-in `[hidden] { display:
-none }` at equal specificity (author styles always win over the UA
+authored `display` rule beats the browser's built-in `[hidden] { display: none }` at equal specificity (author styles always win over the UA
 stylesheet), which silently makes `el.hidden = true` do nothing — this was a
 real bug (the cart's "Discount" row stayed visible showing "-₹0" even when
 no coupon was applied). Fixed with a blanket `[hidden] { display: none !important; }`
@@ -637,8 +643,7 @@ which has no sticky elements, just `position: fixed` — is unaffected).
 
 **Lesson for future CDP verification passes on this page**: always check
 element position/rect *after* scrolling, not just at the initial viewport —
-a screenshot at scroll-position-zero cannot catch a broken `position:
-sticky`, since sticky and static/relative look identical until you scroll
+a screenshot at scroll-position-zero cannot catch a broken `position: sticky`, since sticky and static/relative look identical until you scroll
 past the element's natural position.
 
 ### Two more real bugs found via CDP click-tracing while building Phase 2
@@ -711,8 +716,7 @@ pattern as `GOOGLE_MAPS_API_KEY`/`RAZORPAY_KEY_ID` in the booking app.
   `certificate_key` is nested under `APP['settings']` in
   `SOCIALACCOUNT_PROVIDERS`, not top-level in `APP` — the top-level spot
   still works but logs a deprecation warning.
-- **Password reset emails use the console backend** (`EMAIL_BACKEND =
-  'django.core.mail.backends.console.EmailBackend'`) — reset links print to
+- **Password reset emails use the console backend** (`EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'`) — reset links print to
   the `runserver` terminal instead of sending. Swap `EMAIL_BACKEND` (+ add
   SMTP host/port/credentials settings) for real delivery; no template/view
   changes needed.
@@ -723,8 +727,7 @@ pattern as `GOOGLE_MAPS_API_KEY`/`RAZORPAY_KEY_ID` in the booking app.
   all shipped **completely unstyled**, no classes at all, by design, meant
   to be overridden) rather than one big template per page. We override just
   `templates/allauth/layouts/base.html` (the page shell — logo, centered
-  `.auth-card`, no navbar/footer) plus `templates/allauth/elements/{h1,h2,p,
-  hr,alert,button,button_group,provider,provider_list}.html` (adding our own
+  `.auth-card`, no navbar/footer) plus `templates/allauth/elements/{h1,h2,p, hr,alert,button,button_group,provider,provider_list}.html` (adding our own
   classes). Every current and *future* allauth page (change-password,
   email-change, MFA, etc. if ever enabled) automatically inherits this
   styling with zero additional template files — don't write a full custom
@@ -739,8 +742,7 @@ pattern as `GOOGLE_MAPS_API_KEY`/`RAZORPAY_KEY_ID` in the booking app.
 - **`static/css/auth.css`** is its own bundle (imports `variables.css` +
   `base.css` + `components.css` directly, not `main.css`) — same
   per-surface-bundle pattern as `booking.css`.
-- **Profile dropdown is now real**: `templates/booking/components/
-  profile_dropdown.html` branches on `user.is_authenticated` (available
+- **Profile dropdown is now real**: `templates/booking/components/ profile_dropdown.html` branches on `user.is_authenticated` (available
   everywhere via the existing `django.contrib.auth.context_processors.auth`
   context processor — no view changes needed). Signed out → Sign In/Create
   Account links with the current page as `?next=`. Signed in → real email +
@@ -748,8 +750,7 @@ pattern as `GOOGLE_MAPS_API_KEY`/`RAZORPAY_KEY_ID` in the booking app.
   Addresses/Notification Settings/Support stay `data-coming-soon` — still
   Phase 3 territory. `app_navbar.html`'s avatar shows the user's email
   initial when authenticated, a generic person icon when not.
-- **This is the project's first real migration.** `python manage.py
-  makemigrations && migrate` has now actually been run (previously only
+- **This is the project's first real migration.** `python manage.py makemigrations && migrate` has now actually been run (previously only
   Django's framework-default tables existed, unapplied). The default
   `django.contrib.sites` Site record was updated from `example.com` to
   `glamourathome.com`/`SITE_NAME` — if `db.sqlite3` is ever recreated from
@@ -888,14 +889,12 @@ demo catalog (`catalog/migrations/0004_replace_demo_with_real_catalog.py`).
     **not real photos of this client's actual work**. Same "replace before
     launch" status as every other placeholder in this file.
   - `rating`/`reviews_count`/`popularity_score` — all `0`, not fabricated.
-    `catalog_card.html` and `templates/booking/components/
-    quick_view_modal.html`'s JS (`initQuickView()` in `booking.js`) both
+    `catalog_card.html` and `templates/booking/components/ quick_view_modal.html`'s JS (`initQuickView()` in `booking.js`) both
     hide the ★ rating badge entirely when `reviews_count` is falsy, instead
     of showing "★0.0 (0)" on every real service. `featured_services.html`
     (marketing) does the same, gated on `service.rating` being falsy (that
     mock shape has no separate reviews_count field).
-- **Marketing homepage's Featured Services** (`mock_data.py::
-  get_featured_services()`) were replaced with 6 real services spanning the
+- **Marketing homepage's Featured Services** (`mock_data.py:: get_featured_services()`) were replaced with 6 real services spanning the
   new categories (one threading, two waxing, two facial, one premium
   bridal facial) — ids match the corresponding `catalog.Service.slug`
   exactly, preserving the "Book Now" → booking-cart handoff contract.
@@ -909,6 +908,59 @@ demo catalog (`catalog/migrations/0004_replace_demo_with_real_catalog.py`).
   demo catalog is ever needed again (unlikely, but noted in the migration's
   own docstring too).
 
+## Bookings dashboard (added 2026-08-01)
+
+`/services-booking/bookings/` — Phase 3's first real piece (see "Service
+Booking App" above). `bookings/views.py::bookings_dashboard`, gated with
+`@login_required` (Django's decorator handles the redirect-to-login-with-
+`?next=` itself — no custom logic needed, same as everywhere else auth is
+enforced in this project).
+
+- **Lists the signed-in user's own bookings only** (`request.user.bookings`,
+  the reverse FK from `Booking.user`), newest first (`Booking.Meta.ordering`).
+  Status tabs (All/Upcoming/Completed/Cancelled) are plain client-side class
+  toggling (`bookings_dashboard.js::initBookingTabs()`) over the
+  server-rendered cards — same `is-hidden` pattern the catalog's own filters
+  use — since a user's own booking list is never large enough to need
+  pagination or a server round-trip per tab.
+- **"Rebook"** re-adds a past booking's items to the cart entirely
+  client-side — no new backend endpoint. Each booking's rebookable items
+  (only ones whose `ServiceVariant`/`Service` are still `is_active` — a
+  booking can reference a since-deactivated variant via
+  `BookingItem.service_variant`'s `on_delete=SET_NULL`) are precomputed in
+  the view as `booking.rebook_items` and serialized per-booking via
+  `{{ booking.rebook_items|json_script:booking.booking_number }}` (the
+  filter's second argument can be a template variable, not just a string
+  literal — that's what makes one `json_script` tag per booking, keyed by
+  its own `booking_number`, work without a custom template filter). Clicking
+  "Rebook" reads that JSON and merges it into the cart via
+  `window.GlamourBooking.getCart()`/`saveCart()` — the exact same shared
+  surface `booking_drawer.js` already depends on, so the floating cart's
+  mini-panel and badge count update immediately (`saveCart()` dispatches
+  `glamour:cart-changed`, which the cart panel already listens for).
+- **Reuses `get_booking_catalog()`/`get_booking_categories()`/
+  `get_booking_offers()`/`get_notifications_mock()`** — same context shape
+  `core/views.py::services_booking` passes — because this page also
+  includes `app_navbar.html`, `floating_cart.html`, and `chat_panel.html`
+  for shell consistency, and those all expect that context (Categories/
+  Offers dropdowns, the notification badge dot). This is also *why* the
+  floating cart actually works on this page: `getCatalog()` in `booking.js`
+  degrades to an empty array (not an error) when `#catalog-data` is
+  missing from the page, which would otherwise make the mini-cart panel
+  silently render zero lines even with real items in `localStorage`.
+  `quick_view_modal.html` is deliberately **not** included here — nothing
+  on this page triggers it.
+- **No status transitions built** — a `Booking.status` starts at
+  `'upcoming'` and stays there; nothing yet marks it `'completed'` after
+  its `scheduled_date` passes, or lets a user `'cancel'` it. That's a
+  deliberate scope cut (explicitly asked for "only Bookings dashboard UI"),
+  not an oversight — the `status` field and its three choices already exist
+  and are admin-editable, so the dashboard's tabs work correctly today for
+  however a booking's status gets set (currently: only via Django admin).
+- **"Bookings" nav links** (`bottom_nav.html`, `profile_dropdown.html`) were
+  `data-coming-soon` stubs before this — now real `<a href="{% url 'bookings_dashboard' %}">` links. Grep `data-coming-soon` for what's still
+  stubbed (Profile, Addresses, Notification Settings, Support).
+
 ## Current state vs. future work (explicitly out of scope this phase)
 
 - Marketing site: no payment integration — by design (see project goal at
@@ -917,10 +969,10 @@ demo catalog (`catalog/migrations/0004_replace_demo_with_real_catalog.py`).
   app's profile dropdown surfaces it.
 - Booking app: Phase 1 and 2 done (see above); catalog + bookings now
   persist to real models too (see "Catalog & Bookings models"). No real
-  Maps/Razorpay wiring (by choice, not a gap — Phase 2 works without them),
-  no real chat/notifications backend, no wishlist page, no bookings
-  *dashboard UI* yet (Phase 3) — though the `Booking`/`BookingItem` data it
-  would read from already exists and is admin-manageable right now.
+  Maps/Razorpay wiring (by choice, not a gap — Phase 2 works without them).
+  Bookings dashboard UI now exists (see "Bookings dashboard" above) —
+  still no real chat/notifications backend, and no status-transition logic
+  (nothing yet marks a booking completed/cancelled automatically).
 - Marketing site (`mock_data.py`) still has no models — only the booking
   app's catalog/bookings do (see "Catalog & Bookings models"). Don't
   migrate marketing content to models speculatively; do it when the
@@ -956,8 +1008,7 @@ for the marketing navbar (it already had `backdrop-filter` on `.is-scrolled`).
 - **Icon-button hover lift**: `color → --accent-gold`, `border-color → --gold`,
   `box-shadow` gold ring, `translateY(-1px)` — same premium affordance as the
   marketing site's card hovers.
-- **Avatar gold ring glow**: `border: 2px solid transparent` → `border-color:
-  --gold` + `box-shadow` ring on hover.
+- **Avatar gold ring glow**: `border: 2px solid transparent` → `border-color: --gold` + `box-shadow` ring on hover.
 - **Notification badge pulse**: `badge-pulse` keyframe animation on
   `.app-navbar__badge-dot` — subtle glow pulse to draw attention.
 - **Cart count pop**: `.app-navbar__cart-count.is-updated` runs a `cart-pop`
@@ -972,14 +1023,13 @@ for the marketing navbar (it already had `backdrop-filter` on `.is-scrolled`).
 - **Slide-in panel**: `search-panel-in` keyframe (`opacity 0→1`,
   `translateY(-6px → 0)`) on the autosuggest panel appearance.
 - **Result row slide**: `search-result:hover` translates `translateX(3px)`
-  + shows a CSS chevron arrow `::after` pseudo-element.
+  - shows a CSS chevron arrow `::after` pseudo-element.
 - **Tag hover**: tag chips animate `border-color`, `color`, `background`
   on hover for interactive feedback.
 
 ### Sort bar (`sort_bar.html` + `booking.css` + `booking.js`)
 
-- **Sort pills replace the native `<select>`**: six `<button
-  data-sort-pill="…">` pill buttons (Most Popular | Newest | Price ↑ | Price
+- **Sort pills replace the native `<select>`**: six `<button data-sort-pill="…">` pill buttons (Most Popular | Newest | Price ↑ | Price
   ↓ | Top Rated | Duration) replace the old `<select id="sort-select">`.
   - The hidden `<select data-sort-select class="sr-only">` is preserved so
     `getFilterState()` continues reading `.value` unchanged — the
@@ -988,8 +1038,7 @@ for the marketing navbar (it already had `backdrop-filter` on `.is-scrolled`).
   - Choices.js is no longer initialized (the pill UI supersedes it); the
     guard is kept as a no-op comment so the CDN tag (if still present in
     the base template) doesn't error.
-  - Active pill: `--gradient-gold` background + `box-shadow: 0 4px 14px
-    rgba(169,127,55,0.3)` + `translateY(-1px)`.
+  - Active pill: `--gradient-gold` background + `box-shadow: 0 4px 14px rgba(169,127,55,0.3)` + `translateY(-1px)`.
   - On mobile (≤640px): `.sort-pills { flex-wrap: nowrap }` and
     `.sort-bar__controls { overflow-x: auto }` — pills scroll horizontally
     instead of wrapping.
@@ -1020,5 +1069,4 @@ for the marketing navbar (it already had `backdrop-filter` on `.is-scrolled`).
 - **Clear Filters button**: gold outline (`border-color: --gold`), trash SVG
   icon, subtle gold background on hover. When clicked, range `--range-pct`
   is also reset to `100%` alongside the value reset.
-- **Backdrop blur**: `.filter-sidebar-backdrop` gains `backdrop-filter:
-  blur(3px)` to subtly focus attention on the open sidebar.
+- **Backdrop blur**: `.filter-sidebar-backdrop` gains `backdrop-filter: blur(3px)` to subtly focus attention on the open sidebar.

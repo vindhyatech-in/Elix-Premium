@@ -1,0 +1,90 @@
+{% extends 'booking/layouts/booking_base.html' %}
+{% load static %}
+
+{% block title %}My Bookings — {{ SITE.name }}{% endblock %}
+
+{% block content %}
+  {{ booking_catalog|json_script:"catalog-data" }}
+  {% include 'booking/components/app_navbar.html' %}
+
+  <main id="main-content" class="booking-main">
+    <section class="bookings-dashboard" aria-labelledby="bookings-title">
+      <div class="bookings-dashboard__header">
+        <h1 id="bookings-title">My Bookings</h1>
+        <p>{{ bookings|length }} booking{{ bookings|length|pluralize }}</p>
+      </div>
+
+      {% if bookings %}
+        <div class="bookings-dashboard__tabs" role="tablist" aria-label="Filter by status">
+          <button type="button" class="sort-pill is-active" data-booking-tab="all" role="tab" aria-selected="true">All</button>
+          <button type="button" class="sort-pill" data-booking-tab="upcoming" role="tab" aria-selected="false">Upcoming</button>
+          <button type="button" class="sort-pill" data-booking-tab="completed" role="tab" aria-selected="false">Completed</button>
+          <button type="button" class="sort-pill" data-booking-tab="cancelled" role="tab" aria-selected="false">Cancelled</button>
+        </div>
+
+        <div class="bookings-dashboard__list">
+          {% for booking in bookings %}
+            {{ booking.rebook_items|json_script:booking.booking_number }}
+            <article class="booking-card" data-booking-status="{{ booking.status }}">
+              <div class="booking-card__header">
+                <div>
+                  <p class="booking-card__number">{{ booking.booking_number }}</p>
+                  <p class="booking-card__date">
+                    {{ booking.scheduled_date|date:"D, d M Y" }} ·
+                    {% if booking.booking_type == 'urgent' %}
+                      {{ booking.exact_time|time:"g:i A" }} (Urgent)
+                    {% else %}
+                      {{ booking.get_time_slot_display }}
+                    {% endif %}
+                  </p>
+                </div>
+                <span class="booking-card__status booking-card__status--{{ booking.status }}">{{ booking.get_status_display }}</span>
+              </div>
+
+              <div class="booking-card__items">
+                {% for item in booking.items.all %}
+                  <div class="booking-card__item">
+                    <span>{{ item.name_snapshot }} × {{ item.quantity }}</span>
+                    <span>₹{{ item.price_snapshot|floatformat:"-2" }}</span>
+                  </div>
+                {% endfor %}
+              </div>
+
+              <div class="booking-card__footer">
+                <p class="booking-card__address">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <span>{{ booking.address_label }} — {{ booking.address_text|truncatechars:60 }}</span>
+                </p>
+                <div class="booking-card__total">
+                  <span>Total</span>
+                  <strong>₹{{ booking.total_amount|floatformat:"-2" }}</strong>
+                </div>
+              </div>
+
+              {% if booking.rebook_items %}
+                <button type="button" class="btn btn--ghost btn--sm booking-card__rebook" data-rebook data-booking-number="{{ booking.booking_number }}">Rebook</button>
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+
+        <p class="bookings-dashboard__tab-empty" data-bookings-tab-empty hidden>No bookings in this category.</p>
+      {% else %}
+        <div class="bookings-dashboard__empty">
+          <p>You don't have any bookings yet.</p>
+          <a href="{% url 'services_booking' %}" class="btn btn--primary">Browse Services</a>
+        </div>
+      {% endif %}
+    </section>
+  </main>
+
+  {% include 'booking/components/bottom_nav.html' %}
+  {% include 'booking/components/chat_panel.html' %}
+  {% include 'booking/components/floating_cart.html' %}
+
+  <div class="toast-stack" data-toast-stack aria-live="polite" aria-atomic="true"></div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/bookings_dashboard.js' %}" defer></script>
+{% endblock %}

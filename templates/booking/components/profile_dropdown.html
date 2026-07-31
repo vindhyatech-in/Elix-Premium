@@ -5,7 +5,7 @@
       <span>Signed in</span>
     </div>
     <button type="button" class="app-navbar__dropdown-item" data-coming-soon="Profile" role="menuitem">Profile</button>
-    <button type="button" class="app-navbar__dropdown-item" data-coming-soon="Bookings" role="menuitem">Bookings</button>
+    <a href="{% url 'bookings_dashboard' %}" class="app-navbar__dropdown-item" role="menuitem">Bookings</a>
     <button type="button" class="app-navbar__dropdown-item" data-coming-soon="Saved addresses" role="menuitem">Addresses</button>
     <button type="button" class="app-navbar__dropdown-item" data-coming-soon="Notifications settings" role="menuitem">Notification Settings</button>
     <button type="button" class="app-navbar__dropdown-item" data-coming-soon="Support" role="menuitem">Support</button>

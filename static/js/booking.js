@@ -491,6 +491,19 @@
       debouncedSearch();
     });
 
+    // Enter commits the current query (filtering already happened live via
+    // the input listener above) — closes the dropdown and blurs the field
+    // so the on-screen keyboard dismisses on mobile instead of the input
+    // just sitting there focused with nothing left to do.
+    input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const query = input.value.trim();
+      if (query) pushRecentSearch(query);
+      panel.hidden = true;
+      input.blur();
+    });
+
     input.addEventListener('focus', () => {
       renderRecent();
       renderResults(input.value.trim());

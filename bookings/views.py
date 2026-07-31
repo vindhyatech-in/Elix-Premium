@@ -1,11 +1,14 @@
 import json
 from decimal import Decimal, InvalidOperation
 
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.utils.dateparse import parse_date, parse_time
 from django.views.decorators.http import require_POST
 
 from catalog.models import Service
+from core import booking_data
 
 from .models import Booking, BookingItem
 
@@ -137,3 +140,50 @@ def create_booking(request):
     ])
 
     return JsonResponse({'ok': True, 'booking_number': booking.booking_number})
+
+
+@login_required
+def bookings_dashboard(request):
+    """
+    Phase 3's "bookings dashboard" from developed.md's roadmap — lists the
+    signed-in user's own bookings (upcoming/completed/cancelled, filterable
+    client-side same as the catalog's Type pills) with a "Rebook" action
+    per booking.
+
+    Rebook re-adds a past booking's items to the cart client-side (see
+    bookings_dashboard.js) rather than a server endpoint — it's the exact
+    same {id, variantId, qty} shape booking.js's cart already uses, so no
+    new persistence is needed. Each booking's rebookable items (only those
+    whose ServiceVariant/Service still exist and are active — a booking
+    can reference a since-deactivated variant via service_variant=NULL,
+    see BookingItem.service_variant's on_delete=SET_NULL) are attached as
+    a plain Python attribute for the template to serialize per-booking via
+    json_script, keyed by booking_number.
+    """
+    bookings = list(
+        request.user.bookings
+        .prefetch_related('items__service_variant__service')
+        .all()
+    )
+    for booking in bookings:
+        booking.rebook_items = [
+            {'id': item.service_variant.service.slug, 'variantId': item.service_variant.id, 'qty': item.quantity}
+            for item in booking.items.all()
+            if item.service_variant and item.service_variant.is_active and item.service_variant.service.is_active
+        ]
+
+    # Same shared context services_booking() passes — app_navbar.html (its
+    # Categories/Offers dropdowns, notification badge) and the floating
+    # cart/chat panel this page also includes all expect it, and reusing
+    # get_booking_catalog() here is what keeps the cart mini-panel able to
+    # actually render item names/prices on this page instead of silently
+    # dropping every line (see getCatalog() in booking.js — it degrades to
+    # an empty catalog, not an error, when #catalog-data isn't on the page).
+    context = {
+        'booking_categories': booking_data.get_booking_categories(),
+        'booking_offers': booking_data.get_booking_offers(),
+        'booking_catalog': booking_data.get_booking_catalog(),
+        'notifications': booking_data.get_notifications_mock(),
+        'bookings': bookings,
+    }
+    return render(request, 'booking/pages/bookings_dashboard.html', context)

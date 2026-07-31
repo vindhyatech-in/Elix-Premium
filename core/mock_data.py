@@ -21,7 +21,7 @@ def get_hero():
             'Verified beauticians. Premium products. Five-star rituals — '
             'delivered to your home, on your schedule.'
         ),
-        'primary_cta': {'label': 'Book a Ritual', 'href': '#services'},
+        'primary_cta': {'label': 'Book a Ritual', 'href': '/services-booking/'},
         'secondary_cta': {'label': 'How It Works', 'href': '#how-it-works'},
         'stats': [
             {'value': 50000, 'suffix': '+', 'label': 'Rituals Delivered'},
