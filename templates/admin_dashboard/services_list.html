@@ -1,0 +1,458 @@
+{% extends "admin_dashboard/layouts/admin_base.html" %}
+
+{% block content %}
+  <!-- Toolbar -->
+  <div class="admin-toolbar">
+    <form method="get" action="{% url 'admin_dashboard_services' %}" class="admin-toolbar__form">
+      <div class="admin-toolbar__group">
+        <input
+          type="text"
+          name="q"
+          value="{{ search_query }}"
+          placeholder="Search service name, description..."
+          class="admin-input admin-input--search"
+        >
+
+        <select name="category" class="admin-select" onchange="this.form.submit()">
+          <option value="all">All Categories</option>
+          {% for cat in categories %}
+            <option value="{{ cat.slug }}" {% if category_slug == cat.slug %}selected{% endif %}>{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+
+        <button type="submit" class="admin-btn admin-btn--primary">Filter</button>
+        {% if search_query or category_slug != 'all' %}
+          <a href="{% url 'admin_dashboard_services' %}" class="admin-btn admin-btn--ghost">Clear</a>
+        {% endif %}
+      </div>
+
+      <button type="button" class="admin-btn admin-btn--gold" onclick="document.getElementById('addServiceModal').style.display='flex'">
+        + Add New Service
+      </button>
+    </form>
+  </div>
+
+  <!-- Services List Cards & Variants -->
+  <div class="admin-services-container">
+    {% if services %}
+      {% for service in services %}
+        <div class="admin-service-card {% if not service.is_active %}is-disabled{% endif %}">
+          <!-- Service Header -->
+          <div class="admin-service-card__head">
+            <div class="admin-service-card__main">
+              <div class="admin-service-card__title-row">
+                <h3 class="admin-service-card__name">{{ service.name }}</h3>
+                <span class="admin-badge admin-badge--category">{{ service.category.name }}</span>
+                <span class="admin-badge admin-badge--subtle">{{ service.get_kind_display }}</span>
+                {% if service.badges %}
+                  {% for badge in service.badges %}
+                    <span class="admin-badge admin-badge--gold-tag">{{ badge }}</span>
+                  {% endfor %}
+                {% endif %}
+              </div>
+              <p class="admin-service-card__desc">{{ service.description|default:"No description provided." }}</p>
+              <small class="admin-text-muted">Slug: <code>{{ service.slug }}</code></small>
+            </div>
+
+            <div class="admin-service-card__actions">
+              <!-- Toggle Active -->
+              <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-inline-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_service">
+                <input type="hidden" name="service_id" value="{{ service.id }}">
+                <button type="submit" class="admin-toggle-btn {% if service.is_active %}is-active{% endif %}">
+                  {% if service.is_active %}Enabled{% else %}Disabled{% endif %}
+                </button>
+              </form>
+
+              <!-- Edit Service Details -->
+              <button
+                type="button"
+                class="admin-btn admin-btn--ghost admin-btn--xs"
+                onclick="openEditServiceModal('{{ service.id }}', '{{ service.name|escapejs }}', '{{ service.category.id }}', '{{ service.kind }}', '{{ service.description|escapejs }}', '{{ service.badges|join:", "|escapejs }}')"
+              >
+                ✏ Edit Service
+              </button>
+
+              <!-- Add Variant Button -->
+              <button
+                type="button"
+                class="admin-btn admin-btn--ghost admin-btn--xs"
+                onclick="openAddVariantModal('{{ service.id }}', '{{ service.name|escapejs }}')"
+              >
+                + Add Variant
+              </button>
+
+              <!-- Delete Service -->
+              <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-inline-form" onsubmit="return confirm('Are you sure you want to delete service &quot;{{ service.name|escapejs }}&quot;? This action cannot be undone.');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_service">
+                <input type="hidden" name="service_id" value="{{ service.id }}">
+                <button type="submit" class="admin-btn admin-btn--danger admin-btn--xs">
+                  🗑 Delete
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Variants Table -->
+          <div class="admin-variants-box">
+            <h4 class="admin-variants-title">Service Variants & Pricing ({{ service.variants.count }})</h4>
+            <table class="admin-table admin-table--compact">
+              <thead>
+                <tr>
+                  <th>Variant Label</th>
+                  <th>Duration</th>
+                  <th>Selling Price</th>
+                  <th>MRP</th>
+                  <th>Default?</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for variant in service.variants.all %}
+                  <tr>
+                    <td>
+                      <strong>{{ variant.label|default:"Standard / Default" }}</strong>
+                    </td>
+                    <td>{{ variant.duration_label }}</td>
+                    <td><strong class="admin-text-gold">₹{{ variant.price }}</strong></td>
+                    <td>
+                      {% if variant.mrp %}
+                        <span class="admin-price-mrp">₹{{ variant.mrp }}</span>
+                        <span class="admin-price-discount">({{ variant.discount_pct }}% OFF)</span>
+                      {% else %}
+                        <span class="admin-text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if variant.is_default %}
+                        <span class="admin-badge admin-badge--category">Default</span>
+                      {% else %}
+                        <span class="admin-text-muted">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="admin-btn-group">
+                        <button
+                          type="button"
+                          class="admin-btn admin-btn--ghost admin-btn--xs"
+                          onclick="openEditVariantModal('{{ variant.id }}', '{{ service.name|escapejs }}', '{{ variant.label|escapejs }}', '{{ variant.price }}', '{{ variant.mrp|default:"" }}', '{{ variant.duration_mins }}', {{ variant.is_default|lower }})"
+                        >
+                          Edit
+                        </button>
+
+                        {% if service.variants.count > 1 %}
+                          <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-inline-form" onsubmit="return confirm('Delete this variant?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_variant">
+                            <input type="hidden" name="variant_id" value="{{ variant.id }}">
+                            <button type="submit" class="admin-btn admin-btn--danger admin-btn--xs">Delete</button>
+                          </form>
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="admin-card-table-box admin-empty-state">
+        <p>No services found matching your criteria.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Add Service Modal (With Dynamic Variants) -->
+  <div id="addServiceModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal admin-modal--large">
+      <div class="admin-modal__head">
+        <h2>Add New Service</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('addServiceModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-modal__body">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_service">
+
+        <div class="admin-form-group">
+          <label>Service Name *</label>
+          <input type="text" name="name" required class="admin-input" placeholder="e.g. Honey & Chocolate Body Waxing">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Category *</label>
+            <select name="category_id" required class="admin-select">
+              {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="admin-form-group">
+            <label>Kind *</label>
+            <select name="kind" class="admin-select">
+              <option value="service">Single Service</option>
+              <option value="package">Package / Bundle</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Description</label>
+          <textarea name="description" class="admin-textarea" rows="2" placeholder="Describe the service..."></textarea>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Badges (Comma separated)</label>
+          <input type="text" name="badges" class="admin-input" placeholder="e.g. Bestseller, Trending">
+        </div>
+
+        <!-- Variants Container -->
+        <div class="admin-variants-section">
+          <div class="admin-variants-section__head">
+            <h3>Service Variants & Prices *</h3>
+            <button type="button" class="admin-btn admin-btn--ghost admin-btn--xs" onclick="addVariantRow('variantsContainer')">+ Add Another Variant</button>
+          </div>
+
+          <div id="variantsContainer" class="admin-variant-rows">
+            <!-- Row 1 -->
+            <div class="admin-variant-row">
+              <div class="admin-form-group">
+                <label>Variant Label (Optional)</label>
+                <input type="text" name="variant_label" class="admin-input" placeholder="e.g. Honey Wax / 60 Min">
+              </div>
+              <div class="admin-form-group">
+                <label>Selling Price (₹) *</label>
+                <input type="number" step="0.01" name="variant_price" required class="admin-input" placeholder="499">
+              </div>
+              <div class="admin-form-group">
+                <label>MRP (₹)</label>
+                <input type="number" step="0.01" name="variant_mrp" class="admin-input" placeholder="699">
+              </div>
+              <div class="admin-form-group">
+                <label>Duration (Mins) *</label>
+                <input type="number" name="variant_duration" value="30" required class="admin-input">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-modal__foot">
+          <button type="button" class="admin-btn admin-btn--ghost" onclick="document.getElementById('addServiceModal').style.display='none'">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn--primary">Create Service</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Service Details Modal -->
+  <div id="editServiceModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal">
+      <div class="admin-modal__head">
+        <h2>Edit Service Details</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('editServiceModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-modal__body">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit_service">
+        <input type="hidden" name="service_id" id="editServiceId">
+
+        <div class="admin-form-group">
+          <label>Service Name *</label>
+          <input type="text" name="name" id="editServiceName" required class="admin-input">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Category *</label>
+            <select name="category_id" id="editServiceCategoryId" required class="admin-select">
+              {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="admin-form-group">
+            <label>Kind *</label>
+            <select name="kind" id="editServiceKind" class="admin-select">
+              <option value="service">Single Service</option>
+              <option value="package">Package / Bundle</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Description</label>
+          <textarea name="description" id="editServiceDescription" class="admin-textarea" rows="3"></textarea>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Badges (Comma separated)</label>
+          <input type="text" name="badges" id="editServiceBadges" class="admin-input" placeholder="e.g. Bestseller, Trending">
+        </div>
+
+        <div class="admin-modal__foot">
+          <button type="button" class="admin-btn admin-btn--ghost" onclick="document.getElementById('editServiceModal').style.display='none'">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn--primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Variant Modal (For Existing Service) -->
+  <div id="addVariantModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal">
+      <div class="admin-modal__head">
+        <h2 id="addVariantModalTitle">Add Variant</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('addVariantModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-modal__body">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_variant">
+        <input type="hidden" name="service_id" id="addVariantServiceId">
+
+        <div class="admin-form-group">
+          <label>Variant Label (e.g. "Rica Wax", "90 Min")</label>
+          <input type="text" name="label" class="admin-input" placeholder="e.g. Rica Chocolate Wax">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Selling Price (₹) *</label>
+            <input type="number" step="0.01" name="price" required class="admin-input" placeholder="599">
+          </div>
+          <div class="admin-form-group">
+            <label>MRP (₹)</label>
+            <input type="number" step="0.01" name="mrp" class="admin-input" placeholder="799">
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Duration (Minutes) *</label>
+          <input type="number" name="duration_mins" value="30" required class="admin-input">
+        </div>
+
+        <div class="admin-form-group">
+          <label class="admin-remember-label">
+            <input type="checkbox" name="is_default" class="admin-remember-checkbox">
+            <span class="admin-remember-text">Set as default catalog variant</span>
+          </label>
+        </div>
+
+        <div class="admin-modal__foot">
+          <button type="button" class="admin-btn admin-btn--ghost" onclick="document.getElementById('addVariantModal').style.display='none'">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn--primary">Add Variant</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Variant Modal -->
+  <div id="editVariantModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal">
+      <div class="admin-modal__head">
+        <h2 id="editVariantModalTitle">Edit Variant</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('editVariantModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-modal__body">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_variant_price">
+        <input type="hidden" name="variant_id" id="editVariantId">
+
+        <div class="admin-form-group">
+          <label>Variant Label</label>
+          <input type="text" name="label" id="editVariantLabel" class="admin-input">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Selling Price (₹) *</label>
+            <input type="number" step="0.01" name="price" id="editVariantPrice" required class="admin-input">
+          </div>
+          <div class="admin-form-group">
+            <label>MRP (₹)</label>
+            <input type="number" step="0.01" name="mrp" id="editVariantMrp" class="admin-input">
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Duration (Minutes) *</label>
+          <input type="number" name="duration_mins" id="editVariantDuration" required class="admin-input">
+        </div>
+
+        <div class="admin-form-group">
+          <label class="admin-remember-label">
+            <input type="checkbox" name="is_default" id="editVariantIsDefault" class="admin-remember-checkbox">
+            <span class="admin-remember-text">Set as default catalog variant</span>
+          </label>
+        </div>
+
+        <div class="admin-modal__foot">
+          <button type="button" class="admin-btn admin-btn--ghost" onclick="document.getElementById('editVariantModal').style.display='none'">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn--primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function openEditServiceModal(id, name, categoryId, kind, description, badges) {
+      document.getElementById('editServiceId').value = id;
+      document.getElementById('editServiceName').value = name;
+      document.getElementById('editServiceCategoryId').value = categoryId;
+      document.getElementById('editServiceKind').value = kind;
+      document.getElementById('editServiceDescription').value = description;
+      document.getElementById('editServiceBadges').value = badges;
+      document.getElementById('editServiceModal').style.display = 'flex';
+    }
+
+    function openAddVariantModal(serviceId, serviceName) {
+      document.getElementById('addVariantServiceId').value = serviceId;
+      document.getElementById('addVariantModalTitle').innerText = 'Add Variant — ' + serviceName;
+      document.getElementById('addVariantModal').style.display = 'flex';
+    }
+
+    function openEditVariantModal(variantId, serviceName, label, price, mrp, duration, isDefault) {
+      document.getElementById('editVariantId').value = variantId;
+      document.getElementById('editVariantModalTitle').innerText = 'Edit Variant (' + (label || 'Standard') + ') — ' + serviceName;
+      document.getElementById('editVariantLabel').value = label;
+      document.getElementById('editVariantPrice').value = price;
+      document.getElementById('editVariantMrp').value = mrp;
+      document.getElementById('editVariantDuration').value = duration;
+      document.getElementById('editVariantIsDefault').checked = isDefault;
+      document.getElementById('editVariantModal').style.display = 'flex';
+    }
+
+    function addVariantRow(containerId) {
+      const container = document.getElementById(containerId);
+      const row = document.createElement('div');
+      row.className = 'admin-variant-row';
+      row.innerHTML = `
+        <div class="admin-form-group">
+          <label>Variant Label (Optional)</label>
+          <input type="text" name="variant_label" class="admin-input" placeholder="e.g. Rica Chocolate Wax">
+        </div>
+        <div class="admin-form-group">
+          <label>Selling Price (₹) *</label>
+          <input type="number" step="0.01" name="variant_price" required class="admin-input" placeholder="599">
+        </div>
+        <div class="admin-form-group">
+          <label>MRP (₹)</label>
+          <input type="number" step="0.01" name="variant_mrp" class="admin-input" placeholder="799">
+        </div>
+        <div class="admin-form-group">
+          <label>Duration (Mins) *</label>
+          <input type="number" name="variant_duration" value="30" required class="admin-input">
+        </div>
+        <button type="button" class="admin-btn admin-btn--danger admin-btn--xs" style="align-self: flex-end; margin-bottom: 4px;" onclick="this.parentElement.remove()">Remove</button>
+      `;
+      container.appendChild(row);
+    }
+  </script>
+{% endblock %}

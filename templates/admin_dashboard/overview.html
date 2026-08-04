@@ -1,0 +1,133 @@
+{% extends "admin_dashboard/layouts/admin_base.html" %}
+
+{% block content %}
+  <!-- KPI Grid -->
+  <div class="admin-kpi-grid">
+    <div class="admin-kpi-card">
+      <div class="admin-kpi-card__head">
+        <span class="admin-kpi-card__label">Total Revenue</span>
+        <span class="admin-kpi-card__icon admin-kpi-card__icon--gold">₹</span>
+      </div>
+      <div class="admin-kpi-card__value">₹{{ total_revenue|floatformat:2 }}</div>
+      <div class="admin-kpi-card__sub">From completed bookings</div>
+    </div>
+
+    <div class="admin-kpi-card">
+      <div class="admin-kpi-card__head">
+        <span class="admin-kpi-card__label">Total Bookings</span>
+        <span class="admin-kpi-card__icon">📦</span>
+      </div>
+      <div class="admin-kpi-card__value">{{ total_bookings }}</div>
+      <div class="admin-kpi-card__sub">{{ upcoming_count }} upcoming orders</div>
+    </div>
+
+    <div class="admin-kpi-card">
+      <div class="admin-kpi-card__head">
+        <span class="admin-kpi-card__label">Active Services</span>
+        <span class="admin-kpi-card__icon">✨</span>
+      </div>
+      <div class="admin-kpi-card__value">{{ active_services_count }} <span class="admin-kpi-card__total">/ {{ total_services_count }}</span></div>
+      <div class="admin-kpi-card__sub">Catalog offerings enabled</div>
+    </div>
+
+    <div class="admin-kpi-card">
+      <div class="admin-kpi-card__head">
+        <span class="admin-kpi-card__label">Active Staff</span>
+        <span class="admin-kpi-card__icon">👩‍🎨</span>
+      </div>
+      <div class="admin-kpi-card__value">{{ active_staff_count }} <span class="admin-kpi-card__total">/ {{ total_staff_count }}</span></div>
+      <div class="admin-kpi-card__sub">Verified beauticians ready</div>
+    </div>
+  </div>
+
+  <!-- Status Distribution Grid -->
+  <div class="admin-section-box">
+    <div class="admin-section-box__head">
+      <h2 class="admin-section-box__title">Orders Lifecycle Breakdown</h2>
+      <a href="{% url 'admin_dashboard_bookings' %}" class="admin-btn admin-btn--ghost admin-btn--sm">View All Orders →</a>
+    </div>
+
+    <div class="admin-status-grid">
+      <div class="admin-status-pill admin-status-pill--upcoming">
+        <span class="admin-status-pill__count">{{ upcoming_count }}</span>
+        <span class="admin-status-pill__label">Upcoming</span>
+      </div>
+      <div class="admin-status-pill admin-status-pill--progress">
+        <span class="admin-status-pill__count">{{ in_progress_count }}</span>
+        <span class="admin-status-pill__label">In Progress</span>
+      </div>
+      <div class="admin-status-pill admin-status-pill--completed">
+        <span class="admin-status-pill__count">{{ completed_count }}</span>
+        <span class="admin-status-pill__label">Completed</span>
+      </div>
+      <div class="admin-status-pill admin-status-pill--cancelled">
+        <span class="admin-status-pill__count">{{ cancelled_count }}</span>
+        <span class="admin-status-pill__label">Cancelled</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Orders Table -->
+  <div class="admin-card-table-box">
+    <div class="admin-card-table-box__head">
+      <h2 class="admin-card-table-box__title">Recent Orders</h2>
+    </div>
+
+    {% if recent_bookings %}
+      <div class="admin-table-wrapper">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Booking #</th>
+              <th>Customer</th>
+              <th>Scheduled</th>
+              <th>Items</th>
+              <th>Amount</th>
+              <th>Assigned Staff</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for booking in recent_bookings %}
+              <tr>
+                <td><strong>{{ booking.booking_number }}</strong></td>
+                <td>
+                  <div class="admin-customer-info">
+                    <span class="admin-customer-name">{{ booking.user.first_name|default:booking.user.username }}</span>
+                    <span class="admin-customer-email">{{ booking.user.email }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div>{{ booking.scheduled_date|date:"D, M j, Y" }}</div>
+                  <small class="admin-text-muted">{{ booking.get_time_slot_display|default:booking.exact_time }}</small>
+                </td>
+                <td>{{ booking.items.count }} item(s)</td>
+                <td><strong>₹{{ booking.total_amount }}</strong></td>
+                <td>
+                  {% if booking.assigned_beautician %}
+                    <span class="admin-badge admin-badge--staff">👩‍🎨 {{ booking.assigned_beautician.name }}</span>
+                  {% else %}
+                    <span class="admin-badge admin-badge--unassigned">Unassigned</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="admin-badge admin-badge--{{ booking.status }}">
+                    {{ booking.get_status_display }}
+                  </span>
+                </td>
+                <td>
+                  <a href="{% url 'admin_dashboard_bookings' %}?q={{ booking.booking_number }}" class="admin-btn admin-btn--ghost admin-btn--xs">Manage</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="admin-empty-state">
+        <p>No bookings found yet.</p>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends 'booking/layouts/booking_base.html' %}
+{% load static %}
+
+{% block title %}My Profile — {{ SITE.name }}{% endblock %}
+
+{% block content %}
+  {{ booking_catalog|json_script:"catalog-data" }}
+  {% include 'booking/components/app_navbar.html' %}
+
+  <main id="main-content" class="booking-main">
+    <section class="profile-page" aria-labelledby="profile-title">
+      <div class="profile-page__header">
+        <h1 id="profile-title">My Profile</h1>
+      </div>
+
+      {% if messages %}
+        <div class="profile-page__messages">
+          {% for message in messages %}
+            <p class="profile-page__message profile-page__message--{{ message.tags }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="profile-page__card">
+        <h2>Account Details</h2>
+        <form method="post" class="profile-page__form">
+          {% csrf_token %}
+          <div class="field">
+            <label for="profile-email">Email</label>
+            <input type="email" id="profile-email" value="{{ user.email }}" disabled>
+          </div>
+          <div class="profile-page__form-row">
+            <div class="field">
+              <label for="profile-first-name">First name</label>
+              <input type="text" id="profile-first-name" name="first_name" value="{{ user.first_name }}" autocomplete="given-name">
+            </div>
+            <div class="field">
+              <label for="profile-last-name">Last name</label>
+              <input type="text" id="profile-last-name" name="last_name" value="{{ user.last_name }}" autocomplete="family-name">
+            </div>
+          </div>
+          <div class="field">
+            <label for="profile-phone">Phone</label>
+            <input type="tel" id="profile-phone" name="phone" value="{{ profile.phone }}" placeholder="+91 98765 43210" autocomplete="tel">
+          </div>
+          <button type="submit" class="btn btn--primary">Save Changes</button>
+        </form>
+      </div>
+
+      <div class="profile-page__card" id="addresses">
+        <h2>Saved Addresses</h2>
+
+        <div class="address-list" data-profile-address-list>
+          {% for address in addresses %}
+            <div class="address-card address-card--static" data-address-card data-address-id="{{ address.id }}">
+              <div>
+                <strong>{{ address.label }}</strong>
+                <p>{{ address.text }}{% if address.pincode %} — {{ address.pincode }}{% endif %}</p>
+              </div>
+              <button type="button" class="btn-icon" data-delete-address data-address-id="{{ address.id }}" aria-label="Delete {{ address.label }}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+              </button>
+            </div>
+          {% endfor %}
+        </div>
+        <p class="address-list__empty" data-profile-address-empty {% if addresses %}hidden{% endif %}>No saved addresses yet — add one below.</p>
+
+        <button type="button" class="btn btn--ghost btn--sm" data-add-address-toggle>+ Add New Address</button>
+        <div class="address-form" data-address-form hidden>
+          <div class="field">
+            <label for="new-address-label">Label</label>
+            <input type="text" id="new-address-label" data-address-label placeholder="Home, Office…">
+          </div>
+          <div class="field">
+            <label for="new-address-text">Full Address</label>
+            <textarea id="new-address-text" data-address-text placeholder="House no., street, area, landmark…"></textarea>
+          </div>
+          <div class="field">
+            <label for="new-address-pincode">Pincode</label>
+            <input type="text" id="new-address-pincode" inputmode="numeric" maxlength="6" data-address-pincode placeholder="560001">
+          </div>
+          <div class="address-form__actions">
+            <button type="button" class="btn btn--ghost btn--sm" data-address-cancel>Cancel</button>
+            <button type="button" class="btn btn--primary btn--sm" data-address-save>Save Address</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  {% include 'booking/components/bottom_nav.html' %}
+  {% include 'booking/components/chat_panel.html' %}
+  {% include 'booking/components/floating_cart.html' %}
+
+  <div class="toast-stack" data-toast-stack aria-live="polite" aria-atomic="true"></div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/profile.js' %}" defer></script>
+{% endblock %}

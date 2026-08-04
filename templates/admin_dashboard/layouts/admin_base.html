@@ -1,0 +1,150 @@
+{% load static %}<!doctype html>
+<html lang="en-IN">
+<head>
+  <script>
+    (function () {
+      var stored = localStorage.getItem('theme');
+      var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page_title }} — Admin Dashboard | {{ SITE.name }}</title>
+
+  <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/admin_dashboard.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="admin-body">
+  <div class="admin-sidebar-backdrop" id="adminSidebarBackdrop"></div>
+
+  <div class="admin-shell">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar__header">
+        <a href="{% url 'admin_dashboard_overview' %}" class="admin-sidebar__brand">
+          Glamour<span>Admin</span>
+        </a>
+        <span class="admin-sidebar__badge">Owner</span>
+      </div>
+
+      <nav class="admin-sidebar__nav">
+        <a href="{% url 'admin_dashboard_overview' %}" class="admin-nav-item {% if active_nav == 'overview' %}is-active{% endif %}">
+          <svg class="admin-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>Overview</span>
+        </a>
+
+        <a href="{% url 'admin_dashboard_bookings' %}" class="admin-nav-item {% if active_nav == 'bookings' %}is-active{% endif %}">
+          <svg class="admin-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          <span>Orders & Bookings</span>
+          {% if upcoming_count %}
+            <span class="admin-nav-count">{{ upcoming_count }}</span>
+          {% endif %}
+        </a>
+
+        <a href="{% url 'admin_dashboard_services' %}" class="admin-nav-item {% if active_nav == 'services' %}is-active{% endif %}">
+          <svg class="admin-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+          <span>Services & Pricing</span>
+        </a>
+
+        <a href="{% url 'admin_dashboard_employees' %}" class="admin-nav-item {% if active_nav == 'employees' %}is-active{% endif %}">
+          <svg class="admin-nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span>Employees & Staff</span>
+        </a>
+      </nav>
+
+      <div class="admin-sidebar__footer">
+        <a href="{% url 'services_booking' %}" class="admin-sidebar__link" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+          <span>View Customer App</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Section -->
+    <main class="admin-main">
+      <!-- Topbar -->
+      <header class="admin-topbar">
+        <div class="admin-topbar__title-group">
+          <button type="button" class="admin-mobile-toggle" id="adminMobileToggle" aria-label="Toggle mobile navigation menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <h1 class="admin-topbar__title">{{ page_title }}</h1>
+        </div>
+
+        <div class="admin-topbar__actions">
+          <button type="button" class="admin-theme-toggle" data-theme-toggle aria-label="Toggle dark/light theme">
+            <svg class="admin-theme-icon admin-theme-icon--moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <svg class="admin-theme-icon admin-theme-icon--sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          </button>
+
+          <div class="admin-user-pill">
+            <span class="admin-user-avatar">{{ request.user.email|first|upper }}</span>
+            <span class="admin-user-email">{{ request.user.email }}</span>
+          </div>
+
+          <a href="{% url 'account_logout' %}" class="admin-btn admin-btn--ghost admin-btn--sm">Logout</a>
+        </div>
+      </header>
+
+      <!-- Messages -->
+      {% if messages %}
+        <div class="admin-messages">
+          {% for message in messages %}
+            <div class="admin-alert admin-alert--{{ message.tags }}">
+              <span>{{ message }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <!-- Content -->
+      <div class="admin-content">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var toggleBtn = document.getElementById('adminMobileToggle');
+      var sidebar = document.querySelector('.admin-sidebar');
+      var backdrop = document.getElementById('adminSidebarBackdrop');
+
+      function toggleSidebar() {
+        sidebar.classList.toggle('is-open');
+        backdrop.classList.toggle('is-open');
+      }
+
+      if (toggleBtn && sidebar && backdrop) {
+        toggleBtn.addEventListener('click', toggleSidebar);
+        backdrop.addEventListener('click', toggleSidebar);
+      }
+
+      // Theme toggle handler
+      var themeToggles = document.querySelectorAll('[data-theme-toggle]');
+      var root = document.documentElement;
+
+      themeToggles.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var current = root.getAttribute('data-theme') || 'dark';
+          var next = current === 'dark' ? 'light' : 'dark';
+          root.setAttribute('data-theme', next);
+          localStorage.setItem('theme', next);
+        });
+      });
+    });
+  </script>
+  {% block extra_body %}{% endblock %}
+</body>
+</html>

@@ -14,6 +14,14 @@
         <p>{{ bookings|length }} booking{{ bookings|length|pluralize }}</p>
       </div>
 
+      {% if messages %}
+        <div class="bookings-dashboard__messages">
+          {% for message in messages %}
+            <p class="bookings-dashboard__message bookings-dashboard__message--{{ message.tags }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+
       {% if bookings %}
         <div class="bookings-dashboard__tabs" role="tablist" aria-label="Filter by status">
           <button type="button" class="sort-pill is-active" data-booking-tab="all" role="tab" aria-selected="true">All</button>
@@ -61,7 +69,16 @@
                 </div>
               </div>
 
-              {% if booking.rebook_items %}
+              {% if booking.status == 'upcoming' %}
+                {% if booking.can_cancel %}
+                  <form method="post" action="{% url 'cancel_booking' booking.booking_number %}" data-cancel-booking-form>
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn--ghost btn--sm booking-card__cancel" data-cancel-booking>Cancel Booking</button>
+                  </form>
+                {% else %}
+                  <p class="booking-card__cancel-note">Can't be cancelled — starts within 3 hours.</p>
+                {% endif %}
+              {% elif booking.rebook_items %}
                 <button type="button" class="btn btn--ghost btn--sm booking-card__rebook" data-rebook data-booking-number="{{ booking.booking_number }}">Rebook</button>
               {% endif %}
             </article>

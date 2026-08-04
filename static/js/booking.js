@@ -35,6 +35,13 @@
   // own Add to Cart click has actually added the item.
   let openQuickViewItem = null;
   let closeQuickView = null;
+  // Set by initFloatingCart() once it runs; exposed on window.GlamourBooking
+  // as closeCartPanel so booking_drawer.js can close the mini-cart panel
+  // when the booking drawer opens over it — "Proceed to Booking" lives
+  // inside that panel, and opening the drawer never closed it, so it sat
+  // open (just visually covered by the higher z-index drawer) the whole
+  // time and reappeared the moment the drawer closed again.
+  let closeCartPanel = null;
 
   /* ---------------------------------------------------------
    * Small shared utilities
@@ -871,6 +878,7 @@
       document.querySelectorAll('[data-cart-toggle]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
       setTimeout(() => { if (backdrop) backdrop.hidden = true; }, 300);
     }
+    closeCartPanel = close;
 
     document.querySelectorAll('[data-cart-toggle]').forEach((btn) => btn.addEventListener('click', () => {
       root.classList.contains('is-open') ? close() : open();
@@ -1079,6 +1087,7 @@
       showToast,
       getAppliedDiscountRate: () => (appliedCoupon ? COUPONS[appliedCoupon] : 0),
       getAppliedCouponCode: () => appliedCoupon,
+      closeCartPanel: () => closeCartPanel?.(),
     };
   });
 })();

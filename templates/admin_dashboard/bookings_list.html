@@ -1,0 +1,150 @@
+{% extends "admin_dashboard/layouts/admin_base.html" %}
+
+{% block content %}
+  <!-- Filter Toolbar -->
+  <div class="admin-toolbar">
+    <form method="get" action="{% url 'admin_dashboard_bookings' %}" class="admin-toolbar__form">
+      <div class="admin-toolbar__group">
+        <input
+          type="text"
+          name="q"
+          value="{{ search_query }}"
+          placeholder="Search by ID, customer, address..."
+          class="admin-input admin-input--search"
+        >
+        
+        <input
+          type="date"
+          name="date"
+          value="{{ date_filter }}"
+          class="admin-input"
+        >
+
+        <button type="submit" class="admin-btn admin-btn--primary">Search</button>
+        {% if search_query or status_filter != 'all' or date_filter %}
+          <a href="{% url 'admin_dashboard_bookings' %}" class="admin-btn admin-btn--ghost">Clear</a>
+        {% endif %}
+      </div>
+
+      <!-- Status Filter Tabs -->
+      <div class="admin-filter-tabs">
+        <a href="?status=all{% if search_query %}&q={{ search_query }}{% endif %}" class="admin-filter-tab {% if status_filter == 'all' %}is-active{% endif %}">All Orders</a>
+        <a href="?status=upcoming{% if search_query %}&q={{ search_query }}{% endif %}" class="admin-filter-tab {% if status_filter == 'upcoming' %}is-active{% endif %}">Upcoming</a>
+        <a href="?status=in_progress{% if search_query %}&q={{ search_query }}{% endif %}" class="admin-filter-tab {% if status_filter == 'in_progress' %}is-active{% endif %}">In Progress</a>
+        <a href="?status=completed{% if search_query %}&q={{ search_query }}{% endif %}" class="admin-filter-tab {% if status_filter == 'completed' %}is-active{% endif %}">Completed</a>
+        <a href="?status=cancelled{% if search_query %}&q={{ search_query }}{% endif %}" class="admin-filter-tab {% if status_filter == 'cancelled' %}is-active{% endif %}">Cancelled</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Bookings List Table -->
+  <div class="admin-card-table-box">
+    {% if bookings %}
+      <div class="admin-table-wrapper">
+        <table class="admin-table admin-table--spacious">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Customer & Address</th>
+              <th>Schedule</th>
+              <th>Items & Total</th>
+              <th>Assigned Staff</th>
+              <th>Update Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for booking in bookings %}
+              <tr>
+                <!-- ID & Type -->
+                <td class="admin-td-id">
+                  <strong>{{ booking.booking_number }}</strong>
+                  <div class="admin-badge admin-badge--subtle">{{ booking.get_booking_type_display }}</div>
+                  <small class="admin-text-muted">Placed: {{ booking.created_at|date:"M j, H:i" }}</small>
+                </td>
+
+                <!-- Customer & Address -->
+                <td>
+                  <div class="admin-customer-box">
+                    <div class="admin-customer-name">{{ booking.user.first_name|default:booking.user.username }} {{ booking.user.last_name }}</div>
+                    <div class="admin-customer-email">✉ {{ booking.user.email }}</div>
+                    <div class="admin-customer-address">📍 <strong>{{ booking.address_label }}:</strong> {{ booking.address_text }}</div>
+                  </div>
+                </td>
+
+                <!-- Schedule -->
+                <td>
+                  <div class="admin-schedule-box">
+                    <div class="admin-schedule-date">📅 {{ booking.scheduled_date|date:"D, M j, Y" }}</div>
+                    <div class="admin-schedule-time">⏰ {{ booking.get_time_slot_display|default:booking.exact_time }}</div>
+                  </div>
+                </td>
+
+                <!-- Items & Amounts -->
+                <td>
+                  <div class="admin-items-summary">
+                    <ul class="admin-items-list">
+                      {% for item in booking.items.all %}
+                        <li>{{ item.name_snapshot }} (x{{ item.quantity }}) — ₹{{ item.price_snapshot }}</li>
+                      {% endfor %}
+                    </ul>
+                    <div class="admin-items-total">
+                      <strong>Total: ₹{{ booking.total_amount }}</strong>
+                      <span class="admin-badge admin-badge--pay-{{ booking.payment_status }}">{{ booking.get_payment_method_display }} ({{ booking.get_payment_status_display }})</span>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Assigned Staff -->
+                <td>
+                  <form method="post" action="{% url 'admin_dashboard_bookings' %}" class="admin-inline-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="assign_beautician">
+                    <input type="hidden" name="booking_id" value="{{ booking.id }}">
+                    
+                    <select name="beautician_id" class="admin-select admin-select--sm" onchange="this.form.submit()">
+                      <option value="">-- Unassigned --</option>
+                      {% for emp in employees %}
+                        <option value="{{ emp.id }}" {% if booking.assigned_beautician_id == emp.id %}selected{% endif %}>
+                          {{ emp.name }} ({% if emp.status == 'active' %}Available{% else %}{{ emp.get_status_display }}{% endif %})
+                        </option>
+                      {% endfor %}
+                    </select>
+                  </form>
+                </td>
+
+                <!-- Update Status -->
+                <td>
+                  <form method="post" action="{% url 'admin_dashboard_bookings' %}" class="admin-status-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_status">
+                    <input type="hidden" name="booking_id" value="{{ booking.id }}">
+                    
+                    <div class="admin-form-row">
+                      <select name="status" class="admin-select admin-select--sm admin-select--status-{{ booking.status }}">
+                        {% for code, label in status_choices %}
+                          <option value="{{ code }}" {% if booking.status == code %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                      </select>
+
+                      <select name="payment_status" class="admin-select admin-select--sm">
+                        {% for code, label in payment_status_choices %}
+                          <option value="{{ code }}" {% if booking.payment_status == code %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                      </select>
+
+                      <button type="submit" class="admin-btn admin-btn--ghost admin-btn--xs">Save</button>
+                    </div>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="admin-empty-state">
+        <p>No orders found matching your filter criteria.</p>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

@@ -23,8 +23,6 @@
 (function () {
   'use strict';
 
-  const ADDRESS_KEY = 'glamour_addresses';
-
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str == null ? '' : String(str);
@@ -72,11 +70,29 @@
     const stepper = drawer.querySelector('[data-booking-stepper]');
     const confirmationEl = drawer.querySelector('[data-booking-confirmation]');
 
-    /* --- Addresses (localStorage) --- */
-    function getAddresses() {
-      try { return JSON.parse(localStorage.getItem(ADDRESS_KEY)) || []; } catch (e) { return []; }
+    /* --- Addresses — backend-persisted (accounts app), not localStorage
+       anymore (see developed.md "Profile & saved addresses" for why: they
+       need to survive across devices/browsers and be manageable from the
+       profile page too, which a per-browser localStorage list can't do).
+       addressCache is populated by fetchAddresses() and read synchronously
+       everywhere else, same getCatalog()-from-json_script pattern booking.js
+       already uses — the alternative (making every call site async) would
+       ripple through renderSummary()/confirmBooking()/validateStep() for
+       no real benefit, since the list rarely changes mid-flow. */
+    let addressCache = [];
+
+    async function fetchAddresses() {
+      try {
+        const response = await fetch('/services-booking/addresses/');
+        if (!response.ok) return;
+        const data = await response.json();
+        addressCache = data.addresses || [];
+      } catch (err) {
+        addressCache = [];
+      }
+      renderAddressList();
     }
-    function saveAddresses(list) { localStorage.setItem(ADDRESS_KEY, JSON.stringify(list)); }
+    function getAddresses() { return addressCache; }
 
     function renderAddressList() {
       const addresses = getAddresses();
@@ -99,7 +115,11 @@
     addressListEl.addEventListener('click', (e) => {
       const card = e.target.closest('[data-address-id]');
       if (!card) return;
-      state.addressId = card.dataset.addressId;
+      // IDs from the API are numbers (real ServiceVariant-style PKs, not
+      // the old `addr-${Date.now()}` client-generated strings) — dataset
+      // values are always strings, so this needs a real Number() to ever
+      // strictly-equal an address.id again in renderAddressList() above.
+      state.addressId = Number(card.dataset.addressId);
       renderAddressList();
       updateNextButtonState();
     });
@@ -134,26 +154,42 @@
       setTimeout(() => map.invalidateSize(), 50);
     }
 
-    drawer.querySelector('[data-address-save]').addEventListener('click', () => {
+    const addressSaveBtn = drawer.querySelector('[data-address-save]');
+    addressSaveBtn.addEventListener('click', async () => {
       const labelInput = drawer.querySelector('[data-address-label]');
       const textInput = drawer.querySelector('[data-address-text]');
       const pincodeInput = drawer.querySelector('[data-address-pincode]');
       const text = textInput.value.trim();
       if (!text) { GB.showToast('Enter your full address'); return; }
 
-      const addresses = getAddresses();
-      const id = `addr-${Date.now()}`;
-      addresses.push({
-        id,
-        label: labelInput.value.trim() || 'Address',
-        text,
-        pincode: pincodeInput.value.trim(),
-        lat: pendingPin ? pendingPin.lat : null,
-        lng: pendingPin ? pendingPin.lng : null,
-      });
-      saveAddresses(addresses);
+      addressSaveBtn.disabled = true;
+      let data;
+      try {
+        const response = await fetch('/services-booking/addresses/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+          body: JSON.stringify({
+            label: labelInput.value.trim(),
+            text,
+            pincode: pincodeInput.value.trim(),
+            lat: pendingPin ? pendingPin.lat : null,
+            lng: pendingPin ? pendingPin.lng : null,
+          }),
+        });
+        data = await response.json();
+        if (!response.ok || !data.ok) {
+          GB.showToast(data.error || 'Something went wrong — please try again.');
+          return;
+        }
+      } catch (err) {
+        GB.showToast('Network error — please try again.');
+        return;
+      } finally {
+        addressSaveBtn.disabled = false;
+      }
 
-      state.addressId = id;
+      addressCache.push(data.address);
+      state.addressId = data.address.id;
       addressForm.hidden = true;
       labelInput.value = ''; textInput.value = ''; pincodeInput.value = '';
       pendingPin = null;
@@ -481,6 +517,10 @@
       requestAnimationFrame(() => { drawer.classList.add('is-open'); backdrop.classList.add('is-open'); });
       document.body.style.overflow = 'hidden';
       if (map) setTimeout(() => map.invalidateSize(), 300);
+      // Re-fetch every open, not just once at page load — addresses can
+      // change from the profile page (a different tab, or just earlier in
+      // this same session) between one booking and the next.
+      fetchAddresses();
     }
     function closeDrawer() {
       drawer.classList.remove('is-open');
@@ -500,6 +540,11 @@
         window.location.href = `${loginUrl}?next=${encodeURIComponent(window.location.pathname)}`;
         return;
       }
+      // "Proceed to Booking" lives inside the mini-cart panel itself —
+      // without this, the panel just stayed marked open underneath the
+      // (higher z-index) drawer, and reappeared the moment the drawer
+      // closed again on "Done".
+      GB.closeCartPanel();
       openDrawer();
     });
     drawer.querySelector('[data-booking-close]').addEventListener('click', closeDrawer);

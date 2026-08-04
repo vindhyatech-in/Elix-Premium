@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-^sroozd3j&^fm6s5m!%ro@q#f92q2sffk+lmdchs-65h21t&(5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*','0.0.0.0','localhost','0.0.0.0:8005']
 
 
 # Application definition
@@ -200,13 +200,11 @@ RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='')
 # GOOGLE_MAPS_API_KEY/RAZORPAY_KEY_ID above — the buttons render now, actual
 # sign-in only works once real values are dropped into .env.
 # ---------------------------------------------------------------------------
-ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_LOGIN_METHODS = {'username', 'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
-# Sends a verification email on signup but does NOT block login on it —
-# keeps local testing (console email backend) unblocked. Tighten to
-# 'mandatory' once real email delivery + the "please verify" UX are wanted.
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
 ACCOUNT_RATE_LIMITS = False  # dev-friendly; revisit before any real deploy
+ACCOUNT_LOGOUT_ON_GET = True  # Immediately log out on clicking Logout without confirmation page
 
 LOGIN_REDIRECT_URL = '/services-booking/'
 LOGOUT_REDIRECT_URL = '/services-booking/'

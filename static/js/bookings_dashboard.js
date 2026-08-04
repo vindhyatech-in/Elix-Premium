@@ -76,8 +76,25 @@
     });
   }
 
+  /* ---------------------------------------------------------
+   * Cancel booking — a plain server-rendered <form method="post"> (see
+   * bookings_dashboard.html) does the actual work; this only guards
+   * against an accidental tap/click before the request goes out. No
+   * fetch/AJAX here on purpose — the resulting page reload is what shows
+   * the booking's new "Cancelled" status and moves it between tabs, same
+   * as any other Django form.
+   * ------------------------------------------------------- */
+  function initCancelConfirm() {
+    document.querySelectorAll('[data-cancel-booking-form]').forEach((form) => {
+      form.addEventListener('submit', (e) => {
+        if (!window.confirm('Cancel this booking? This can\'t be undone.')) e.preventDefault();
+      });
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     initBookingTabs();
     initRebook();
+    initCancelConfirm();
   });
 })();

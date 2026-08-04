@@ -1,0 +1,223 @@
+{% extends "admin_dashboard/layouts/admin_base.html" %}
+
+{% block content %}
+  <!-- Toolbar -->
+  <div class="admin-toolbar">
+    <div class="admin-toolbar__title-text">
+      <h2>Beauticians & Staff Roster</h2>
+      <p class="admin-text-muted">Manage staff profiles, specialties, availability, and active order assignments.</p>
+    </div>
+
+    <button type="button" class="admin-btn admin-btn--gold" onclick="document.getElementById('addEmployeeModal').style.display='flex'">
+      + Add New Beautician
+    </button>
+  </div>
+
+  <!-- Employees Table / Cards Grid -->
+  <div class="admin-card-table-box">
+    {% if employees %}
+      <div class="admin-table-wrapper">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Beautician Name</th>
+              <th>Contact Details</th>
+              <th>Specialties</th>
+              <th>Experience & Rating</th>
+              <th>Assigned Orders</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for emp in employees %}
+              <tr>
+                <td>
+                  <div class="admin-staff-user-box">
+                    <span class="admin-staff-avatar">👩‍🎨</span>
+                    <div>
+                      <strong>{{ emp.name }}</strong>
+                      <small class="admin-text-muted">ID: #{{ emp.id }}</small>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div>📞 {{ emp.phone }}</div>
+                  {% if emp.email %}<small class="admin-text-muted">✉ {{ emp.email }}</small>{% endif %}
+                </td>
+                <td>
+                  <span class="admin-badge admin-badge--subtle">{{ emp.specialties }}</span>
+                </td>
+                <td>
+                  <div>⭐ {{ emp.rating }} / 5.0</div>
+                  <small class="admin-text-muted">{{ emp.experience_years }} year(s) exp</small>
+                </td>
+                <td>
+                  <strong class="admin-text-gold">{{ emp.assigned_bookings.count }}</strong> order(s)
+                </td>
+                <td>
+                  <span class="admin-badge admin-badge--emp-{{ emp.status }}">
+                    {{ emp.get_status_display }}
+                  </span>
+                </td>
+                <td>
+                  <div class="admin-btn-group">
+                    <button
+                      type="button"
+                      class="admin-btn admin-btn--ghost admin-btn--xs"
+                      onclick="openEditEmpModal('{{ emp.id }}', '{{ emp.name|escapejs }}', '{{ emp.phone|escapejs }}', '{{ emp.email|escapejs }}', '{{ emp.specialties|escapejs }}', '{{ emp.experience_years }}', '{{ emp.status }}')"
+                    >
+                      Edit
+                    </button>
+
+                    <form method="post" action="{% url 'admin_dashboard_employees' %}" class="admin-inline-form">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_status">
+                      <input type="hidden" name="employee_id" value="{{ emp.id }}">
+                      <button type="submit" class="admin-btn admin-btn--ghost admin-btn--xs">
+                        {% if emp.status == 'active' %}Mark Leave{% else %}Mark Active{% endif %}
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="admin-empty-state">
+        <p>No beauticians or staff added yet.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Add Employee Modal -->
+  <div id="addEmployeeModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal">
+      <div class="admin-modal__head">
+        <h2>Add New Beautician / Staff</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('addEmployeeModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{% url 'admin_dashboard_employees' %}" class="admin-modal__body">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_employee">
+
+        <div class="admin-form-group">
+          <label>Full Name *</label>
+          <input type="text" name="name" required class="admin-input" placeholder="e.g. Meera Nair">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Phone Number *</label>
+            <input type="text" name="phone" required class="admin-input" placeholder="+91 90000 00000">
+          </div>
+          <div class="admin-form-group">
+            <label>Email Address</label>
+            <input type="email" name="email" class="admin-input" placeholder="meera@glamourathome.com">
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Specialties *</label>
+          <input type="text" name="specialties" required class="admin-input" placeholder="e.g. Hair Spa, Facials, Threading">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Experience (Years)</label>
+            <input type="number" name="experience_years" value="3" required class="admin-input">
+          </div>
+
+          <div class="admin-form-group">
+            <label>Status *</label>
+            <select name="status" class="admin-select">
+              <option value="active">Active</option>
+              <option value="on_leave">On Leave</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="admin-modal__foot">
+          <button type="button" class="admin-btn admin-btn--ghost" onclick="document.getElementById('addEmployeeModal').style.display='none'">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn--primary">Add Staff</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Employee Modal -->
+  <div id="editEmployeeModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal">
+      <div class="admin-modal__head">
+        <h2 id="editEmpModalTitle">Edit Beautician Details</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('editEmployeeModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{% url 'admin_dashboard_employees' %}" class="admin-modal__body">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_employee">
+        <input type="hidden" name="employee_id" id="editEmpId">
+
+        <div class="admin-form-group">
+          <label>Full Name *</label>
+          <input type="text" name="name" id="editEmpName" required class="admin-input">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Phone Number *</label>
+            <input type="text" name="phone" id="editEmpPhone" required class="admin-input">
+          </div>
+          <div class="admin-form-group">
+            <label>Email Address</label>
+            <input type="email" name="email" id="editEmpEmail" class="admin-input">
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Specialties *</label>
+          <input type="text" name="specialties" id="editEmpSpecialties" required class="admin-input">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Experience (Years)</label>
+            <input type="number" name="experience_years" id="editEmpExp" required class="admin-input">
+          </div>
+
+          <div class="admin-form-group">
+            <label>Status *</label>
+            <select name="status" id="editEmpStatus" class="admin-select">
+              <option value="active">Active</option>
+              <option value="on_leave">On Leave</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="admin-modal__foot">
+          <button type="button" class="admin-btn admin-btn--ghost" onclick="document.getElementById('editEmployeeModal').style.display='none'">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn--primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function openEditEmpModal(id, name, phone, email, specialties, exp, status) {
+      document.getElementById('editEmpId').value = id;
+      document.getElementById('editEmpModalTitle').innerText = 'Edit Details — ' + name;
+      document.getElementById('editEmpName').value = name;
+      document.getElementById('editEmpPhone').value = phone;
+      document.getElementById('editEmpEmail').value = email;
+      document.getElementById('editEmpSpecialties').value = specialties;
+      document.getElementById('editEmpExp').value = exp;
+      document.getElementById('editEmpStatus').value = status;
+      document.getElementById('editEmployeeModal').style.display = 'flex';
+    }
+  </script>
+{% endblock %}

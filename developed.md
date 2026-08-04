@@ -1,4 +1,3 @@
-
 # developed.md — project brain
 
 Read this first. It's written so an agent (or a new dev) can get full context
@@ -696,11 +695,12 @@ pattern as `GOOGLE_MAPS_API_KEY`/`RAZORPAY_KEY_ID` in the booking app.
   `ModuleNotFoundError`). `requests` is consequently now a **real, permanent
   project dependency** — unlike earlier phases, don't uninstall it after a
   CDP testing session; only `websocket-client` is test-only.
-- **No custom User model.** allauth's `ACCOUNT_LOGIN_METHODS = {'email'}` +
-  `ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']` give
-  email-based login/signup on top of Django's default `auth.User` — no
+- **No custom User model.** allauth's `ACCOUNT_LOGIN_METHODS = {'username', 'email'}` +
+  `ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']` allow users to log in entering either their username or email address on top of Django's default `auth.User` — no
   `AUTH_USER_MODEL` swap needed (which would've been painful *after*
   migrations exist, but was never necessary here at all).
+- **Redesigned Sign In page (`templates/account/login.html`)**:
+  Custom luxury sign-in page template created to override default allauth layout. Features a dark card container (`border-radius: 32px`), clean full-width input fields (`auth-input`) for Username/Email (`Username or email address` placeholder) and Password, Forgot your password link, Remember Me checkbox, full-width gold gradient action button (`.auth-submit-btn`), third-party section divider, and centered pill-shaped social sign-in buttons with inline Apple and Google icons (`.auth-social-btn`).
 - **No custom adapter needed either.** allauth's `get_login_redirect_url()`/
   `get_logout_redirect_url()` fall back to Django's own standard
   `LOGIN_REDIRECT_URL`/`LOGOUT_REDIRECT_URL` settings (both point at
@@ -720,28 +720,9 @@ pattern as `GOOGLE_MAPS_API_KEY`/`RAZORPAY_KEY_ID` in the booking app.
   the `runserver` terminal instead of sending. Swap `EMAIL_BACKEND` (+ add
   SMTP host/port/credentials settings) for real delivery; no template/view
   changes needed.
-- **Templates override allauth's `{% element %}` partials, not full
-  pages.** allauth 65.x renders every account page (login/signup/password
-  reset/logout) through small reusable template partials
-  (`allauth/elements/h1.html`, `p.html`, `button.html`, `form.html`, etc. —
-  all shipped **completely unstyled**, no classes at all, by design, meant
-  to be overridden) rather than one big template per page. We override just
-  `templates/allauth/layouts/base.html` (the page shell — logo, centered
-  `.auth-card`, no navbar/footer) plus `templates/allauth/elements/{h1,h2,p, hr,alert,button,button_group,provider,provider_list}.html` (adding our own
-  classes). Every current and *future* allauth page (change-password,
-  email-change, MFA, etc. if ever enabled) automatically inherits this
-  styling with zero additional template files — don't write a full custom
-  template per allauth view; find the `{% element %}` tag it uses and style
-  that partial instead. `button.html` reads `attrs.tags` (a list) to decide
-  `.btn--primary` vs `.btn--ghost` — e.g. the password-reset-from-key page's
-  "Cancel" button passes `tags="link,cancel"` and renders ghost.
-- **Forms render via Django's plain `form.as_p`** (allauth's `fields`
-  element just calls `attrs.form.as_p`) — no per-field classes to hook
-  into, so `auth.css` styles `input[type=...]`/`label`/`.errorlist` etc.
-  scoped under `.auth-card form` by tag/attribute instead.
+- **Templates override allauth's `{% element %}` partials for generic pages & custom `account/login.html` for sign-in.** allauth 65.x renders account pages through small reusable template partials (`allauth/elements/*`). We override `templates/allauth/layouts/base.html` (the page shell — logo, centered `.auth-card`, no navbar/footer), `templates/allauth/elements/`, and explicitly `templates/account/login.html` for the bespoke Sign In design.
 - **`static/css/auth.css`** is its own bundle (imports `variables.css` +
-  `base.css` + `components.css` directly, not `main.css`) — same
-  per-surface-bundle pattern as `booking.css`.
+  `base.css` + `components.css` directly, not `main.css`) — updated with luxury dark card styling, gold accent buttons, custom input focus states, and explicit flex-row inline SVG button styling for Apple & Google third-party social logins.
 - **Profile dropdown is now real**: `templates/booking/components/ profile_dropdown.html` branches on `user.is_authenticated` (available
   everywhere via the existing `django.contrib.auth.context_processors.auth`
   context processor — no view changes needed). Signed out → Sign In/Create
@@ -950,16 +931,121 @@ enforced in this project).
   silently render zero lines even with real items in `localStorage`.
   `quick_view_modal.html` is deliberately **not** included here — nothing
   on this page triggers it.
-- **No status transitions built** — a `Booking.status` starts at
-  `'upcoming'` and stays there; nothing yet marks it `'completed'` after
-  its `scheduled_date` passes, or lets a user `'cancel'` it. That's a
-  deliberate scope cut (explicitly asked for "only Bookings dashboard UI"),
-  not an oversight — the `status` field and its three choices already exist
-  and are admin-editable, so the dashboard's tabs work correctly today for
-  however a booking's status gets set (currently: only via Django admin).
+- **Cancel booking** (added 2026-08-01, right after the dashboard itself):
+  the one status transition a *user* can trigger — `POST /services-booking/bookings/<booking_number>/cancel/`
+  (`bookings/views.py::cancel_booking`), a plain server-rendered
+  `<form method="post">` per booking, not a fetch/AJAX call — the resulting
+  page reload is exactly what's needed to move the booking to a new tab and
+  show its updated status badge, so there's no reason to build a JSON
+  round-trip for this.
+  - **Rule: only `status == 'upcoming'` AND more than 3 hours before its
+    `scheduled_start`.** `Booking.scheduled_start` (a new property) turns
+    `scheduled_date` + `time_slot`/`exact_time` into one concrete datetime —
+    a *regular* booking only ever stored a time_slot (a window, e.g.
+    "Morning (8 AM – 12 PM)"), not a moment, so `SLOT_START_TIMES` maps each
+    slot to its own start time; an *urgent* booking already has a real
+    `exact_time`. `Booking.can_cancel` (also a property) does the actual
+    `timezone.now() <= scheduled_start - CANCELLATION_CUTOFF` check —
+    `CANCELLATION_CUTOFF = timedelta(hours=3)`, both module-level in
+    `bookings/models.py` so the exact same rule can't drift between the
+    template (which only *renders* the Cancel button when `can_cancel` is
+    true) and the view (which re-checks `can_cancel` again server-side,
+    since a tab left open past the cutoff would otherwise still submit a
+    now-stale button).
+  - **No `USE_TZ`/`timezone.make_aware()` needed** — this project runs
+    `USE_TZ = False` (see settings.py), so `timezone.now()` and
+    `datetime.combine(...)` are both already-naive and directly comparable.
+  - **Cross-user protection**: `get_object_or_404(Booking, booking_number=..., user=request.user)` — a booking_number belonging to
+    someone else 404s (not 403s), so the endpoint never confirms or denies
+    whether a given booking_number exists at all.
+  - **Feedback via `django.contrib.messages`**, rendered as simple
+    `<p class="bookings-dashboard__message--{{ message.tags }}">` — the
+    first real use of the messages framework outside `allauth`'s own pages
+    in this project (MessageMiddleware was already in `MIDDLEWARE`, so no
+    settings changes needed).
+  - **A booking that's upcoming but past the 3h cutoff** shows a plain note
+    ("Can't be cancelled — starts within 3 hours") instead of Rebook or
+    Cancel — Rebook itself is now also correctly scoped to non-`'upcoming'`
+    bookings only (it computed for every booking regardless of status
+    before this; rebooking something that hasn't happened yet never made
+    sense).
+  - **Still no automatic `'completed'` transition** — nothing marks a
+    booking completed after its date passes; that remains a gap (would need
+    a scheduled task/cron, out of scope here).
 - **"Bookings" nav links** (`bottom_nav.html`, `profile_dropdown.html`) were
   `data-coming-soon` stubs before this — now real `<a href="{% url 'bookings_dashboard' %}">` links. Grep `data-coming-soon` for what's still
-  stubbed (Profile, Addresses, Notification Settings, Support).
+  stubbed (Notification Settings, Support — Profile/Addresses stopped being
+  stubs too, right after this; see "Profile & saved addresses" below).
+
+## Profile & saved addresses (added 2026-08-01)
+
+New `accounts` app models — `accounts/models.py` — this project's User is
+still plain `auth.User` (never swapped to a custom model; way too late in
+the project for that to be a safe change now), extended the standard way:
+
+- **`Profile`** — `OneToOneField` to `User`, holding the one field
+  `auth.User` doesn't have that the account page needs: `phone`.
+  `first_name`/`last_name`/`email` are edited/read directly off `User`
+  itself. `Profile.objects.get_or_create(user=request.user)` in
+  `profile_view` means no signal is needed to create one at signup time —
+  it's created lazily the first time anyone visits the page.
+- **`Address`** — `ForeignKey` to `User`, `{label, text, pincode, lat, lng}`
+  — the *exact* shape the booking drawer's address step already used when
+  it was `localStorage`-backed (`glamour_addresses`). **Not** the same
+  thing as `Booking`'s own `address_*` fields — those stay a frozen
+  snapshot taken at booking time (see "Catalog & Bookings models"); `Address`
+  rows are the *reusable, editable* source those snapshots get copied from.
+
+**`/services-booking/profile/`** (`accounts/views.py::profile_view`) — one
+page, two sections:
+
+- **Account details**: a plain form POST (not fetch) updating
+  first/last name + phone, `django.contrib.messages` for the "Profile
+  updated." feedback (same `{{ message.tags }}`-keyed CSS classes pattern
+  `bookings_dashboard.html` already established for Cancel Booking's
+  messages — kept as a separate `.profile-page__message` class rather than
+  reusing `.bookings-dashboard__message` outright, since the two pages
+  don't share a base template section worth factoring out yet for just
+  this).
+- **Saved addresses**: list + delete + a plain (no map) add-address form.
+  Deliberately **no Leaflet map here** — that interactive pin-drop UI stays
+  exclusive to the booking drawer's own address step; the profile page's
+  add-form only takes label/text/pincode, leaving `lat`/`lng` `null` (both
+  already nullable on `Address` — nothing downstream requires them).
+
+**Why the booking drawer needed a real rewrite, not just a new page**: the
+address step's `getAddresses()`/`saveAddresses()` were pure `localStorage`
+reads/writes (`ADDRESS_KEY = 'glamour_addresses'`) — meaning addresses
+never left the browser they were created in, and the new profile page's
+address list would've been a *second, disconnected* set of addresses
+otherwise. Fixed in `booking_drawer.js`:
+
+- `addressCache` (a plain array, populated by `fetchAddresses()` hitting
+  `GET /services-booking/addresses/`) replaces `localStorage.getItem(...)`
+  — `getAddresses()` now just returns that cache synchronously, so
+  `renderSummary()`/`confirmBooking()`/`validateStep()` (all synchronous,
+  called many times per flow) needed zero changes beyond that one function
+  swap. `fetchAddresses()` re-runs every time `openDrawer()` runs, not just
+  once at page load, so an address added/deleted on the profile page (or
+  earlier in the same session) is never stale by the next booking.
+- **id type changed from string to number** — the old client-generated ids
+  were `` `addr-${Date.now()}` `` strings; real Django PKs are numbers.
+  `state.addressId = card.dataset.addressId` (a DOM dataset value, always a
+  string) would silently never `===`-match `addr.id` (a number) again
+  without `Number(...)` — fixed at the one place that reads it off the DOM
+  (`renderAddressList()`'s click handler); every other comparison already
+  worked once that single value was the right type.
+- "Save Address" is now `async`, `POST`s to the same
+  `/services-booking/addresses/` endpoint (`X-CSRFToken` header, Django's
+  standard AJAX CSRF pattern — same as `confirmBooking()`), and pushes the
+  server's returned address (with its real id) into `addressCache` on
+  success instead of constructing one locally.
+- **No delete from inside the drawer** — deliberately out of scope there
+  (it's mid-booking-flow, not the place for it); deletion lives on the
+  profile page only. `address_delete` (`accounts/views.py`) still uses the
+  same `get_object_or_404(Address, id=..., user=request.user)` ownership
+  check pattern as `bookings/views.py::cancel_booking` — a 404, not a 403,
+  for someone else's address id.
 
 ## Current state vs. future work (explicitly out of scope this phase)
 
@@ -1070,3 +1156,41 @@ for the marketing navbar (it already had `backdrop-filter` on `.is-scrolled`).
   icon, subtle gold background on hover. When clicked, range `--range-pct`
   is also reset to `100%` alongside the value reset.
 - **Backdrop blur**: `.filter-sidebar-backdrop` gains `backdrop-filter: blur(3px)` to subtly focus attention on the open sidebar.
+
+## Admin / Owner Dashboard (added 2026-08-04)
+
+A dedicated, high-end control panel at `/owner-dashboard/` for business owners to manage operations, catalog pricing, order lifecycle, and staff roster. Restricted to users with `@staff_member_required` (`is_staff=True`).
+
+- **KPI Analytics Overview (`/owner-dashboard/`)**:
+  - Displays 4 key metric cards: Total Revenue (sum of completed orders), Total Bookings, Active Services count, and Active Staff count.
+  - Lifecycle Breakdown: Visual grid tracking Upcoming, In Progress, Completed, and Cancelled orders.
+  - Recent Orders table with real-time status badges and customer info.
+- **Order & Booking Management (`/owner-dashboard/bookings/`)**:
+  - Filter by status tabs (`All`, `Upcoming`, `In Progress`, `Completed`, `Cancelled`), date, or text search across ID, customer email, name, and address.
+  - Update order status and payment status in real-time.
+  - Assign or reassign beauticians/employees to orders (`Booking.assigned_beautician`).
+- **Service Catalog & Pricing (`/owner-dashboard/services/`)**:
+  - Filter catalog by Category or search service names.
+  - Full Service Editing: Edit service name, category, kind (service vs. package), description, and badges (`edit_service`).
+  - Delete Service: Delete services permanently (`delete_service`).
+  - Multi-Variant Service Creation: Add a new service with multiple initial variants dynamically in the creation modal (`add_service`).
+  - Variant Management: Add new variants to existing services (`add_variant`), edit variant label/price/MRP/duration/default status (`update_variant_price`), and delete variants (`delete_variant`).
+  - Toggle `is_active` state inline to enable/disable services from the customer catalog instantly.
+- **Employee & Staff Roster (`/owner-dashboard/employees/`)**:
+  - Backed by the `accounts.Employee` model (`name`, `phone`, `email`, `specialties`, `status`, `rating`, `experience_years`).
+  - List staff with assigned order counts, specialties, and experience ratings.
+  - Toggle employee availability (`active` vs. `on_leave`).
+  - Add new beauticians and edit staff details via modal dialogs.
+- **Styling & Mobile Navigation**: `static/css/admin_dashboard.css` provides a luxury control panel theme with dark sidebar navigation, gold accents, status pill badges, data table layouts, and glassmorphic modal dialogs. Features a dark/light mode toggle button (`.admin-theme-toggle`) in the topbar linked to `localStorage`, a responsive mobile hamburger toggle (`#adminMobileToggle`), drawer backdrop (`#adminSidebarBackdrop`), and topbar text truncation to prevent overflow on mobile screens.
+
+## Employee / Beautician Dashboard (added 2026-08-04)
+
+A dedicated, mobile-first job execution portal at `/emp-dashboard/` for field beauticians and staff to manage daily appointments and job lifecycles on smartphones.
+
+- **Model Linking**: `accounts.Employee` model linked to Django `User` (`user = models.OneToOneField(settings.AUTH_USER_MODEL, ...)`).
+- **Daily Appointments Schedule**: Highlights assigned bookings for the current date with time slot, customer phone call links (`tel:`), and Google Maps direction links (`maps:`).
+- **Job Status Execution**: One-tap buttons to update job status (`Upcoming` $\rightarrow$ `In Progress` $\rightarrow$ `Completed`) and mark payments as `Paid`.
+- **Duty Toggle**: Quick topbar switch (`On Duty` vs. `Off Duty`) updating availability in real-time.
+- **Performance KPIs**: Tracks today's appointments, total completed jobs, customer rating score, and revenue earnings.
+- **Styling & Theme**: `static/css/employee_dashboard.css` provides a mobile-first dark/light theme supporting `data-theme-toggle` and `localStorage`.
+

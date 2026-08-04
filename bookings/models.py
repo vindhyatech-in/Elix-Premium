@@ -1,7 +1,21 @@
 import secrets
+from datetime import datetime, time, timedelta
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
+
+# Each regular time_slot's own start time — used to compute a concrete
+# datetime a booking is "for", since only exact_time exists on urgent
+# bookings. Mirrors the windows in Booking.SLOT_CHOICES below.
+SLOT_START_TIMES = {
+    'morning': time(8, 0),
+    'afternoon': time(12, 0),
+    'evening': time(16, 0),
+}
+
+# How far ahead of the scheduled time a booking can still be cancelled.
+CANCELLATION_CUTOFF = timedelta(hours=3)
 
 
 def _generate_booking_number():
@@ -35,12 +49,16 @@ class Booking(models.Model):
     ]
     STATUS_CHOICES = [
         ('upcoming', 'Upcoming'),
+        ('in_progress', 'In Progress'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
     ]
 
     booking_number = models.CharField(max_length=20, unique=True, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bookings')
+    assigned_beautician = models.ForeignKey(
+        'accounts.Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_bookings'
+    )
 
     # Snapshotted, not just an FK to a saved Address — a booking must stay
     # accurate even if the address is later edited/deleted. See
@@ -81,6 +99,23 @@ class Booking(models.Model):
 
     def __str__(self):
         return self.booking_number
+
+    @property
+    def scheduled_start(self):
+        """The concrete datetime this booking is actually for — a regular
+        booking only stores a time_slot (a window, not a moment), so this
+        uses that slot's own start time; an urgent booking already has a
+        real exact_time. Only meaningful thing this is used for today is
+        can_cancel below (USE_TZ=False, so plain naive datetimes throughout
+        — no timezone.make_aware() needed)."""
+        slot_time = self.exact_time if self.booking_type == 'urgent' and self.exact_time else SLOT_START_TIMES.get(self.time_slot, time(0, 0))
+        return datetime.combine(self.scheduled_date, slot_time)
+
+    @property
+    def can_cancel(self):
+        """Only an 'upcoming' booking, and only until CANCELLATION_CUTOFF
+        (3h) before it starts — see developed.md "Bookings dashboard"."""
+        return self.status == 'upcoming' and timezone.now() <= self.scheduled_start - CANCELLATION_CUTOFF
 
 
 class BookingItem(models.Model):

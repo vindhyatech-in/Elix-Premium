@@ -1,9 +1,10 @@
 import json
 from decimal import Decimal, InvalidOperation
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date, parse_time
 from django.views.decorators.http import require_POST
 
@@ -187,3 +188,28 @@ def bookings_dashboard(request):
         'bookings': bookings,
     }
     return render(request, 'booking/pages/bookings_dashboard.html', context)
+
+
+@login_required
+@require_POST
+def cancel_booking(request, booking_number):
+    """
+    Cancels a booking — only allowed while `Booking.can_cancel` is True
+    (status still 'upcoming' AND more than CANCELLATION_CUTOFF (3h) before
+    its scheduled_start; see bookings/models.py). Re-checked here even
+    though the dashboard template only renders the Cancel button when
+    `can_cancel` was true at page-render time — that snapshot can go stale
+    if the user leaves the tab open past the cutoff before clicking it.
+
+    `get_object_or_404(..., user=request.user)` doubles as the ownership
+    check — a 404 (not a 403) for someone else's booking_number, so this
+    endpoint never confirms/denies whether a given booking_number exists.
+    """
+    booking = get_object_or_404(Booking, booking_number=booking_number, user=request.user)
+    if booking.can_cancel:
+        booking.status = 'cancelled'
+        booking.save(update_fields=['status', 'updated_at'])
+        messages.success(request, f'Booking {booking.booking_number} has been cancelled.')
+    else:
+        messages.error(request, 'This booking can no longer be cancelled — either it’s already completed/cancelled, or it starts within 3 hours.')
+    return redirect('bookings_dashboard')
