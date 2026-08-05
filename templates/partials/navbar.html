@@ -4,10 +4,53 @@
     <a href="#top" class="navbar__logo">Glamour<span>At</span>Home</a>
 
     <nav class="navbar__links" aria-label="Primary">
-      <a href="#services">Services</a>
-      <a href="#packages">Packages</a>
-      <a href="#how-it-works">How It Works</a>
-      <a href="#stories">Stories</a>
+      <div class="app-navbar__dropdown" data-dropdown>
+        <button type="button" class="app-navbar__link" data-dropdown-trigger aria-expanded="false" aria-controls="mkt-categories-menu">
+          Categories
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="app-navbar__dropdown-panel" id="mkt-categories-menu" data-dropdown-panel role="menu">
+          <a href="{% url 'services_booking' %}?category=all" class="app-navbar__dropdown-item" role="menuitem">All Services</a>
+          {% for cat in booking_categories %}
+            <a href="{% url 'services_booking' %}?category={{ cat.slug }}" class="app-navbar__dropdown-item" role="menuitem">{{ cat.name }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="app-navbar__dropdown" data-dropdown>
+        <button type="button" class="app-navbar__link" data-dropdown-trigger aria-expanded="false" aria-controls="mkt-offers-menu">
+          Offers
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="app-navbar__dropdown-panel app-navbar__dropdown-panel--wide" id="mkt-offers-menu" data-dropdown-panel role="menu">
+          {% for offer in booking_offers %}
+            <a href="{% url 'services_booking' %}" class="offer-item" style="text-decoration: none; color: inherit;">
+              <span class="offer-item__code">{{ offer.code }}</span>
+              <div class="offer-item__copy">
+                <strong>{{ offer.title }}</strong>
+                <p>{{ offer.description }}</p>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="app-navbar__dropdown" data-dropdown>
+        <button type="button" class="app-navbar__link" data-dropdown-trigger aria-expanded="false" aria-controls="mkt-packages-menu">
+          Packages
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="app-navbar__dropdown-panel" id="mkt-packages-menu" data-dropdown-panel role="menu">
+          <a href="{% url 'services_booking' %}?category=package" class="app-navbar__dropdown-item" role="menuitem" style="font-weight: 700; color: var(--blue);">View All Packages</a>
+          {% for item in booking_catalog %}
+            {% if item.kind == 'package' %}
+              <a href="{% url 'service_detail' item.id %}" class="app-navbar__dropdown-item" role="menuitem">
+                {{ item.name }} <span style="color: var(--ink-muted); font-size: 0.8em; margin-left: 0.3rem;">(₹{{ item.price|floatformat:0 }})</span>
+              </a>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
     </nav>
 
     <div class="navbar__actions">

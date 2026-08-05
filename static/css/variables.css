@@ -1,56 +1,55 @@
 /* ============================================================
    DESIGN TOKENS — Glamour At Home
-   Palette: warm espresso ink + ivory + champagne gold + blush.
-   Change values here to re-theme the entire site.
+   Palette: Modern Aesthetic Minimalist (Black, White, Blue, Green)
    ============================================================ */
 :root {
-  /* --- Core palette --- */
-  --ink: #16120f;              /* near-black, warm charcoal */
-  --ink-soft: #2b2320;
-  --ink-muted: #6b5f56;
-  --cream: #faf6ef;            /* primary light background */
-  --cream-deep: #f1e8da;       /* secondary light background */
+  /* --- Core Palette --- */
+  --ink: #0f172a;              /* Deep Slate Black */
+  --ink-soft: #1e293b;         /* Dark Charcoal */
+  --ink-muted: #64748b;        /* Muted Slate Text */
+  --cream: #ffffff;            /* Pure White */
+  --cream-deep: #f8fafc;       /* Soft Light Surface */
   --white: #ffffff;
-  --gold: #c9a15a;             /* champagne gold accent */
-  --gold-light: #e9d6ac;
-  --gold-deep: #a97f37;
-  --blush: #e9c8c2;
-  --rose: #c78d86;
+
+  /* --- Vibrant Accents --- */
+  --blue: #4f46e5;             /* Indigo Royal Blue (Primary CTA) */
+  --blue-light: #eef2ff;       /* Soft Indigo Tint */
+  --blue-deep: #3730a3;        /* Deep Indigo Hover */
+  
+  --green: #059669;            /* Emerald Green (Discounts & Highlights) */
+  --green-light: #ecfdf5;      /* Soft Emerald Tint */
+  --green-deep: #047857;
+
+  /* Legacy gold aliases mapped to vibrant modern theme */
+  --gold: var(--blue);
+  --gold-light: var(--blue-light);
+  --gold-deep: var(--blue);
+  --blush: var(--green-light);
+  --rose: var(--green);
 
   /* --- Gradients --- */
-  --gradient-gold: linear-gradient(135deg, #e9d6ac 0%, #c9a15a 55%, #a97f37 100%);
-  --gradient-ink: linear-gradient(160deg, #16120f 0%, #2b2320 100%);
-  --gradient-blush: linear-gradient(135deg, #f6e2dd 0%, #e9c8c2 100%);
+  --gradient-gold: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  --gradient-ink: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+  --gradient-green: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-blush: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
 
   /* --- Surfaces --- */
-  --surface-glass: rgba(255, 255, 255, 0.6);
-  --surface-glass-dark: rgba(22, 18, 15, 0.55);
-  --border-hairline: rgba(22, 18, 15, 0.1);
-  --border-hairline-dark: rgba(250, 246, 239, 0.14);
+  --surface-glass: rgba(255, 255, 255, 0.85);
+  --surface-glass-dark: rgba(15, 23, 42, 0.85);
+  --border-hairline: rgba(15, 23, 42, 0.08);
+  --border-hairline-dark: rgba(255, 255, 255, 0.12);
 
-  /* --- Theme-aware surface/text tokens ---
-     Light-mode values below; [data-theme="dark"] redefines these same
-     names further down. Everything else in this file (--ink, --cream,
-     --white, --ink-soft, gradients, etc.) is intentionally NEVER redefined
-     by theme — those are used throughout the CSS as fixed contrast pairs
-     (gold buttons, dark-accent hovers, chip.is-active, photo-overlay
-     badges, the footer/mobile-drawer which stay dark regardless of theme
-     by deliberate design). Trust/download used to be in that fixed-dark
-     list too, but that reads as broken once a real theme toggle exists
-     (2026-07-25: they now flip like any other section — see their rules
-     in sections.css). Flipping the tokens below would break the
-     still-fixed ones, since they pair a fixed background with fixed text.
-     Only page-level surfaces/body text should flip — that's what these
-     tokens are for. See developed.md "Dark mode". */
-  --surface-1: var(--cream);       /* default section/page background */
-  --surface-2: var(--white);       /* cards, chips, form fields, inputs */
-  --surface-3: var(--cream-deep);  /* alternate section background */
-  --text-body: var(--ink);         /* default body/heading text */
-  --text-soft: var(--ink-soft);    /* secondary text on light surfaces (chips, badges, feature lists) */
-  --accent-gold: var(--gold-deep); /* gold accent tuned for legibility against a LIGHT surface */
+  /* --- Theme-Aware Surface / Text Tokens --- */
+  --surface-1: #f8fafc;       /* Default section/page background */
+  --surface-2: #ffffff;       /* Cards, form fields, inputs */
+  --surface-3: #f1f5f9;       /* Alternate section background */
+  --text-body: #0f172a;       /* Default body/heading text */
+  --text-soft: #334155;       /* Secondary text */
+  --accent-gold: #4f46e5;     /* Royal blue accent */
 
   /* --- Typography --- */
-  --font-display: 'Fraunces', 'Georgia', serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 
   --fs-display-xl: clamp(2.1rem, 4.5vw + 1rem, 5.5rem);
@@ -61,7 +60,7 @@
   --fs-sm: 0.875rem;
   --fs-xs: 0.75rem;
 
-  /* --- Spacing scale --- */
+  /* --- Spacing Scale --- */
   --space-3xs: 0.25rem;
   --space-2xs: 0.5rem;
   --space-xs: 0.75rem;
@@ -72,12 +71,12 @@
   --space-2xl: 6rem;
   --space-3xl: 9rem;
 
-  /* --- Layout --- */
+  /* --- Layout & Radius --- */
   --container-width: 1280px;
   --container-pad: clamp(1rem, 4vw, 4rem);
   --radius-sm: 0.5rem;
-  --radius-md: 1rem;
-  --radius-lg: 1.75rem;
+  --radius-md: 0.85rem;
+  --radius-lg: 1.25rem;
   --radius-pill: 999px;
 
   /* --- Motion --- */
@@ -88,51 +87,42 @@
   --dur-lg: 1s;
 
   /* --- Elevation --- */
-  --shadow-sm: 0 4px 16px rgba(22, 18, 15, 0.06);
-  --shadow-md: 0 12px 40px rgba(22, 18, 15, 0.1);
-  --shadow-lg: 0 24px 70px rgba(22, 18, 15, 0.16);
-  --shadow-gold: 0 16px 45px rgba(169, 127, 55, 0.35);
+  --shadow-sm: 0 2px 10px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 8px 30px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 20px 50px rgba(15, 23, 42, 0.12);
+  --shadow-gold: 0 12px 35px rgba(79, 70, 229, 0.3);
 
-  /* --- Z-index scale --- */
+  /* --- Z-index Scale --- */
   --z-nav: 500;
   --z-preloader: 900;
   --z-cursor: 800;
   --z-modal: 700;
 
-  /* Service Booking app (booking.css) — appended rather than reusing the
-     marketing z-indexes above, since the app shell's stacking (sticky nav +
-     bottom nav + dropdowns + cart + modal + toasts, all above one another
-     in a defined order) is independent of the landing page's. */
   --z-app-nav: 600;
   --z-app-dropdown: 650;
   --z-bottom-nav: 600;
   --z-fab: 620;
   --z-cart: 680;
   --z-app-modal: 750;
-  --z-drawer: 760; /* booking drawer (Phase 2) — sits above the quick-view modal */
+  --z-drawer: 760;
   --z-toast: 950;
 }
 
 /* ============================================================
    DARK THEME — overrides applied when <html data-theme="dark">.
-   Only the theme-aware tokens above (surface-1/2/3, text-body,
-   text-soft) plus --ink-muted/--border-hairline/shadows are redefined.
-   Everything else (--ink, --cream, --white, --ink-soft, gradients,
-   --border-hairline-dark) is intentionally untouched — see the note
-   above --surface-1 for why.
    ============================================================ */
 :root[data-theme="dark"] {
-  --surface-1: #16120f;
-  --surface-2: #241e19;
-  --surface-3: #1c1712;
-  --text-body: #f3ede1;
-  --text-soft: #cfc3b3;
-  --ink-muted: #a89a89;
-  --border-hairline: rgba(250, 246, 239, 0.12);
-  --accent-gold: var(--gold-light); /* legible against the now-dark surfaces */
+  --surface-1: #0f172a;
+  --surface-2: #1e293b;
+  --surface-3: #0f172a;
+  --text-body: #f8fafc;
+  --text-soft: #cbd5e1;
+  --ink-muted: #94a3b8;
+  --border-hairline: rgba(255, 255, 255, 0.1);
+  --accent-gold: #818cf8;
 
-  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.28);
-  --shadow-md: 0 12px 40px rgba(0, 0, 0, 0.38);
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 12px 40px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.5);
-  --shadow-gold: 0 16px 45px rgba(169, 127, 55, 0.25);
+  --shadow-gold: 0 16px 45px rgba(99, 102, 241, 0.3);
 }

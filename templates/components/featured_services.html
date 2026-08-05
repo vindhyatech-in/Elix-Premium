@@ -1,40 +1,28 @@
 {% load static %}
-<section class="services section" id="services" data-api="/api/v1/services/featured/" aria-labelledby="services-title">
+<section class="services section" id="services" aria-labelledby="services-title">
   <div class="container">
-    <div class="services__head">
-      <div class="section-head">
-        <p class="eyebrow" data-aos="fade-up">Featured Services</p>
-        <h2 class="section-title" id="services-title" data-aos="fade-up">Rituals, curated for <em>every mood</em>.</h2>
-        <p class="section-lead" data-aos="fade-up">From a 45-minute manicure to a full bridal transformation — every service is delivered by a verified specialist.</p>
-      </div>
-
-      <div class="services__filters" role="tablist" aria-label="Filter services by category" data-service-filters>
-        {% for category in categories %}
-          <button type="button" class="chip{% if forloop.first %} is-active{% endif %}" role="tab" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}" data-filter="{{ category }}">{{ category }}</button>
-        {% endfor %}
-      </div>
+    <div class="section-head section-head--center" data-aos="fade-up">
+      <p class="eyebrow">Service Categories</p>
+      <h2 class="section-title" id="services-title">Explore by <em>Category</em></h2>
+      <p class="section-lead">Select a category to view all specialized services and book your at-home salon appointment.</p>
     </div>
 
-    <div class="services__grid" data-service-grid>
-      {% for service in services %}
-        <article class="service-card" data-category="{{ service.category }}" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
-          <div class="service-card__visual service-card__visual--{{ service.tone }}">
-            <img class="service-card__photo" src="{% static service.photo %}" alt="{{ service.name }}" loading="lazy">
-            <span class="service-card__category">{{ service.category }}</span>
+    <div class="category-cards-grid">
+      {% for cat in categories %}
+        <a href="{% url 'services_booking' %}?category={{ cat.slug }}" class="category-card" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
+          <div class="category-card__media">
+            <img src="{% static cat.photo %}" alt="{{ cat.name }}" loading="lazy">
+            <span class="category-card__count">{{ cat.services_count }} Services</span>
           </div>
-          <div class="service-card__body">
-            <div class="service-card__top">
-              <h3 class="service-card__name">{{ service.name }}</h3>
-              {% if service.rating %}<span class="stars" aria-label="Rated {{ service.rating }} out of 5">★ {{ service.rating }}</span>{% endif %}
-            </div>
-            <p class="service-card__desc">{{ service.description }}</p>
-            <div class="service-card__meta">
-              <span>{{ service.duration }}</span>
-              <span class="service-card__price">₹{{ service.price }}</span>
-            </div>
-            <a href="{% url 'services_booking' %}?open_cart=1" class="btn btn--ghost btn--sm service-card__cta" data-add-to-booking-cart data-catalog-id="{{ service.id }}">Book Now</a>
+          <div class="category-card__body">
+            <h3 class="category-card__title">{{ cat.name }}</h3>
+            <p class="category-card__desc">{{ cat.description }}</p>
+            <span class="category-card__cta">
+              Explore Services
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </span>
           </div>
-        </article>
+        </a>
       {% endfor %}
     </div>
   </div>

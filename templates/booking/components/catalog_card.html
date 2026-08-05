@@ -1,7 +1,9 @@
 {% load static %}
 <article class="catalog-card" data-catalog-card data-catalog-id="{{ item.id }}" data-category="{{ item.category }}" data-kind="{{ item.kind }}">
   <div class="catalog-card__media">
-    <img src="{% static item.photo %}" alt="{{ item.name }}" loading="lazy">
+    <a href="{% url 'service_detail' item.id %}" style="display: block; width: 100%; height: 100%;">
+      <img src="{% static item.photo %}" alt="{{ item.name }}" loading="lazy">
+    </a>
 
     <div class="catalog-card__badges">
       {% if item.discount_pct %}<span class="catalog-card__badge catalog-card__badge--offer">{{ item.discount_pct }}% OFF</span>{% endif %}
@@ -10,16 +12,18 @@
 
     {% if not item.available_today %}<span class="catalog-card__unavailable">Not available today</span>{% endif %}
 
-    <button type="button" class="catalog-card__quickview" data-quick-view data-catalog-id="{{ item.id }}" aria-label="Quick view {{ item.name }}">
+    <a href="{% url 'service_detail' item.id %}" class="catalog-card__quickview" aria-label="View details for {{ item.name }}">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-      <span class="catalog-card__quickview-label">Quick View</span>
-    </button>
+      <span class="catalog-card__quickview-label">View Details</span>
+    </a>
   </div>
 
   <div class="catalog-card__body">
     <p class="catalog-card__category">{{ item.category|title }}</p>
-    <h3 class="catalog-card__name">{{ item.name }}</h3>
-    <p class="catalog-card__desc" data-quick-view data-catalog-id="{{ item.id }}" data-catalog-desc data-full-desc="{{ item.description }}">{{ item.description }}</p>
+    <h3 class="catalog-card__name">
+      <a href="{% url 'service_detail' item.id %}" style="color: inherit; text-decoration: none;">{{ item.name }}</a>
+    </h3>
+    <p class="catalog-card__desc" data-catalog-desc data-full-desc="{{ item.description }}">{{ item.description }}</p>
 
     <div class="catalog-card__meta">
       {% if item.reviews_count %}
@@ -29,6 +33,41 @@
       {% endif %}
       <span class="catalog-card__duration">{{ item.duration_label }}</span>
     </div>
+
+    {% if item.kind == 'package' and item.included_services %}
+      <div class="catalog-card__pkg-box" data-pkg-discount="{{ item.discount_pct|default:0 }}" style="margin-top: 0.5rem; padding: 0.5rem; background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm);">
+        <small style="font-weight: 700; color: var(--text-body); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em;">Included Services:</small>
+        <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.35rem;">
+          {% for inc in item.included_services %}
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.78rem; padding: 0.25rem 0.4rem; background: var(--surface-1); border-radius: 6px; border: 1px solid var(--border-hairline);">
+              <div style="display: flex; align-items: center; gap: 0.4rem; min-width: 0;">
+                <img src="{% static inc.photo|default:'images/portfolio-5.jpg' %}" alt="{{ inc.name }}" style="width: 28px; height: 28px; object-fit: cover; border-radius: 4px; flex-shrink: 0;">
+                <span style="font-weight: 600; color: var(--text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.78rem;">{{ inc.name }}</span>
+              </div>
+              {% if inc.variants|length > 1 %}
+                <select
+                  class="catalog-card__pkg-variant-select"
+                  data-inc-id="{{ inc.id }}"
+                  onchange="onCustomerPackageVariantChange(this)"
+                  style="font-size: 0.72rem; padding: 0.15rem 0.35rem; border-radius: 4px; border: 1px solid var(--border-hairline); background: var(--surface-2); color: var(--text-body); cursor: pointer; font-weight: 600;"
+                >
+                  {% for v in inc.variants %}
+                    <option value="{{ v.id }}" data-price="{{ v.price }}" data-duration="{{ v.duration_mins }}">
+                      {{ v.label }} (₹{{ v.price|floatformat:0 }})
+                    </option>
+                  {% endfor %}
+                </select>
+              {% else %}
+                <span style="font-size: 0.72rem; color: var(--ink-muted); white-space: nowrap; font-weight: 600;">
+                  ₹{{ inc.price|floatformat:0 }}
+                </span>
+                <input type="hidden" class="catalog-card__pkg-single-val" data-price="{{ inc.price }}" data-duration="{{ inc.duration_mins }}">
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
 
     <div class="catalog-card__footer">
       <div class="catalog-card__price">

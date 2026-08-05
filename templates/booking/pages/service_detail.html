@@ -1,0 +1,393 @@
+{% extends 'booking/layouts/booking_base.html' %}
+{% load static %}
+
+{% block title %}{{ service.name }} — {{ SITE.name }}{% endblock %}
+
+{% block content %}
+  {% include 'booking/components/app_navbar.html' %}
+
+  <main id="main-content" class="booking-main" style="padding-top: 1rem; padding-bottom: 5rem;">
+    <div class="container" style="max-width: 1140px; margin: 0 auto; padding: 1rem;">
+
+    <!-- Main Detail Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; align-items: start;">
+
+      <!-- Left Media Gallery Card -->
+      <div style="background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); position: sticky; top: 110px;">
+        <div style="position: relative; width: 100%; aspect-ratio: 4/3; overflow: hidden; background: #0f172a;">
+          <img
+            src="{% static service.photo %}"
+            alt="{{ service.name }}"
+            style="width: 100%; height: 100%; object-fit: cover;"
+            id="detailMainPhoto"
+          >
+          <div style="position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; flex-wrap: wrap;">
+            {% if default_variant.discount_pct %}
+              <span style="background: var(--green); color: #fff; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px;" id="detailDiscountBadge">
+                {{ default_variant.discount_pct }}% OFF
+              </span>
+            {% endif %}
+            <span style="background: var(--ink); color: #fff; font-weight: 600; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px;">
+              {{ service.get_kind_display }}
+            </span>
+            {% for b in service.badges %}
+              <span style="background: var(--blue); color: #fff; font-weight: 600; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px;">
+                {{ b }}
+              </span>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div style="padding: 1.25rem; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-hairline); background: var(--surface-1);">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="color: #f59e0b; font-size: 1.1rem; font-weight: 700;">★ {{ service.rating|default:"4.9" }}</span>
+            <span style="color: var(--ink-muted); font-size: 0.85rem;">({{ service.reviews_count|default:"128" }} verified reviews)</span>
+          </div>
+          <span style="color: var(--green); font-size: 0.8rem; font-weight: 700; background: var(--green-light); padding: 0.25rem 0.5rem; border-radius: 4px;">
+            ✓ Sealed Products
+          </span>
+        </div>
+      </div>
+
+      <!-- Right Overview & Purchasing Box -->
+      <div style="background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); padding: 1.75rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1.25rem;">
+        
+        <div>
+          <span style="text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; font-weight: 700; color: var(--blue);">
+            {{ service.category.name }}
+          </span>
+          <h1 style="font-family: var(--font-display); font-size: 1.85rem; font-weight: 600; margin: 0.25rem 0 0.5rem 0; color: var(--text-body);">
+            {{ service.name }}
+          </h1>
+          <p style="color: var(--ink-muted); font-size: 0.95rem; line-height: 1.5; margin: 0;">
+            {{ service.description }}
+          </p>
+        </div>
+
+        <!-- Pricing Header -->
+        <div style="display: flex; align-items: baseline; gap: 0.75rem; border-y: 1px solid var(--border-hairline); padding: 1rem 0; border-top: 1px solid var(--border-hairline); border-bottom: 1px solid var(--border-hairline);" id="detailPricingBox" data-pkg-discount="{{ default_variant.discount_pct|default:0 }}">
+          <span style="font-size: 2rem; font-weight: 700; color: var(--text-body);" id="detailPriceNow">
+            ₹{{ default_variant.price|floatformat:"-2" }}
+          </span>
+          {% if default_variant.mrp %}
+            <span style="font-size: 1.1rem; color: var(--ink-muted); text-decoration: line-through;" id="detailPriceMrp">
+              ₹{{ default_variant.mrp|floatformat:"-2" }}
+            </span>
+          {% endif %}
+          <span style="font-size: 0.85rem; font-weight: 600; color: var(--ink-muted); margin-left: auto;" id="detailDurationLabel">
+            ⏱ {{ default_variant.duration_label }}
+          </span>
+        </div>
+
+        <!-- Single Service Variant Selector -->
+        {% if service.kind == 'service' and variants|length > 1 %}
+          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <label style="font-weight: 700; font-size: 0.85rem; color: var(--text-body);">Choose Service Option / Variant:</label>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+              {% for v in variants %}
+                <button
+                  type="button"
+                  class="detail-variant-pill {% if v.id == default_variant.id %}is-active{% endif %}"
+                  data-variant-id="{{ v.id }}"
+                  data-price="{{ v.price }}"
+                  data-mrp="{{ v.mrp|default:'' }}"
+                  data-duration="{{ v.duration_label }}"
+                  data-discount="{{ v.discount_pct|default:'' }}"
+                  onclick="selectDetailVariant(this)"
+                  style="padding: 0.5rem 0.85rem; border-radius: var(--radius-pill); border: 1px solid var(--border-hairline); background: var(--surface-1); font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-body); transition: all 0.2s ease;"
+                >
+                  {{ v.label|default:v.duration_label }} — ₹{{ v.price|floatformat:0 }}
+                </button>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+
+        <!-- Package Included Services Breakdown (Small Cards with Images) -->
+        {% if service.kind == 'package' and included_services %}
+          <div style="background: var(--surface-1); border: 1px solid var(--border-hairline); border-radius: var(--radius-md); padding: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+              <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-body); text-transform: uppercase; letter-spacing: 0.04em;">
+                Included Services in Package:
+              </span>
+              <small style="font-size: 0.75rem; color: var(--blue); font-weight: 600;">
+                Select preferred variants below
+              </small>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+              {% for inc in included_services %}
+                <div class="detail-pkg-inc-row" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.85rem; padding: 0.5rem 0.65rem; background: var(--surface-2); border-radius: 8px; border: 1px solid var(--border-hairline); box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                  <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 0;">
+                    <img
+                      src="{% static inc.photo %}"
+                      alt="{{ inc.name }}"
+                      style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--surface-1);"
+                    >
+                    <div style="display: flex; flex-direction: column; gap: 0.15rem; min-width: 0;">
+                      <span style="font-weight: 700; color: var(--text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem;">{{ inc.name }}</span>
+                    </div>
+                  </div>
+
+                  {% if inc.variants|length > 1 %}
+                    <select
+                      class="detail-pkg-variant-select"
+                      style="font-size: 0.78rem; padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-hairline); background: var(--surface-1); color: var(--text-body); cursor: pointer; font-weight: 600; max-width: 175px;"
+                      onchange="recalculateDetailPackageTotal()"
+                    >
+                      {% for v in inc.variants %}
+                        <option value="{{ v.id }}" data-price="{{ v.price }}" data-duration="{{ v.duration_mins }}">
+                          {{ v.label }} (₹{{ v.price|floatformat:0 }})
+                        </option>
+                      {% endfor %}
+                    </select>
+                  {% else %}
+                    <span style="font-size: 0.78rem; color: var(--ink-muted); font-weight: 700; white-space: nowrap; background: var(--surface-1); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--border-hairline);">
+                      ₹{{ inc.price|floatformat:0 }} · {{ inc.duration_label }}
+                    </span>
+                    <input type="hidden" class="detail-pkg-single-val" data-price="{{ inc.price }}" data-duration="{{ inc.duration_mins }}">
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+
+        <!-- CTAs -->
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+          <button
+            type="button"
+            class="btn btn--primary"
+            style="flex: 1; padding: 0.85rem 1.25rem; font-size: 1rem; border-radius: var(--radius-pill); font-weight: 700;"
+            id="detailAddToCartBtn"
+            onclick="addDetailItemToCart()"
+          >
+            Add to Cart
+          </button>
+          <a
+            href="{% url 'services_booking' %}"
+            class="btn btn--dark"
+            style="padding: 0.85rem 1.25rem; font-size: 0.9rem; border-radius: var(--radius-pill); text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem;"
+          >
+            View All Catalog
+          </a>
+        </div>
+
+        <!-- Trust Features -->
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-hairline); font-size: 0.8rem; color: var(--ink-muted);">
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <span style="color: var(--blue); font-weight: 700;">✓</span> 100% Certified Beauticians
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <span style="color: var(--blue); font-weight: 700;">✓</span> Mono-Dose Sealed Sachets
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <span style="color: var(--blue); font-weight: 700;">✓</span> Free Rescheduling & Cancel
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <span style="color: var(--blue); font-weight: 700;">✓</span> Mess-Free Home Clean-up
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- How It Works Section -->
+    <div style="margin-top: 3.5rem; background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); padding: 2rem;">
+      <h2 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; margin: 0 0 1.5rem 0; color: var(--text-body);">
+        How At-Home Salon Works
+      </h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem;">
+        {% for hw in how_it_works %}
+          <div style="background: var(--surface-1); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-hairline);">
+            <div style="font-size: 1.5rem; font-weight: 800; color: var(--blue); margin-bottom: 0.5rem;">
+              {{ hw.step }}
+            </div>
+            <h3 style="font-size: 1rem; font-weight: 700; margin: 0 0 0.35rem 0; color: var(--text-body);">
+              {{ hw.title }}
+            </h3>
+            <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0; line-height: 1.4;">
+              {{ hw.desc }}
+            </p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Customer Reviews Section -->
+    <div style="margin-top: 2.5rem; background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); padding: 2rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h2 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; margin: 0; color: var(--text-body);">
+            Customer Reviews & Ratings
+          </h2>
+          <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0.2rem 0 0 0;">
+            Based on {{ service.reviews_count|default:"128" }} verified completed appointments
+          </p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--surface-1); padding: 0.5rem 1rem; border-radius: var(--radius-pill); border: 1px solid var(--border-hairline);">
+          <span style="font-size: 1.25rem; font-weight: 800; color: #f59e0b;">★ {{ service.rating|default:"4.9" }}</span>
+          <span style="font-size: 0.85rem; color: var(--text-body); font-weight: 600;">Overall Score</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
+        {% for rev in reviews %}
+          <div style="background: var(--surface-1); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-hairline); display: flex; flex-direction: column; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-body);">{{ rev.author }}</span>
+              <span style="font-size: 0.75rem; color: var(--ink-muted);">{{ rev.date }}</span>
+            </div>
+            <div style="color: #f59e0b; font-size: 0.85rem;">
+              ★★★★★ <span style="color: var(--green); font-size: 0.75rem; margin-left: 0.35rem; font-weight: 600;">✓ Verified Booking</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0; line-height: 1.4;">
+              "{{ rev.comment }}"
+            </p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- FAQs Section -->
+    <div style="margin-top: 2.5rem; background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); padding: 2rem;">
+      <h2 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; margin: 0 0 1.25rem 0; color: var(--text-body);">
+        Frequently Asked Questions
+      </h2>
+      <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+        {% for faq in faqs %}
+          <div style="background: var(--surface-1); padding: 1rem 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-hairline);">
+            <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0 0 0.35rem 0; color: var(--text-body);">
+              Q: {{ faq.question }}
+            </h3>
+            <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0; line-height: 1.4;">
+              {{ faq.answer }}
+            </p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let activeVariantId = '{{ default_variant.id }}';
+
+  function selectDetailVariant(btn) {
+    document.querySelectorAll('.detail-variant-pill').forEach(b => {
+      b.classList.remove('is-active');
+      b.style.background = 'var(--surface-1)';
+      b.style.borderColor = 'var(--border-hairline)';
+    });
+    btn.classList.add('is-active');
+    btn.style.background = 'var(--blue)';
+    btn.style.borderColor = 'var(--blue)';
+    btn.style.color = '#ffffff';
+
+    activeVariantId = btn.dataset.variantId;
+    const price = parseFloat(btn.dataset.price || 0);
+    const mrp = btn.dataset.mrp ? parseFloat(btn.dataset.mrp) : null;
+    const duration = btn.dataset.duration || '';
+    const discount = btn.dataset.discount || '';
+
+    const priceNowEl = document.getElementById('detailPriceNow');
+    const priceMrpEl = document.getElementById('detailPriceMrp');
+    const durationEl = document.getElementById('detailDurationLabel');
+    const discountBadge = document.getElementById('detailDiscountBadge');
+
+    if (priceNowEl) priceNowEl.textContent = `₹${price.toFixed(0)}`;
+    if (priceMrpEl) {
+      if (mrp) {
+        priceMrpEl.textContent = `₹${mrp.toFixed(0)}`;
+        priceMrpEl.style.display = 'inline';
+      } else {
+        priceMrpEl.style.display = 'none';
+      }
+    }
+    if (durationEl) durationEl.textContent = `⏱ ${duration}`;
+    if (discountBadge) {
+      if (discount) {
+        discountBadge.textContent = `${discount}% OFF`;
+        discountBadge.style.display = 'inline-block';
+      } else {
+        discountBadge.style.display = 'none';
+      }
+    }
+  }
+
+  function recalculateDetailPackageTotal() {
+    const box = document.getElementById('detailPricingBox');
+    if (!box) return;
+    const discountPct = parseFloat(box.dataset.pkgDiscount || 0);
+
+    let totalMrp = 0;
+    let totalDur = 0;
+
+    document.querySelectorAll('.detail-pkg-inc-row').forEach(row => {
+      const sel = row.querySelector('.detail-pkg-variant-select');
+      if (sel) {
+        const opt = sel.options[sel.selectedIndex];
+        if (opt) {
+          totalMrp += parseFloat(opt.dataset.price || 0);
+          totalDur += parseInt(opt.dataset.duration || 0, 10);
+        }
+      } else {
+        const inp = row.querySelector('.detail-pkg-single-val');
+        if (inp) {
+          totalMrp += parseFloat(inp.dataset.price || 0);
+          totalDur += parseInt(inp.dataset.duration || 0, 10);
+        }
+      }
+    });
+
+    let newPrice = totalMrp;
+    if (discountPct > 0) {
+      newPrice = Math.round(totalMrp * (1 - discountPct / 100));
+    }
+
+    const hours = Math.floor(totalDur / 60);
+    const mins = totalDur % 60;
+    let durLabel = '';
+    if (hours > 0 && mins > 0) durLabel = `${hours}h ${mins}m`;
+    else if (hours > 0) durLabel = `${hours}h`;
+    else durLabel = `${mins} min`;
+
+    const priceNowEl = document.getElementById('detailPriceNow');
+    const priceMrpEl = document.getElementById('detailPriceMrp');
+    const durationEl = document.getElementById('detailDurationLabel');
+
+    if (priceNowEl) priceNowEl.textContent = `₹${newPrice}`;
+    if (priceMrpEl) priceMrpEl.textContent = `₹${totalMrp}`;
+    if (durationEl) durationEl.textContent = `⏱ ${durLabel}`;
+  }
+
+  function addDetailItemToCart() {
+    const itemSlug = '{{ service.slug }}';
+    if (window.GlamourBooking && window.GlamourBooking.getCart) {
+      const cart = window.GlamourBooking.getCart();
+      const existing = cart.find(i => i.id === itemSlug && i.variantId === activeVariantId);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        cart.push({ id: itemSlug, variantId: activeVariantId ? parseInt(activeVariantId, 10) : null, qty: 1 });
+      }
+      window.GlamourBooking.saveCart(cart);
+      if (window.GlamourBooking.showToast) {
+        window.GlamourBooking.showToast('Added {{ service.name|escapejs }} to cart!');
+      }
+    } else {
+      alert('Added {{ service.name|escapejs }} to cart!');
+    }
+  }
+</script>
+
+  </main>
+
+  {% include 'booking/components/bottom_nav.html' %}
+  {% include 'booking/components/chat_panel.html' %}
+  {% include 'booking/components/floating_cart.html' %}
+  {% include 'booking/components/booking_drawer.html' %}
+
+  <div class="toast-stack" data-toast-stack aria-live="polite" aria-atomic="true"></div>
+{% endblock %}

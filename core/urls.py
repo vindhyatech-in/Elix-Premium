@@ -5,6 +5,7 @@ from . import admin_dashboard_views, employee_dashboard_views, views
 urlpatterns = [
     path('', views.index, name='index'),
     path('services-booking/', views.services_booking, name='services_booking'),
+    path('service/<slug:slug>/', views.service_detail, name='service_detail'),
     path('robots.txt', views.robots_txt, name='robots_txt'),
     path('sitemap.xml', views.sitemap_xml, name='sitemap_xml'),
     # Owner / Admin Dashboard

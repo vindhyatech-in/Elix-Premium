@@ -167,6 +167,27 @@
       });
     }
 
+    document.querySelectorAll('[data-dropdown]').forEach((dropdown) => {
+      dropdown.addEventListener('mouseenter', () => {
+        const panel = dropdown.querySelector('[data-dropdown-panel]');
+        if (!panel) return;
+        closeAll(panel);
+        panel.classList.add('is-open');
+        dropdown.classList.add('is-open');
+        const trigger = dropdown.querySelector('[data-dropdown-trigger]');
+        if (trigger) trigger.setAttribute('aria-expanded', 'true');
+      });
+
+      dropdown.addEventListener('mouseleave', () => {
+        const panel = dropdown.querySelector('[data-dropdown-panel]');
+        if (!panel) return;
+        panel.classList.remove('is-open');
+        dropdown.classList.remove('is-open');
+        const trigger = dropdown.querySelector('[data-dropdown-trigger]');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      });
+    });
+
     document.querySelectorAll('[data-dropdown-trigger]').forEach((trigger) => {
       trigger.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -420,6 +441,29 @@
         document.getElementById('catalog')?.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
       });
     });
+  }
+
+  function checkURLCategoryParam() {
+    const params = new URLSearchParams(window.location.search);
+    const cat = params.get('category');
+    if (!cat) return;
+    const sidebar = document.getElementById('filter-sidebar');
+    if (!sidebar) return;
+
+    if (cat === 'package') {
+      const typeGroup = sidebar.querySelector('[data-filter-type]');
+      typeGroup?.querySelectorAll('.filter-segmented__btn').forEach((b) => {
+        const isActive = b.dataset.typeValue === 'package';
+        b.classList.toggle('is-active', isActive);
+        b.setAttribute('aria-checked', String(isActive));
+      });
+    } else {
+      sidebar.querySelectorAll('[data-filter-category-checkbox]').forEach((cb) => {
+        cb.checked = cb.value === cat;
+      });
+    }
+    applyCatalogState();
+    updateFilterBadge();
   }
 
   /* ---------------------------------------------------------
@@ -690,8 +734,10 @@
     document.body.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-quick-view]');
       if (!btn) return;
-      const item = getCatalog().find((i) => i.id === btn.dataset.catalogId);
-      if (item) open(item);
+      const catId = btn.dataset.catalogId;
+      if (catId && btn.tagName.toLowerCase() !== 'a') {
+        window.location.href = `/service/${catId}/`;
+      }
     });
 
     modal.querySelector('[data-modal-close]')?.addEventListener('click', close);
@@ -1064,6 +1110,7 @@
     initFilters();
     initSort();
     initNavCategoryShortcuts();
+    checkURLCategoryParam();
     initSearch();
     initQuickView();
     initQuickViewTouchPeek();
@@ -1090,4 +1137,49 @@
       closeCartPanel: () => closeCartPanel?.(),
     };
   });
+
+  window.onCustomerPackageVariantChange = function(selectEl) {
+    const card = selectEl.closest('.catalog-card');
+    if (!card) return;
+    const pkgBox = card.querySelector('.catalog-card__pkg-box');
+    if (!pkgBox) return;
+
+    const discountPct = parseFloat(pkgBox.dataset.pkgDiscount || 0);
+
+    let totalMrp = 0;
+    let totalDuration = 0;
+
+    card.querySelectorAll('.catalog-card__pkg-variant-select').forEach(sel => {
+      const selectedOpt = sel.options[sel.selectedIndex];
+      if (selectedOpt) {
+        totalMrp += parseFloat(selectedOpt.dataset.price || 0);
+        totalDuration += parseInt(selectedOpt.dataset.duration || 0, 10);
+      }
+    });
+
+    card.querySelectorAll('.catalog-card__pkg-single-val').forEach(inp => {
+      totalMrp += parseFloat(inp.dataset.price || 0);
+      totalDuration += parseInt(inp.dataset.duration || 0, 10);
+    });
+
+    let newPackagePrice = totalMrp;
+    if (discountPct > 0) {
+      newPackagePrice = Math.round(totalMrp * (1 - discountPct / 100));
+    }
+
+    const hours = Math.floor(totalDuration / 60);
+    const minutes = totalDuration % 60;
+    let durLabel = '';
+    if (hours > 0 && minutes > 0) durLabel = `${hours}h ${minutes}m`;
+    else if (hours > 0) durLabel = `${hours}h`;
+    else durLabel = `${minutes} min`;
+
+    const priceNowEl = card.querySelector('.catalog-card__price-now');
+    const priceMrpEl = card.querySelector('.catalog-card__price-mrp');
+    const durationEl = card.querySelector('.catalog-card__duration');
+
+    if (priceNowEl) priceNowEl.textContent = `₹${newPackagePrice}`;
+    if (priceMrpEl) priceMrpEl.textContent = `₹${totalMrp}`;
+    if (durationEl) durationEl.textContent = durLabel;
+  };
 })();

@@ -374,11 +374,64 @@
     }, { passive: true });
   }
 
+  function initDropdowns() {
+    const panels = document.querySelectorAll('[data-dropdown-panel]');
+    if (!panels.length) return;
+
+    function closeAll(except) {
+      panels.forEach((panel) => {
+        if (panel === except) return;
+        panel.classList.remove('is-open');
+        panel.closest('[data-dropdown]')?.classList.remove('is-open');
+        document.querySelectorAll(`[aria-controls="${panel.id}"]`).forEach((t) => t.setAttribute('aria-expanded', 'false'));
+      });
+    }
+
+    document.querySelectorAll('[data-dropdown]').forEach((dropdown) => {
+      dropdown.addEventListener('mouseenter', () => {
+        const panel = dropdown.querySelector('[data-dropdown-panel]');
+        if (!panel) return;
+        closeAll(panel);
+        panel.classList.add('is-open');
+        dropdown.classList.add('is-open');
+        const trigger = dropdown.querySelector('[data-dropdown-trigger]');
+        if (trigger) trigger.setAttribute('aria-expanded', 'true');
+      });
+
+      dropdown.addEventListener('mouseleave', () => {
+        const panel = dropdown.querySelector('[data-dropdown-panel]');
+        if (!panel) return;
+        panel.classList.remove('is-open');
+        dropdown.classList.remove('is-open');
+        const trigger = dropdown.querySelector('[data-dropdown-trigger]');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    document.querySelectorAll('[data-dropdown-trigger]').forEach((trigger) => {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = trigger.getAttribute('aria-controls');
+        const panel = document.getElementById(id);
+        if (!panel) return;
+        const willOpen = !panel.classList.contains('is-open');
+        closeAll(willOpen ? panel : null);
+        panel.classList.toggle('is-open', willOpen);
+        panel.closest('[data-dropdown]')?.classList.toggle('is-open', willOpen);
+        document.querySelectorAll(`[aria-controls="${id}"]`).forEach((t) => t.setAttribute('aria-expanded', String(willOpen)));
+      });
+    });
+
+    document.addEventListener('click', () => closeAll());
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     initPreloader();
     window.__lenis = initSmoothScroll();
     initNavbar();
     initThemeToggle();
+    initDropdowns();
     initAOS();
     initCarousels();
     initServiceFilters();

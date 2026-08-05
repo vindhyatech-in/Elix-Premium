@@ -702,9 +702,25 @@ body.admin-body {
 }
 
 .admin-btn--gold {
-  background: var(--gradient-gold);
-  color: var(--ink);
+  background: var(--blue);
+  color: #ffffff;
   font-weight: 700;
+}
+.admin-btn--gold:hover {
+  background: var(--blue-deep);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.admin-btn--green {
+  background: var(--green);
+  color: #ffffff;
+  font-weight: 700;
+}
+.admin-btn--green:hover {
+  background: var(--green-deep);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
 }
 
 .admin-btn--ghost {

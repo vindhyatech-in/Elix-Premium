@@ -26,6 +26,62 @@ def get_booking_categories():
     ]
 
 
+def get_landing_categories():
+    """Category list with descriptions, service counts, and photos for the landing page grid."""
+    category_defaults = {
+        'threading': {'photo': 'images/portfolio-5.jpg', 'desc': 'Precision shaping & smooth hair removal for face & eyebrows.'},
+        'peel-off-wax': {'photo': 'images/portfolio-3.jpg', 'desc': 'Painless peel-off waxing for facial & delicate areas.'},
+        'body-wax': {'photo': 'images/service-massage.jpg', 'desc': 'Full body, arms & legs waxing with soothing aloe care.'},
+        'bikini-wax': {'photo': 'images/portfolio-4.jpg', 'desc': 'Hygienic & gentle wax rituals by trained female experts.'},
+        'basic-facial': {'photo': 'images/service-facial.jpg', 'desc': 'Deep cleansing, fruit & glow facials for instant radiance.'},
+        'premium-facial': {'photo': 'images/compare-facial-after.jpg', 'desc': 'O3+, Sara Lightening & luxury anti-aging facial treatments.'},
+        'package': {'photo': 'images/portfolio-6.jpg', 'desc': 'Super saver beauty combos & monthly maintenance packages.'},
+    }
+
+    categories = []
+    for cat in Category.objects.all():
+        if cat.slug == 'package':
+            continue
+        first_svc = cat.services.first()
+        defaults = category_defaults.get(cat.slug, {})
+        photo = defaults.get('photo') or (first_svc.photo if first_svc else 'images/service-facial.jpg')
+        desc = defaults.get('desc', 'Professional at-home salon services by certified beauticians.')
+        
+        categories.append({
+            'slug': cat.slug,
+            'name': cat.name,
+            'services_count': cat.services.count(),
+            'photo': photo,
+            'description': desc,
+        })
+    return categories
+
+
+def get_landing_packages():
+    """Returns real package offerings from the database for the marketing landing page."""
+    packages = []
+    pkgs_qs = Service.objects.filter(kind='package', is_active=True).prefetch_related('included_services', 'variants')
+    for pkg in pkgs_qs:
+        v = pkg.default_variant
+        if not v:
+            continue
+        inc_names = [inc.name for inc in pkg.included_services.all()]
+        features = inc_names if inc_names else ['Custom beauty bundle', 'Certified beautician', 'Sealed products']
+
+        packages.append({
+            'id': pkg.slug,
+            'name': pkg.name,
+            'tagline': pkg.description or 'Curated super saver beauty combo',
+            'price': float(v.price),
+            'mrp': float(v.mrp) if v.mrp else None,
+            'discount_pct': v.discount_pct,
+            'featured': 'Bestseller' in (pkg.badges or []) or pkg.popularity_score > 80,
+            'photo': pkg.photo or 'images/portfolio-6.jpg',
+            'features': features,
+        })
+    return packages
+
+
 def get_booking_offers():
     """Endpoint: GET /api/v1/offers/"""
     return [
@@ -76,23 +132,44 @@ def get_booking_catalog():
     services = (
         Service.objects.filter(is_active=True)
         .select_related('category')
-        .prefetch_related('variants')
+        .prefetch_related('variants', 'included_services__variants')
         .order_by('id')
     )
     for service in services:
         variant = service.default_variant
         if not variant:
             continue
-        # Built from the prefetched `variants` queryset (filtered/sorted in
-        # Python, not a fresh `.filter()` call) so this doesn't cost an
-        # extra query per service on top of the one `default_variant`
-        # already makes. Lets the quick-view modal offer every price point
-        # instead of only ever showing/adding the one `default_variant`
-        # picks — see developed.md "Catalog & Bookings models".
         all_variants = sorted(
             (v for v in service.variants.all() if v.is_active),
             key=lambda v: (v.sort_order, v.id),
         )
+
+        included_services_data = []
+        if service.kind == 'package':
+            for inc in service.included_services.all():
+                inc_vars = [
+                    {
+                        'id': iv.id,
+                        'label': iv.label or iv.duration_label,
+                        'price': float(iv.price),
+                        'duration_mins': iv.duration_mins,
+                        'duration_label': iv.duration_label,
+                    }
+                    for iv in inc.variants.filter(is_active=True)
+                ]
+                inc_default = inc.default_variant
+                if inc_default:
+                    included_services_data.append({
+                        'id': inc.id,
+                        'name': inc.name,
+                        'photo': inc.photo or 'images/portfolio-5.jpg',
+                        'selected_variant_id': inc_default.id,
+                        'price': float(inc_default.price),
+                        'duration_mins': inc_default.duration_mins,
+                        'duration_label': inc_default.duration_label,
+                        'variants': inc_vars,
+                    })
+
         catalog.append({
             'id': service.slug,
             'kind': service.kind,
@@ -111,6 +188,7 @@ def get_booking_catalog():
             'photo': service.photo,
             'discount_pct': variant.discount_pct,
             'duration_label': variant.duration_label,
+            'included_services': included_services_data,
             'variants': [
                 {
                     'id': v.id,

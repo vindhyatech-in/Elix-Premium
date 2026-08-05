@@ -173,6 +173,7 @@ def get_packages():
             'price': 1999,
             'period': 'per visit',
             'featured': False,
+            'photo': 'images/portfolio-2.jpg',
             'features': [
                 'Choice of 1 signature service',
                 'Certified beautician',
@@ -187,6 +188,7 @@ def get_packages():
             'price': 4499,
             'period': 'per visit',
             'featured': True,
+            'photo': 'images/portfolio-6.jpg',
             'features': [
                 'Any 3 services, bundled',
                 'Senior beautician, your choice',
@@ -202,6 +204,7 @@ def get_packages():
             'price': 8999,
             'period': 'per visit',
             'featured': False,
+            'photo': 'images/portfolio-1.jpg',
             'features': [
                 'Full-day multi-service ritual',
                 'Two dedicated specialists',

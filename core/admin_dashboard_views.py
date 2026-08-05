@@ -170,6 +170,7 @@ def dashboard_services(request):
             kind = request.POST.get('kind', 'service')
             description = request.POST.get('description', '').strip()
             badges_str = request.POST.get('badges', '').strip()
+            included_service_ids = request.POST.getlist('included_service_ids')
 
             if name and category_id:
                 category = get_object_or_404(Category, id=category_id)
@@ -182,6 +183,19 @@ def dashboard_services(request):
                 else:
                     service.badges = []
                 service.save()
+
+                if kind == 'package':
+                    service.included_services.set(included_service_ids)
+                    auto_dur = service.total_included_duration
+                    auto_mrp = service.total_included_mrp
+                    v = service.default_variant
+                    if v:
+                        if auto_dur > 0:
+                            v.duration_mins = auto_dur
+                        if auto_mrp > 0:
+                            v.mrp = auto_mrp
+                        v.save()
+
                 messages.success(request, f'Updated service details for "{name}".')
 
         elif action == 'add_service':
@@ -190,6 +204,7 @@ def dashboard_services(request):
             kind = request.POST.get('kind', 'service')
             description = request.POST.get('description', '').strip()
             badges_str = request.POST.get('badges', '').strip()
+            included_service_ids = request.POST.getlist('included_service_ids')
 
             variant_labels = request.POST.getlist('variant_label')
             variant_prices = request.POST.getlist('variant_price')
@@ -220,6 +235,12 @@ def dashboard_services(request):
                         is_active=True,
                     )
 
+                    if kind == 'package' and included_service_ids:
+                        service.included_services.set(included_service_ids)
+
+                    auto_dur = service.total_included_duration
+                    auto_mrp = service.total_included_mrp
+
                     created_count = 0
                     for idx in range(len(variant_prices)):
                         p_val = variant_prices[idx]
@@ -228,6 +249,12 @@ def dashboard_services(request):
                         lbl = variant_labels[idx].strip() if idx < len(variant_labels) else ''
                         mrp_val = variant_mrps[idx] if idx < len(variant_mrps) and variant_mrps[idx] else None
                         dur_val = int(variant_durations[idx]) if idx < len(variant_durations) and variant_durations[idx] else 30
+
+                        if kind == 'package':
+                            if auto_dur > 0:
+                                dur_val = auto_dur
+                            if auto_mrp > 0:
+                                mrp_val = auto_mrp
 
                         ServiceVariant.objects.create(
                             service=service,
@@ -241,7 +268,7 @@ def dashboard_services(request):
                         )
                         created_count += 1
 
-                messages.success(request, f'Created new service "{name}" with {created_count} variant(s).')
+                messages.success(request, f'Created new {kind} "{name}" with {created_count} variant(s).')
 
         elif action == 'add_variant':
             service_id = request.POST.get('service_id')
@@ -249,23 +276,24 @@ def dashboard_services(request):
             label = request.POST.get('label', '').strip()
             price = request.POST.get('price')
             mrp = request.POST.get('mrp')
-            duration = request.POST.get('duration_mins', 30)
-            is_default = request.POST.get('is_default') in ['on', 'true', '1']
+            duration_mins = request.POST.get('duration_mins', 30)
+            is_default = request.POST.get('is_default') == 'on'
 
             if price:
                 with transaction.atomic():
                     if is_default:
                         service.variants.update(is_default=False)
+
                     ServiceVariant.objects.create(
                         service=service,
                         label=label,
-                        duration_mins=int(duration),
                         price=float(price),
                         mrp=float(mrp) if mrp else None,
+                        duration_mins=int(duration_mins),
                         is_default=is_default or not service.variants.exists(),
                         is_active=True,
                     )
-                messages.success(request, f'Added variant "{label or "Standard"}" to "{service.name}".')
+                messages.success(request, f'Added new variant to "{service.name}".')
 
         elif action == 'update_variant_price':
             variant_id = request.POST.get('variant_id')
@@ -273,21 +301,20 @@ def dashboard_services(request):
             label = request.POST.get('label', '').strip()
             price = request.POST.get('price')
             mrp = request.POST.get('mrp')
-            duration = request.POST.get('duration_mins')
-            is_default = request.POST.get('is_default') in ['on', 'true', '1']
+            duration_mins = request.POST.get('duration_mins')
+            is_default = request.POST.get('is_default') == 'on'
 
-            if price:
-                variant.label = label
-                variant.price = float(price)
-                variant.mrp = float(mrp) if mrp and float(mrp) > 0 else None
-                if duration:
-                    variant.duration_mins = int(duration)
+            if price and duration_mins:
+                with transaction.atomic():
+                    if is_default and not variant.is_default:
+                        variant.service.variants.update(is_default=False)
 
-                if is_default and not variant.is_default:
-                    variant.service.variants.update(is_default=False)
-                    variant.is_default = True
-
-                variant.save()
+                    variant.label = label
+                    variant.price = float(price)
+                    variant.mrp = float(mrp) if mrp else None,
+                    variant.duration_mins = int(duration_mins)
+                    variant.is_default = is_default
+                    variant.save()
                 messages.success(request, f'Updated variant details for "{variant.service.name}".')
 
         elif action == 'delete_variant':
@@ -308,12 +335,14 @@ def dashboard_services(request):
         return redirect(request.get_full_path())
 
     categories = Category.objects.all()
+    single_services = Service.objects.filter(kind='service', is_active=True).prefetch_related('variants').order_by('name')
 
     context = {
         'page_title': 'Service Catalog Management',
         'active_nav': 'services',
         'services': services_qs,
         'categories': categories,
+        'single_services': single_services,
         'category_slug': category_slug,
         'search_query': search_query,
     }

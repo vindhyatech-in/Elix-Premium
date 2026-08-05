@@ -48,6 +48,13 @@ class Service(models.Model):
     rating = models.DecimalField(max_digits=2, decimal_places=1, default=0)
     reviews_count = models.PositiveIntegerField(default=0)
     popularity_score = models.PositiveSmallIntegerField(default=0)
+    included_services = models.ManyToManyField(
+        'self',
+        symmetrical=False,
+        blank=True,
+        related_name='included_in_packages',
+        help_text='Select single services included in this package'
+    )
     badges = models.JSONField(default=list, blank=True, help_text='e.g. ["Bestseller", "New"]')
     available_today = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
@@ -59,6 +66,30 @@ class Service(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def total_included_duration(self):
+        """Calculated sum of duration in minutes for all included services."""
+        if self.kind != 'package':
+            return 0
+        total = 0
+        for svc in self.included_services.all():
+            v = svc.default_variant
+            if v:
+                total += v.duration_mins
+        return total
+
+    @property
+    def total_included_mrp(self):
+        """Calculated sum of individual service prices for all included services (serves as Package MRP)."""
+        if self.kind != 'package':
+            return 0
+        total = 0
+        for svc in self.included_services.all():
+            v = svc.default_variant
+            if v:
+                total += v.price
+        return float(total)
 
     @property
     def default_variant(self):

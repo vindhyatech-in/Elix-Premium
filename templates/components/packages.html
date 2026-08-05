@@ -1,28 +1,31 @@
+{% load static %}
 <section class="packages section" id="packages" data-api="/api/v1/packages/" aria-labelledby="packages-title">
   <div class="container">
     <div class="section-head section-head--center" data-aos="fade-up">
       <p class="eyebrow">Beauty Packages</p>
-      <h2 class="section-title" id="packages-title">One ritual, or a <em>full indulgence</em>.</h2>
-      <p class="section-lead">Transparent pricing. No hidden charges. Cancel or reschedule anytime, free.</p>
+      <h2 class="section-title" id="packages-title">Super Saver <em>Packages</em></h2>
+      <p class="section-lead">Transparent pricing. No hidden charges. Save up to 20% on curated beauty combos.</p>
     </div>
 
-    <div class="packages__grid">
+    <div class="category-cards-grid">
       {% for package in packages %}
-        <article class="package-card{% if package.featured %} package-card--featured{% endif %}" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
-          {% if package.featured %}<span class="package-card__badge">Most Loved</span>{% endif %}
-          <h3 class="package-card__name">{{ package.name }}</h3>
-          <p class="package-card__tagline">{{ package.tagline }}</p>
-          <div class="package-card__price">
-            <span class="package-card__amount">₹{{ package.price }}</span>
-            <span class="package-card__period">{{ package.period }}</span>
+        <a href="{% url 'services_booking' %}?category=package" class="category-card" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
+          <div class="category-card__media">
+            <img src="{% static package.photo|default:'images/portfolio-6.jpg' %}" alt="{{ package.name }}" loading="lazy">
+            {% if package.featured %}<span class="category-card__count">Most Loved</span>{% endif %}
           </div>
-          <ul class="package-card__features">
-            {% for feature in package.features %}
-              <li>{{ feature }}</li>
-            {% endfor %}
-          </ul>
-          <a href="{% url 'services_booking' %}?open_cart=1" class="btn {% if package.featured %}btn--primary{% else %}btn--ghost{% endif %}" data-add-to-booking-cart data-catalog-id="{{ package.id }}">Choose {{ package.name }}</a>
-        </article>
+          <div class="category-card__body">
+            <h3 class="category-card__title">{{ package.name }} Package</h3>
+            <p class="category-card__desc">{{ package.tagline }} — {{ package.features|join:", " }}</p>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: var(--space-xs);">
+              <span style="font-weight: 700; font-size: 1.15rem; color: var(--text-body);">₹{{ package.price }}</span>
+              <span class="category-card__cta">
+                View Packages
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </span>
+            </div>
+          </div>
+        </a>
       {% endfor %}
     </div>
   </div>

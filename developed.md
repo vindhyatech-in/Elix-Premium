@@ -1200,3 +1200,29 @@ A dedicated, mobile-first job execution portal at `/emp-dashboard/` for field be
 - **50-Minute Service Guarantee Banner**: Displays an express notice (`.urgent-express-banner`) informing customers: *"Express Service Guarantee: We will provide your service within 50 minutes of your selected time."*
 - **Validation**: Enforces a 50-minute minimum prep time when selecting today's time slots, preventing invalid past or immediate time selections with an informative toast notice.
 
+## Minimalist Aesthetic Theme (Black, White, Blue, Green) (added 2026-08-05)
+
+- **Color Palette Overhaul**: Restyled the entire platform using a modern minimalist aesthetic matching leading beauty & salon apps (Urban Company / Salon Prime):
+  - **Crisp Surfaces**: Pure white (`#ffffff`) cards & modals on soft light gray (`#f8fafc`) page surfaces.
+  - **Dark Typography & Accents**: Deep slate black (`#0f172a`) headings, body text, active sort pills, and floating menu buttons.
+  - **Royal Indigo Blue (`#4f46e5`)**: Vibrant primary CTA accent for "Add" buttons, "View cart" floating bar, primary action buttons, and active indicators.
+  - **Emerald Green (`#059669` / `#ecfdf5`)**: Vibrant discount offer badges (`20% OFF`, `10% OFF`), package tags (`■ PACKAGE`), and active duty indicators.
+- **Files Modified**: Updated global variables in [static/css/variables.css](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/static/css/variables.css), component styles in [static/css/components.css](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/static/css/components.css), catalog styles in [static/css/booking.css](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/static/css/booking.css), and dashboard themes in [static/css/admin_dashboard.css](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/static/css/admin_dashboard.css).
+
+## Package Services Auto-Calculation Backend & DB (added 2026-08-05)
+
+- **Database Model Relation (`Service.included_services`)**: Added `included_services = ManyToManyField('self', symmetrical=False, blank=True)` to [catalog/models.py](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/catalog/models.py#L48-L60) allowing packages (`kind='package'`) to link multiple single services.
+- **Auto-Calculated MRP & Duration**:
+  - `total_included_duration`: Automatically sums individual service durations in minutes.
+  - `total_included_mrp`: Automatically sums individual service prices to serve as the package **MRP**.
+  - **Actual Price**: Owners set a custom discounted package price (`price`). The difference between `mrp` and `price` automatically generates the discount percentage badge (`discount_pct`).
+- **Owner Dashboard & Django Admin Integration**:
+  - Multi-select service picker with **live search filter** and **per-service variant selectors** added to [templates/admin_dashboard/services_list.html](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/templates/admin_dashboard/services_list.html) and [catalog/admin.py](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/catalog/admin.py).
+  - Hide variant creation section for packages — only single services support variant management.
+  - Real-time client-side JS auto-calculates total MRP & duration as single services and variants are selected/unselected.
+- **Customer Package Customization & Proportional Discount**:
+  - Interactive variant dropdowns rendered on customer package cards in [templates/booking/components/catalog_card.html](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/templates/booking/components/catalog_card.html).
+  - When customers switch variants for included services, `onCustomerPackageVariantChange()` in [static/js/booking.js](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/static/js/booking.js#L1118-L1150) updates the total MRP, package price, and total duration in real-time while keeping the package **discount % constant**.
+- **Marketing Landing Page Integration ([core/booking_data.py](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/core/booking_data.py#L60-L82) & [core/views.py](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/core/views.py#L25))**:
+  - Replaced hardcoded static mock packages on the marketing home page (`/`) with real database packages query `get_landing_packages()`. Packages added or modified by the owner are now immediately visible live on the homepage with their real included services and calculated prices.
+
