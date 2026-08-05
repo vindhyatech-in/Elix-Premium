@@ -243,13 +243,144 @@
       if (calendarMonth > 11) { calendarMonth = 0; calendarYear += 1; }
       renderCalendar();
     });
+    function isTodayOrPast(dateStr) {
+      const now = new Date();
+      if (!dateStr) return true;
+      const todayISO = toISODate(now);
+      return String(dateStr).trim() <= todayISO;
+    }
+
+    function updateRegularSlotsAvailability() {
+      const now = new Date();
+      const isToday = isTodayOrPast(state.date);
+
+      const minDate = new Date(now.getTime() + 50 * 60 * 1000);
+      const minMins = minDate.getHours() * 60 + minDate.getMinutes();
+
+      const slotEndTimes = {
+        morning: 12 * 60,   // 12:00 PM
+        afternoon: 16 * 60, // 4:00 PM
+        evening: 20 * 60,   // 8:00 PM
+      };
+
+      regularSlots.querySelectorAll('.slot-card').forEach((card) => {
+        const slotValue = card.dataset.slotValue;
+        const endTime = slotEndTimes[slotValue] || 0;
+
+        if (isToday && minMins >= endTime) {
+          card.classList.add('is-disabled');
+          card.style.opacity = '0.4';
+          card.style.pointerEvents = 'none';
+          if (card.classList.contains('is-selected')) {
+            card.classList.remove('is-selected');
+            state.slot = null;
+          }
+        } else {
+          card.classList.remove('is-disabled');
+          card.style.opacity = '1';
+          card.style.pointerEvents = 'auto';
+        }
+      });
+    }
+
     calendarGrid.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-date]');
       if (!btn || btn.disabled) return;
       state.date = btn.dataset.date;
       renderCalendar();
+      updateRegularSlotsAvailability();
+      if (state.type === 'urgent') {
+        populateUrgentTimeDropdown();
+      }
       updateNextButtonState();
     });
+
+    /* --- Urgent Express Time (Dropdown & 50 Min Calculation) --- */
+    function formatTime12h(timeStr) {
+      if (!timeStr) return '';
+      const parts = timeStr.split(':');
+      if (parts.length < 2) return timeStr;
+      let h = parseInt(parts[0], 10);
+      const m = parts[1];
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${h}:${m} ${ampm}`;
+    }
+
+    function populateUrgentTimeDropdown() {
+      if (!urgentTimeInput) return;
+      urgentTimeInput.innerHTML = '';
+
+      const now = new Date();
+      const isToday = isTodayOrPast(state.date);
+
+      let startMins;
+      if (isToday) {
+        // Current time + 50 minutes, rounded up to next 15-min slot
+        const minDate = new Date(now.getTime() + 50 * 60 * 1000);
+        const rem = minDate.getMinutes() % 15;
+        if (rem > 0) {
+          minDate.setMinutes(minDate.getMinutes() + (15 - rem));
+        }
+        startMins = minDate.getHours() * 60 + minDate.getMinutes();
+      } else {
+        startMins = 8 * 60; // 8:00 AM for future dates
+      }
+
+      const endMins = 21 * 60; // 9:00 PM
+      let count = 0;
+
+      for (let m = startMins; m <= endMins; m += 15) {
+        const hh = Math.floor(m / 60);
+        const mm = m % 60;
+        const isoTime = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+        
+        const ampm = hh >= 12 ? 'PM' : 'AM';
+        const displayH = hh % 12 || 12;
+        const displayM = String(mm).padStart(2, '0');
+        const formatted12h = `${displayH}:${displayM} ${ampm}`;
+
+        const opt = document.createElement('option');
+        opt.value = isoTime;
+        if (count === 0 && isToday) {
+          opt.textContent = `${formatted12h} (Earliest Express — 50 min)`;
+        } else {
+          opt.textContent = formatted12h;
+        }
+        urgentTimeInput.appendChild(opt);
+        count++;
+      }
+
+      if (count === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No express slots available today (After 9 PM)';
+        urgentTimeInput.appendChild(opt);
+      }
+
+      if (urgentTimeInput.options.length > 0 && urgentTimeInput.options[0].value) {
+        urgentTimeInput.selectedIndex = 0;
+        state.urgentTime = urgentTimeInput.value;
+      } else {
+        state.urgentTime = null;
+      }
+      updateUrgentTimeDisplay();
+    }
+
+    function updateUrgentTimeDisplay() {
+      const urgentExpressTimeEl = drawer.querySelector('[data-urgent-express-time]');
+      if (!urgentTimeInput.value) {
+        state.urgentTime = null;
+        if (urgentExpressTimeEl) urgentExpressTimeEl.textContent = 'No slot selected';
+        return;
+      }
+
+      state.urgentTime = urgentTimeInput.value;
+      const formatted = formatTime12h(urgentTimeInput.value);
+      if (urgentExpressTimeEl) {
+        urgentExpressTimeEl.textContent = `${formatted} (Within 50 mins)`;
+      }
+    }
 
     /* --- Booking type / slots --- */
     typeButtons.forEach((btn) => btn.addEventListener('click', () => {
@@ -260,9 +391,20 @@
       state.slot = null;
       state.urgentTime = null;
       regularSlots.querySelectorAll('.slot-card').forEach((c) => c.classList.remove('is-selected'));
-      urgentTimeInput.value = '';
+      
       regularSlots.hidden = state.type !== 'regular';
       urgentTimeWrap.hidden = state.type !== 'urgent';
+
+      if (state.type === 'urgent') {
+        if (!state.date) {
+          state.date = toISODate(new Date());
+          renderCalendar();
+        }
+        populateUrgentTimeDropdown();
+      } else {
+        updateRegularSlotsAvailability();
+      }
+
       updateNextButtonState();
     }));
 
@@ -275,8 +417,8 @@
       updateNextButtonState();
     });
 
-    urgentTimeInput.addEventListener('input', (e) => {
-      state.urgentTime = e.target.value;
+    urgentTimeInput.addEventListener('change', () => {
+      updateUrgentTimeDisplay();
       updateNextButtonState();
     });
 
@@ -488,7 +630,7 @@
     });
 
     function resetState() {
-      state = { step: 1, addressId: null, date: null, type: 'regular', slot: null, urgentTime: null, payment: null, paymentConfirmed: false };
+      state = { step: 1, addressId: null, date: toISODate(new Date()), type: 'regular', slot: null, urgentTime: null, payment: null, paymentConfirmed: false };
       justConfirmed = false;
       confirmationEl.hidden = true;
       footer.hidden = false;

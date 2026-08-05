@@ -90,8 +90,19 @@
       </div>
 
       <div class="urgent-time" data-urgent-time hidden>
-        <label for="urgent-time-input">Choose an exact time (today)</label>
-        <input type="time" id="urgent-time-input" data-urgent-time-input>
+        <div class="urgent-express-banner">
+          <div class="urgent-express-banner__header">
+            <span class="urgent-express-banner__badge">⚡ Express Urgent Service</span>
+            <span class="urgent-express-banner__timer">Arriving in 50 Mins</span>
+          </div>
+          <p class="urgent-express-banner__note">
+            <strong>Express Service Guarantee:</strong> We will provide your service within <strong>50 minutes</strong> of your selected time (<span data-urgent-express-time>--:--</span>).
+          </p>
+        </div>
+
+        <label for="urgent-time-input">Select Express Time Slot (Available from 50 min onwards)</label>
+        <select id="urgent-time-input" data-urgent-time-input class="urgent-time-select"></select>
+        <small class="urgent-time-hint" data-urgent-time-hint>Earliest available express slot calculated automatically.</small>
       </div>
     </section>
 

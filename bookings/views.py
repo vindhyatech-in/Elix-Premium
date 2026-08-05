@@ -1,10 +1,12 @@
 import json
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
 from django.views.decorators.http import require_POST
 
@@ -75,6 +77,25 @@ def create_booking(request):
     if booking_type == 'urgent' and not exact_time:
         return JsonResponse({'ok': False, 'error': 'Select a time.'}, status=400)
 
+    # Enforce strict 50-minute advance window for today's bookings
+    now_dt = timezone.now()
+    today_date = now_dt.date()
+    min_allowed_time = (now_dt + timedelta(minutes=50)).time()
+
+    if scheduled_date == today_date:
+        if booking_type == 'urgent':
+            if exact_time < min_allowed_time:
+                return JsonResponse({'ok': False, 'error': 'Urgent bookings for today must be scheduled at least 50 minutes in advance.'}, status=400)
+        elif booking_type == 'regular':
+            slot_end_times = {
+                'morning': parse_time('12:00:00'),
+                'afternoon': parse_time('16:00:00'),
+                'evening': parse_time('20:00:00'),
+            }
+            slot_end = slot_end_times.get(time_slot)
+            if slot_end and min_allowed_time >= slot_end:
+                return JsonResponse({'ok': False, 'error': f'The selected {time_slot} slot is no longer available for today. Please select a later slot or date.'}, status=400)
+
     # Resolve cart -> real ServiceVariant prices server-side. A line's
     # variantId (set once the quick-view variant picker exists — see
     # developed.md "Catalog & Bookings models") picks a specific
@@ -120,7 +141,7 @@ def create_booking(request):
         scheduled_date=scheduled_date,
         booking_type=booking_type,
         time_slot=time_slot if booking_type == 'regular' else '',
-        exact_time=exact_time,
+        exact_time=exact_time if booking_type == 'urgent' else None,
         payment_method=payment_method,
         payment_status='paid' if payment_method == 'pay_now' else 'pending',
         subtotal=subtotal,

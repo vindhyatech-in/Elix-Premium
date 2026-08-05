@@ -1194,3 +1194,9 @@ A dedicated, mobile-first job execution portal at `/emp-dashboard/` for field be
 - **Performance KPIs**: Tracks today's appointments, total completed jobs, customer rating score, and revenue earnings.
 - **Styling & Theme**: `static/css/employee_dashboard.css` provides a mobile-first dark/light theme supporting `data-theme-toggle` and `localStorage`.
 
+## Express Urgent Booking Feature (added 2026-08-05)
+
+- **Automatic 50-Minute Calculation**: Selecting the **Urgent** booking type calculates `current_time + 50 minutes` dynamically via JavaScript (`getMinUrgentTime()`), setting the minimum time constraint (`min`) and initial value on the time picker.
+- **50-Minute Service Guarantee Banner**: Displays an express notice (`.urgent-express-banner`) informing customers: *"Express Service Guarantee: We will provide your service within 50 minutes of your selected time."*
+- **Validation**: Enforces a 50-minute minimum prep time when selecting today's time slots, preventing invalid past or immediate time selections with an informative toast notice.
+

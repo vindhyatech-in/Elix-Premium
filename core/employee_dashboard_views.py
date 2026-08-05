@@ -76,7 +76,9 @@ def employee_dashboard(request):
     )
 
     today_bookings = assigned_bookings.filter(scheduled_date=today_date).exclude(status='cancelled')
-    upcoming_bookings = assigned_bookings.filter(scheduled_date__gt=today_date, status__in=['upcoming', 'in_progress'])
+    upcoming_bookings = assigned_bookings.filter(status__in=['upcoming', 'in_progress']).exclude(
+        id__in=today_bookings.values_list('id', flat=True)
+    )
     completed_bookings = assigned_bookings.filter(status='completed')
 
     # Metrics

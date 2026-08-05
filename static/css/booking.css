@@ -1590,7 +1590,71 @@ body.booking-app {
 
 .urgent-time { margin-top: var(--space-md); }
 .urgent-time label { display: block; font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); margin-bottom: 0.4rem; }
-.urgent-time input[type="time"] { padding: 0.6rem 0.9rem; border-radius: var(--radius-sm); border: 1px solid var(--border-hairline); background: var(--surface-1); color: var(--text-body); font-size: var(--fs-sm); }
+.urgent-time-select, .urgent-time input[type="time"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-1);
+  color: var(--text-body);
+  font-size: var(--fs-sm);
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+.urgent-time-select option {
+  background: var(--surface-2);
+  color: var(--text-body);
+}
+
+.urgent-express-banner {
+  background: rgba(201, 161, 90, 0.15);
+  border: 1px solid var(--accent-gold);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.urgent-express-banner__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.urgent-express-banner__badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.urgent-express-banner__timer {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  background: var(--gradient-gold);
+  color: var(--ink);
+}
+
+.urgent-express-banner__note {
+  font-size: 0.825rem;
+  color: var(--text-body);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.urgent-time-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  margin-top: 0.35rem;
+}
 
 /* --- Step 4: payment --- */
 .payment-options { display: flex; flex-direction: column; gap: 0.6rem; }

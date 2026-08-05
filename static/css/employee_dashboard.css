@@ -136,6 +136,28 @@ body.emp-body {
   font-size: 0.85rem;
 }
 
+.emp-select {
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-2);
+  color: var(--text-body);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+.emp-select option {
+  background: var(--surface-2);
+  color: var(--text-body);
+}
+
+.emp-select--sm {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+}
+
 /* --- Stats Grid --- */
 .emp-stats-grid {
   display: grid;
