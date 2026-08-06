@@ -1,5 +1,5 @@
 /**
- * booking.js — Service Booking app (/services-booking/).
+ * booking.js — Service Booking app (/booking/).
  * Sibling to main.js/animations.js, not an extension of them — this page
  * has its own shell (app navbar, bottom nav, catalog, cart) that main.js
  * knows nothing about. main.js is still loaded alongside this file for the

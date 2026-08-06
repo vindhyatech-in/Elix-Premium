@@ -1,11 +1,86 @@
+import calendar as calendar_module
+import secrets
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
+from django.db.models import Count, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 
-from accounts.models import Employee
+# How long a generated start OTP stays valid — long enough that a slow
+# customer isn't locked out, short enough that an old code lying around
+# is useless later. regenerate_otp exists for anything past this.
+OTP_VALIDITY = timedelta(minutes=20)
+
+
+def _generate_otp():
+    return ''.join(secrets.choice('0123456789') for _ in range(6))
+
+from accounts.models import Employee, EmployeeLeave
 from bookings.models import Booking
+
+MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+
+def _build_month_calendar(employee, year, month, today_date):
+    """
+    A Sunday-first month grid (matching booking_drawer.js's own calendar —
+    same `S M T W T F S` convention across the whole app) for the Today
+    tab's "at a glance" widget. Each day gets: how many of the employee's
+    non-cancelled bookings fall on it (`job_count`), whether it's inside an
+    EmployeeLeave range (`is_leave`), and `has_conflict` when both are
+    true — a job assigned during declared leave, worth flagging since it
+    means the owner assigned something after (or without seeing) the leave.
+    """
+    cal = calendar_module.Calendar(firstweekday=6)  # 6 = Sunday
+    month_dates = list(cal.itermonthdates(year, month))
+    range_start, range_end = month_dates[0], month_dates[-1]
+
+    job_counts = {}
+    if employee:
+        rows = (
+            Booking.objects.filter(
+                assigned_beautician=employee, scheduled_date__range=(range_start, range_end),
+            )
+            .exclude(status='cancelled')
+            .values('scheduled_date')
+            .annotate(count=Count('id'))
+        )
+        job_counts = {row['scheduled_date']: row['count'] for row in rows}
+
+    leave_dates = set()
+    if employee:
+        leaves = employee.leaves.filter(start_date__lte=range_end, end_date__gte=range_start)
+        for leave in leaves:
+            d = max(leave.start_date, range_start)
+            last = min(leave.end_date, range_end)
+            while d <= last:
+                leave_dates.add(d)
+                d += timedelta(days=1)
+
+    weeks, week = [], []
+    for d in month_dates:
+        job_count = job_counts.get(d, 0)
+        is_leave = d in leave_dates
+        week.append({
+            'date': d,
+            'day': d.day,
+            'in_month': d.month == month,
+            'is_today': d == today_date,
+            'is_weekend': d.weekday() in (5, 6),
+            'job_count': job_count,
+            'is_leave': is_leave,
+            'has_conflict': job_count > 0 and is_leave,
+        })
+        if len(week) == 7:
+            weeks.append(week)
+            week = []
+    return weeks
 
 
 @login_required(login_url='account_login')
@@ -35,6 +110,8 @@ def employee_dashboard(request):
         messages.error(request, 'You do not have an assigned Beautician profile.')
         return redirect('services_booking')
 
+    today_date = timezone.now().date()
+
     # Handle POST Actions
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -46,27 +123,138 @@ def employee_dashboard(request):
             status_label = 'On Duty (Active)' if new_status == 'active' else 'Off Duty (On Leave)'
             messages.success(request, f'Your status is now {status_label}.')
 
-        elif action == 'update_booking_status':
+        elif action == 'update_booking_status' and employee:
             booking_id = request.POST.get('booking_id')
             new_status = request.POST.get('status')
-            booking = get_object_or_404(Booking, id=booking_id)
+            booking = get_object_or_404(Booking, id=booking_id, assigned_beautician=employee)
 
             if new_status in dict(Booking.STATUS_CHOICES):
                 booking.status = new_status
                 booking.save()
                 messages.success(request, f'Order #{booking.booking_number} updated to {booking.get_status_display()}.')
 
-        elif action == 'mark_paid':
+        elif action == 'mark_paid' and employee:
             booking_id = request.POST.get('booking_id')
-            booking = get_object_or_404(Booking, id=booking_id)
+            booking = get_object_or_404(Booking, id=booking_id, assigned_beautician=employee)
             booking.payment_status = 'paid'
             booking.save()
             messages.success(request, f'Order #{booking.booking_number} marked as Paid.')
 
+        elif action == 'mark_on_the_way' and employee:
+            booking_id = request.POST.get('booking_id')
+            booking = get_object_or_404(Booking, id=booking_id, assigned_beautician=employee)
+            if booking.status == 'upcoming':
+                booking.status = 'on_the_way'
+                booking.save()
+                messages.success(request, f'Order #{booking.booking_number} marked On The Way.')
+
+        elif action == 'upload_verification' and employee:
+            booking_id = request.POST.get('booking_id')
+            booking = get_object_or_404(Booking, id=booking_id, assigned_beautician=employee)
+            photo = request.FILES.get('verification_photo')
+
+            if booking.status != 'on_the_way':
+                messages.error(request, 'This job is not in the "On The Way" stage.')
+            elif not photo:
+                messages.error(request, 'Please take or choose a photo first.')
+            else:
+                booking.verification_photo = photo
+                booking.start_otp = _generate_otp()
+                booking.otp_generated_at = timezone.now()
+                booking.otp_verified_at = None
+                booking.save()
+                messages.success(
+                    request,
+                    f'Arrival photo saved for #{booking.booking_number}. Ask the customer for the code '
+                    f'shown on their Bookings page, then enter it below to start the job.',
+                )
+
+        elif action == 'regenerate_otp' and employee:
+            booking_id = request.POST.get('booking_id')
+            booking = get_object_or_404(Booking, id=booking_id, assigned_beautician=employee)
+            if booking.status == 'on_the_way' and booking.verification_photo:
+                booking.start_otp = _generate_otp()
+                booking.otp_generated_at = timezone.now()
+                booking.save()
+                messages.success(request, f'New code generated for #{booking.booking_number} — ask the customer to refresh their Bookings page.')
+
+        elif action == 'verify_start_otp' and employee:
+            booking_id = request.POST.get('booking_id')
+            entered_otp = request.POST.get('otp', '').strip()
+            booking = get_object_or_404(Booking, id=booking_id, assigned_beautician=employee)
+
+            if booking.status != 'on_the_way':
+                messages.error(request, 'This job is not in the "On The Way" stage.')
+            elif not booking.start_otp or not booking.otp_generated_at:
+                messages.error(request, 'No code has been generated yet — save an arrival photo first.')
+            elif timezone.now() > booking.otp_generated_at + OTP_VALIDITY:
+                messages.error(request, 'That code has expired — tap "Get New Code" and try again.')
+            elif entered_otp != booking.start_otp:
+                messages.error(request, 'Incorrect code. Double-check with the customer and try again.')
+            else:
+                booking.status = 'in_progress'
+                booking.otp_verified_at = timezone.now()
+                booking.save()
+                messages.success(request, f'Verified — #{booking.booking_number} is now Job Started.')
+
+        elif action == 'upload_face_photos' and employee:
+            slots = ['face_photo_front', 'face_photo_left', 'face_photo_right', 'face_photo_top', 'face_photo_bottom']
+            uploaded = [name for name in slots if request.FILES.get(name)]
+            for name in uploaded:
+                setattr(employee, name, request.FILES[name])
+            if uploaded:
+                employee.save()
+                messages.success(request, 'Face photo saved.')
+            else:
+                messages.error(request, 'Please choose a photo first.')
+
+        elif action == 'update_profile' and employee:
+            phone = request.POST.get('phone', '').strip()
+            specialties = request.POST.get('specialties', '').strip()
+            if phone:
+                employee.phone = phone
+            if specialties:
+                employee.specialties = specialties
+            employee.save()
+            messages.success(request, 'Profile updated.')
+
+        elif action == 'request_leave' and employee:
+            start_date = parse_date(request.POST.get('start_date') or '')
+            end_date = parse_date(request.POST.get('end_date') or '')
+            reason = request.POST.get('reason', '').strip()
+
+            if not start_date or not end_date:
+                messages.error(request, 'Please provide both a start and end date.')
+            elif end_date < start_date:
+                messages.error(request, 'Leave end date cannot be before the start date.')
+            elif start_date < today_date:
+                messages.error(request, 'Leave start date cannot be in the past.')
+            else:
+                EmployeeLeave.objects.create(
+                    employee=employee, start_date=start_date, end_date=end_date, reason=reason,
+                )
+                conflict_count = (
+                    Booking.objects.filter(assigned_beautician=employee, scheduled_date__range=(start_date, end_date))
+                    .exclude(status='cancelled')
+                    .count()
+                )
+                if conflict_count:
+                    messages.success(
+                        request,
+                        f'Leave requested — but you already have {conflict_count} job'
+                        f'{"s" if conflict_count != 1 else ""} scheduled in this window. Let the owner know so they can reassign them.',
+                    )
+                else:
+                    messages.success(request, 'Leave request added.')
+
+        elif action == 'cancel_leave' and employee:
+            leave_id = request.POST.get('leave_id')
+            EmployeeLeave.objects.filter(id=leave_id, employee=employee).delete()
+            messages.success(request, 'Leave cancelled.')
+
         return redirect(request.get_full_path())
 
     # Get Assigned Bookings
-    today_date = timezone.now().date()
     assigned_bookings = (
         Booking.objects.filter(assigned_beautician=employee)
         .select_related('user')
@@ -76,7 +264,7 @@ def employee_dashboard(request):
     )
 
     today_bookings = assigned_bookings.filter(scheduled_date=today_date).exclude(status='cancelled')
-    upcoming_bookings = assigned_bookings.filter(status__in=['upcoming', 'in_progress']).exclude(
+    upcoming_bookings = assigned_bookings.filter(status__in=['upcoming', 'on_the_way', 'in_progress']).exclude(
         id__in=today_bookings.values_list('id', flat=True)
     )
     completed_bookings = assigned_bookings.filter(status='completed')
@@ -84,6 +272,24 @@ def employee_dashboard(request):
     # Metrics
     completed_count = completed_bookings.count()
     total_earnings = completed_bookings.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+
+    upcoming_leaves = (
+        employee.leaves.filter(end_date__gte=today_date) if employee else EmployeeLeave.objects.none()
+    )
+
+    # Calendar month navigation (?cal_year=&cal_month=) — defaults to the
+    # current month. Clamped to valid values instead of 500ing on a
+    # hand-edited/garbage query string.
+    try:
+        cal_year = int(request.GET.get('cal_year', today_date.year))
+        cal_month = int(request.GET.get('cal_month', today_date.month))
+        if not 1 <= cal_month <= 12:
+            raise ValueError
+    except ValueError:
+        cal_year, cal_month = today_date.year, today_date.month
+
+    prev_month, prev_year = (12, cal_year - 1) if cal_month == 1 else (cal_month - 1, cal_year)
+    next_month, next_year = (1, cal_year + 1) if cal_month == 12 else (cal_month + 1, cal_year)
 
     context = {
         'page_title': 'Beautician Dashboard',
@@ -94,6 +300,11 @@ def employee_dashboard(request):
         'completed_count': completed_count,
         'total_earnings': total_earnings,
         'today_date': today_date,
+        'upcoming_leaves': upcoming_leaves,
         'all_employees': Employee.objects.all() if user.is_staff else None,
+        'calendar_weeks': _build_month_calendar(employee, cal_year, cal_month, today_date),
+        'calendar_label': f'{MONTH_NAMES[cal_month - 1]} {cal_year}',
+        'calendar_prev': {'month': prev_month, 'year': prev_year},
+        'calendar_next': {'month': next_month, 'year': next_year},
     }
     return render(request, 'employee_dashboard/emp_dashboard.html', context)

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Booking, BookingItem
+from .models import Booking, BookingItem, Review
 
 
 class BookingItemInline(admin.TabularInline):
@@ -24,3 +24,10 @@ class BookingAdmin(admin.ModelAdmin):
         'created_at', 'updated_at',
     )
     inlines = [BookingItemInline]
+
+
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    list_display = ('service', 'user', 'rating', 'created_at')
+    list_filter = ('rating', 'created_at')
+    search_fields = ('service__name', 'user__email', 'comment')

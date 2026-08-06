@@ -1,5 +1,5 @@
 /**
- * profile.js — /services-booking/profile/. Add/delete against the same
+ * profile.js — /booking/profile/. Add/delete against the same
  * JSON address API (accounts/views.py::addresses_api / address_delete)
  * the booking drawer's address step now reads from too — see
  * developed.md "Profile & saved addresses". Reloads the page on success
@@ -40,7 +40,7 @@
       if (!text) { showToast('Enter your full address'); return; }
 
       try {
-        const response = await fetch('/services-booking/addresses/', {
+        const response = await fetch('/booking/addresses/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
           body: JSON.stringify({
@@ -69,7 +69,7 @@
       if (!window.confirm('Delete this address?')) return;
 
       try {
-        const response = await fetch(`/services-booking/addresses/${btn.dataset.addressId}/`, {
+        const response = await fetch(`/booking/addresses/${btn.dataset.addressId}/`, {
           method: 'DELETE',
           headers: { 'X-CSRFToken': getCsrfToken() },
         });

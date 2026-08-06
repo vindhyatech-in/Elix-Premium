@@ -1,4 +1,4 @@
-# Glamour At Home — Landing Page
+# Elix — Landing Page
 
 A premium, animated, single-page marketing site for an on-demand home beauty
 service, built with Django templates (no frontend build step required).

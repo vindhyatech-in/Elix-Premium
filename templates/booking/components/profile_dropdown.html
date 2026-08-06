@@ -9,6 +9,16 @@
     <a href="{% url 'profile' %}#addresses" class="app-navbar__dropdown-item" role="menuitem">Addresses</a>
     <button type="button" class="app-navbar__dropdown-item" data-coming-soon="Notifications settings" role="menuitem">Notification Settings</button>
     <button type="button" class="app-navbar__dropdown-item" data-coming-soon="Support" role="menuitem">Support</button>
+
+    {% if user.is_staff or user.employee_profile %}
+      <div class="app-navbar__dropdown-divider"></div>
+      {% if user.is_staff %}
+        <a href="{% url 'admin_dashboard_overview' %}" class="app-navbar__dropdown-item" role="menuitem">Owner Dashboard</a>
+      {% endif %}
+      {% if user.employee_profile %}
+        <a href="{% url 'employee_dashboard' %}" class="app-navbar__dropdown-item" role="menuitem">Beautician Dashboard</a>
+      {% endif %}
+    {% endif %}
     <form method="post" action="{% url 'account_logout' %}">
       {% csrf_token %}
       <input type="hidden" name="next" value="{% url 'services_booking' %}">

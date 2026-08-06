@@ -1,5 +1,5 @@
 /**
- * bookings_dashboard.js — /services-booking/bookings/. Depends on
+ * bookings_dashboard.js — /booking/my-bookings/. Depends on
  * window.GlamourBooking (set by booking.js's DOMContentLoaded handler,
  * which always runs first — both scripts are `defer`, executed in source
  * order, so listener registration order guarantees this; same assumption

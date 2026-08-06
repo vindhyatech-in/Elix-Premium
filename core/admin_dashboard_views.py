@@ -1,12 +1,46 @@
+import re
+
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Prefetch, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
-from accounts.models import Employee
+from accounts.models import Employee, EmployeeLeave
 from bookings.models import Booking
 from catalog.models import Category, Service, ServiceVariant
+
+
+def _create_employee_login(name):
+    """
+    Auto-provisions a login for a newly added employee: username is
+    firstname+lastname (lowercased, collision-suffixed), password is
+    Firstname2026 (first letter capitalised) — a simple, predictable
+    scheme the owner can hand to new hires without a separate invite flow.
+    Returns (user, plaintext_password) so the caller can show the password
+    once, since it's never recoverable again after this (only the hash is
+    stored).
+    """
+    parts = name.split()
+    first_name = parts[0] if parts else 'user'
+    last_name = ' '.join(parts[1:]) if len(parts) > 1 else ''
+
+    base_username = re.sub(r'[^a-z0-9]', '', (first_name + last_name).lower()) or 'employee'
+    username = base_username
+    suffix = 1
+    while User.objects.filter(username=username).exists():
+        suffix += 1
+        username = f'{base_username}{suffix}'
+
+    password = f'{first_name.capitalize()}2026'
+
+    user = User.objects.create_user(
+        username=username, password=password,
+        first_name=first_name, last_name=last_name,
+    )
+    return user, password
 
 
 @staff_member_required(login_url='account_login')
@@ -367,15 +401,25 @@ def dashboard_employees(request):
             status = request.POST.get('status', 'active')
 
             if name and phone:
-                Employee.objects.create(
-                    name=name,
-                    phone=phone,
-                    email=email,
-                    specialties=specialties or 'General Beauty',
-                    experience_years=int(experience_years),
-                    status=status,
+                with transaction.atomic():
+                    user, password = _create_employee_login(name)
+                    if email:
+                        user.email = email
+                        user.save(update_fields=['email'])
+                    Employee.objects.create(
+                        user=user,
+                        name=name,
+                        phone=phone,
+                        email=email,
+                        specialties=specialties or 'General Beauty',
+                        experience_years=int(experience_years),
+                        status=status,
+                    )
+                messages.success(
+                    request,
+                    f'Employee "{name}" added. Login — username: {user.username}, '
+                    f'password: {password} (share with them now; the password can\'t be shown again).',
                 )
-                messages.success(request, f'Employee "{name}" added successfully.')
 
         elif action == 'update_employee':
             employee_id = request.POST.get('employee_id')
@@ -392,6 +436,26 @@ def dashboard_employees(request):
             employee.save()
             messages.success(request, f'Updated employee "{employee.name}".')
 
+        elif action == 'generate_login':
+            employee_id = request.POST.get('employee_id')
+            employee = get_object_or_404(Employee, id=employee_id)
+
+            if employee.user:
+                messages.error(request, f'"{employee.name}" already has a login ({employee.user.username}).')
+            else:
+                with transaction.atomic():
+                    user, password = _create_employee_login(employee.name)
+                    if employee.email:
+                        user.email = employee.email
+                        user.save(update_fields=['email'])
+                    employee.user = user
+                    employee.save(update_fields=['user'])
+                messages.success(
+                    request,
+                    f'Login created for "{employee.name}". Login — username: {user.username}, '
+                    f'password: {password} (share with them now; the password can\'t be shown again).',
+                )
+
         elif action == 'toggle_status':
             employee_id = request.POST.get('employee_id')
             employee = get_object_or_404(Employee, id=employee_id)
@@ -402,7 +466,14 @@ def dashboard_employees(request):
 
         return redirect(request.get_full_path())
 
-    employees_qs = Employee.objects.prefetch_related('assigned_bookings').all()
+    employees_qs = Employee.objects.prefetch_related(
+        'assigned_bookings',
+        Prefetch(
+            'leaves',
+            queryset=EmployeeLeave.objects.filter(end_date__gte=timezone.now().date()),
+            to_attr='upcoming_leaves',
+        ),
+    ).all()
 
     context = {
         'page_title': 'Employee & Staff Management',

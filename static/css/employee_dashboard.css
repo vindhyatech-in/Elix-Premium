@@ -17,7 +17,7 @@ body.emp-body {
 .emp-shell {
   max-width: 640px;
   margin: 0 auto;
-  padding: 1.25rem 1rem 3rem 1rem;
+  padding: 1.25rem 1rem calc(4.5rem + env(safe-area-inset-bottom)) 1rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -196,21 +196,10 @@ body.emp-body {
   color: var(--ink-muted);
 }
 
-/* --- Tabs --- */
-.emp-tabs {
-  display: flex;
-  gap: 0.35rem;
-  background: var(--surface-2);
-  padding: 0.35rem;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-hairline);
-  overflow-x: auto;
-}
-
+/* --- Tabs (base — still used as JS hook via .emp-tab/.is-active; visual
+   treatment for the bottom nav is layered on top below, same pattern as
+   the customer app's bottom_nav.html) --- */
 .emp-tab {
-  flex: 1;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-pill);
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--ink-muted);
@@ -221,9 +210,98 @@ body.emp-body {
   transition: all 0.2s ease;
 }
 
-.emp-tab.is-active {
-  background: var(--gradient-gold);
+/* --- Dashboard section nav. Mobile: fixed to the bottom, icon-first,
+   thumb-reachable — mirrors bottom_nav.html in the customer-facing booking
+   app. Desktop: a fixed bottom bar is a mobile pattern, not a desktop one
+   — @641px+ below switches it to a normal top tab row instead (same
+   markup/JS, position-only change; it already sits in the DOM right after
+   the header, so no reordering trick is needed for the desktop case). --- */
+.emp-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 640px;
+  z-index: 100;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border-hairline);
+  border-left: 1px solid var(--border-hairline);
+  border-right: 1px solid var(--border-hairline);
+  padding: 0.4rem 0.25rem calc(0.4rem + env(safe-area-inset-bottom));
+}
+
+.emp-bottom-nav__item {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.35rem 0.2rem;
+  font-size: 0.65rem;
+}
+
+.emp-bottom-nav__item.is-active {
+  background: transparent;
+  color: var(--accent-gold);
+}
+
+@media (min-width: 641px) {
+  .emp-shell { padding-bottom: 1.25rem; }
+
+  .emp-bottom-nav {
+    position: static;
+    left: auto;
+    transform: none;
+    width: auto;
+    max-width: none;
+    justify-content: flex-start;
+    gap: 0.35rem;
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 0.35rem;
+  }
+
+  .emp-bottom-nav__item {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 0.4rem;
+    padding: 0.55rem 0.9rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .emp-bottom-nav__item.is-active {
+    background: var(--gradient-gold);
+    color: var(--ink);
+  }
+
+  .emp-bottom-nav__badge {
+    position: static;
+    margin-left: 0.15rem;
+  }
+}
+
+.emp-bottom-nav__badge {
+  position: absolute;
+  top: 0; right: calc(50% - 1.1rem);
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding-inline: 0.2rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent-gold);
   color: var(--ink);
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* --- Job Cards --- */
@@ -292,6 +370,15 @@ body.emp-body {
   color: var(--ink-muted);
 }
 
+.emp-customer-phone {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-gold);
+  text-decoration: none;
+  width: fit-content;
+}
+.emp-customer-phone:hover { text-decoration: underline; }
+
 .emp-job-location {
   display: flex;
   align-items: center;
@@ -355,6 +442,7 @@ body.emp-body {
 }
 
 .emp-badge--upcoming { background: rgba(54, 162, 235, 0.15); color: #36a2eb; }
+.emp-badge--on_the_way { background: rgba(155, 89, 182, 0.15); color: #9b59b6; }
 .emp-badge--in_progress { background: rgba(255, 159, 64, 0.15); color: #ff9f40; }
 .emp-badge--completed { background: rgba(75, 192, 192, 0.15); color: #4bc0c0; }
 .emp-badge--cancelled { background: rgba(255, 99, 132, 0.15); color: #ff6384; }
@@ -398,6 +486,106 @@ body.emp-body {
 
 .emp-inline-form { display: inline-block; }
 
+/* --- Arrival Verification & Start OTP --- */
+.emp-otp-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.emp-otp-hint {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+.emp-otp-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.emp-otp-input {
+  width: 8rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-1);
+  color: var(--text-body);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-align: center;
+}
+
+/* --- Arrival Photo Camera Modal --- */
+.emp-camera-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.emp-camera-modal__panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.emp-camera-modal__title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  margin: 0;
+  color: var(--text-body);
+}
+
+.emp-camera-modal__hint {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+.emp-camera-modal__video,
+.emp-camera-modal__preview {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background: #000;
+}
+
+/* Mirror only the live feed, like a mirror-facing selfie preview — the
+   captured still (canvas draw + saved blob) is NOT mirrored, so the
+   preview shown before saving matches what actually gets stored. */
+.emp-camera-modal__video { transform: scaleX(-1); }
+
+.emp-camera-modal__error {
+  font-size: 0.8rem;
+  color: #e74c3c;
+  margin: 0;
+}
+
+.emp-camera-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .emp-messages {
   display: flex;
   flex-direction: column;
@@ -422,3 +610,293 @@ body.emp-body {
   color: var(--ink-muted);
 }
 .emp-empty-icon { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+
+/* --- Profile & Leave Tab --- */
+.emp-profile-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.emp-profile-card + .emp-profile-card { margin-top: 1rem; }
+
+.emp-section-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  margin: 0;
+  color: var(--text-body);
+}
+
+.emp-section-hint {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+.emp-profile-readonly {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--border-hairline);
+}
+
+.emp-profile-readonly div { display: flex; flex-direction: column; gap: 0.15rem; }
+
+.emp-profile-readonly small {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+
+.emp-profile-readonly span { font-size: 0.9rem; color: var(--text-body); }
+
+.emp-face-complete {
+  display: inline-block;
+  margin-left: 0.4rem;
+  color: #2ecc71;
+  font-weight: 700;
+}
+
+.emp-face-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .emp-face-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.emp-face-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.85rem 0.6rem;
+  background: var(--surface-1);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.emp-face-diagram { color: var(--ink-muted); }
+
+.emp-face-slot__title { font-size: 0.85rem; color: var(--text-body); }
+.emp-face-slot__hint { font-size: 0.72rem; color: var(--ink-muted); margin: 0; line-height: 1.3; }
+
+.emp-face-slot__preview {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hairline);
+}
+
+.emp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.emp-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+@media (max-width: 480px) {
+  .emp-form-grid { grid-template-columns: 1fr; }
+}
+
+.emp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.emp-field label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-muted);
+}
+
+.emp-field input {
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-1);
+  color: var(--text-body);
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.emp-field input:focus { border-color: var(--accent-gold); }
+
+.emp-leave-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.emp-leave-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--surface-1);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.85rem;
+}
+
+.emp-leave-dates {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-body);
+}
+
+.emp-leave-duration {
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.emp-leave-duration-preview {
+  margin: -0.4rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-gold);
+}
+
+.emp-leave-reason {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+}
+
+/* --- Month-at-a-glance calendar (Today tab) --- */
+.emp-calendar-card {
+  margin-top: 1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.emp-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+}
+
+.emp-calendar-label {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+.emp-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+  margin-bottom: 0.4rem;
+}
+
+.emp-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+}
+
+.emp-calendar-day {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  background: var(--surface-1);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+}
+
+.emp-calendar-day.is-outside {
+  opacity: 0.35;
+}
+
+.emp-calendar-day.is-weekend {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.emp-calendar-day.is-today {
+  border: 2px solid var(--accent-gold);
+  font-weight: 700;
+}
+
+.emp-calendar-day.is-leave {
+  background: rgba(231, 76, 60, 0.16);
+  border-color: rgba(231, 76, 60, 0.4);
+  color: #e74c3c;
+}
+
+.emp-calendar-day.has-conflict {
+  background: rgba(231, 76, 60, 0.3);
+  border-color: #e74c3c;
+}
+
+.emp-calendar-day__num { line-height: 1; }
+
+.emp-calendar-day__count {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--accent-gold);
+  border-radius: 9999px;
+  padding: 0 0.3rem;
+  line-height: 1.3;
+}
+
+.emp-calendar-day__flag { font-size: 0.65rem; line-height: 1; }
+
+.emp-calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+}
+
+.emp-calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.emp-calendar-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.emp-calendar-dot--job { background: var(--accent-gold); }
+.emp-calendar-dot--leave { background: rgba(231, 76, 60, 0.5); border: 1px solid #e74c3c; }
+.emp-calendar-dot--conflict { background: #e74c3c; }

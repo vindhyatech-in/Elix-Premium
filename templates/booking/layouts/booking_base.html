@@ -38,14 +38,18 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
   <link rel="stylesheet" href="https://unpkg.com/aos@2.3.4/dist/aos.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js@10/public/assets/styles/choices.min.css">
-  <!-- Leaflet + OpenStreetMap tiles — free, no API key required (unlike
-       Google Maps JS API). Powers the booking drawer's address-map step.
-       See developed.md "Service Booking App" for why. -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  {% if not USE_GOOGLE_MAPS_FOR_ADDRESS %}
+    <!-- Leaflet + OpenStreetMap tiles — free, no API key required. Powers
+         the booking drawer's address-map step while USE_GOOGLE_MAPS_FOR_ADDRESS
+         is off (e.g. no billing enabled yet on the Maps Platform project —
+         see settings.py). Never remove this even once Google Maps is
+         live — it's the fallback the flag switches back to. -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  {% endif %}
   <link rel="stylesheet" href="{% static 'css/main.css' %}">
   <link rel="stylesheet" href="{% static 'css/booking.css' %}">
 </head>
-<body id="top" class="booking-app" data-static-url="{% static '' %}" data-authenticated="{{ user.is_authenticated|yesno:'true,false' }}" data-login-url="{% url 'account_login' %}">
+<body id="top" class="booking-app" data-static-url="{% static '' %}" data-authenticated="{{ user.is_authenticated|yesno:'true,false' }}" data-login-url="{% url 'account_login' %}" data-use-google-maps="{{ USE_GOOGLE_MAPS_FOR_ADDRESS|yesno:'true,false' }}">
   <a href="#catalog" class="skip-link">Skip to services</a>
 
   {% block content %}{% endblock %}
@@ -59,7 +63,16 @@
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   <script src="https://unpkg.com/lenis@1.1.14/dist/lenis.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/choices.js@10/public/assets/scripts/choices.min.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  {% if USE_GOOGLE_MAPS_FOR_ADDRESS %}
+    <!-- Google Maps JS API — powers the booking drawer's address-map step
+         (map, pin drop, reverse geocoding) once USE_GOOGLE_MAPS_FOR_ADDRESS
+         is on and billing is enabled on the Maps Platform project — see
+         settings.py. Key is meant to be visible client-side — restrict it
+         by HTTP referrer in the Google Cloud Console, not by secrecy. -->
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}" defer></script>
+  {% else %}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  {% endif %}
 
   <script src="{% static 'js/main.js' %}" defer></script>
   <script src="{% static 'js/booking.js' %}" defer></script>

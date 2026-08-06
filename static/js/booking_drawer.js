@@ -6,17 +6,25 @@
  *
  * Depends on window.GlamourBooking (set by booking.js's DOMContentLoaded
  * handler, which always runs first — both scripts are `defer`, executed in
- * source order, so listener registration order guarantees this). No Google
- * Maps / Razorpay keys exist yet, so:
- *  - the address step uses Leaflet + OpenStreetMap tiles (free, keyless,
- *    genuinely interactive) instead of a static placeholder image.
- *  - the payment step's "Pay Now" simulates a checkout (processing →
- *    success), same pattern as main.js's contact/newsletter form handlers.
+ * source order, so listener registration order guarantees this). No
+ * Razorpay key exists yet, so the payment step's "Pay Now" simulates a
+ * checkout (processing → success), same pattern as main.js's
+ * contact/newsletter form handlers.
+ *
+ * The address step's map (added 2026-08-06) supports two interchangeable
+ * backends, switched by settings.USE_GOOGLE_MAPS_FOR_ADDRESS (read here via
+ * document.body.dataset.useGoogleMaps — see booking_base.html): free/keyless
+ * Leaflet + OpenStreetMap + Nominatim (the default — no billing required),
+ * or the Google Maps JS API + Geocoder (needs a real key *and* billing
+ * enabled on the Cloud project — a key alone isn't enough, every call fails
+ * with REQUEST_DENIED otherwise). Both implementations stay in this file
+ * regardless of which is active, so flipping the flag is all that's needed
+ * once billing is confirmed working.
  *
  * "Proceed to Booking" is gated on window.body.dataset.authenticated (set
  * by booking_base.html from request.user) — signed-out users get redirected
  * to login instead of the drawer opening. confirmBooking() (added
- * 2026-07-31) does a real POST to /services-booking/book/ and creates
+ * 2026-07-31) does a real POST to /booking/checkout/ and creates
  * actual Booking/BookingItem rows — no more a client-generated mock id.
  * See developed.md "Catalog & Bookings models" for the full rationale.
  */
@@ -48,8 +56,9 @@
       slot: null, urgentTime: null, payment: null, paymentConfirmed: false,
     };
     let calendarMonth, calendarYear;
-    let map, marker;
+    let map, marker, geocoder;
     let pendingPin = null;
+    const useGoogleMaps = document.body.dataset.useGoogleMaps === 'true';
     let justConfirmed = false; // true from confirmBooking() until resetState() — see the cart-changed listener below
 
     const addressListEl = drawer.querySelector('[data-address-list]');
@@ -83,7 +92,7 @@
 
     async function fetchAddresses() {
       try {
-        const response = await fetch('/services-booking/addresses/');
+        const response = await fetch('/booking/addresses/');
         if (!response.ok) return;
         const data = await response.json();
         addressCache = data.addresses || [];
@@ -130,8 +139,30 @@
     });
     drawer.querySelector('[data-address-cancel]').addEventListener('click', () => { addressForm.hidden = true; });
 
+    const MAP_CENTER = { lat: 22.7196, lng: 75.8577 }; // Indore — the only city this service currently covers
+
     function initMap() {
-      if (map) { setTimeout(() => map.invalidateSize(), 50); return; }
+      if (map) return;
+      if (useGoogleMaps) initGoogleMap(); else initLeafletMap();
+    }
+
+    function initGoogleMap() {
+      if (typeof google === 'undefined' || !google.maps) return; // script blocked/unavailable — form still works without a map
+
+      map = new google.maps.Map(document.getElementById('booking-map'), {
+        center: MAP_CENTER, zoom: 12, streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
+      });
+      geocoder = new google.maps.Geocoder();
+      map.addListener('click', (e) => {
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+        pendingPin = { lat, lng };
+        if (marker) marker.setPosition(e.latLng); else marker = new google.maps.Marker({ position: e.latLng, map });
+        reverseGeocodePin(lat, lng);
+      });
+    }
+
+    function initLeafletMap() {
       if (typeof L === 'undefined') return; // CDN unavailable — form still works without a map
 
       // Leaflet's default marker icon uses relative image paths resolved
@@ -145,13 +176,108 @@
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       });
 
-      map = L.map('booking-map', { attributionControl: false }).setView([12.9716, 77.5946], 12);
+      map = L.map('booking-map', { attributionControl: false }).setView([MAP_CENTER.lat, MAP_CENTER.lng], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
       map.on('click', (e) => {
         pendingPin = { lat: e.latlng.lat, lng: e.latlng.lng };
         if (marker) marker.setLatLng(e.latlng); else marker = L.marker(e.latlng).addTo(map);
+        reverseGeocodePin(e.latlng.lat, e.latlng.lng);
       });
-      setTimeout(() => map.invalidateSize(), 50);
+    }
+
+    // Fills the address/pincode fields as a starting point on every pin
+    // drop; both stay fully editable, so a bad/missing match just means
+    // the customer types it themselves like before this existed. Silent on
+    // failure — a flaky geocode lookup must never block dropping a pin.
+    async function reverseGeocodePin(lat, lng) {
+      return useGoogleMaps ? reverseGeocodeGoogle(lat, lng) : reverseGeocodeNominatim(lat, lng);
+    }
+
+    async function reverseGeocodeGoogle(lat, lng) {
+      const textInput = drawer.querySelector('[data-address-text]');
+      const pincodeInput = drawer.querySelector('[data-address-pincode]');
+      if (!textInput || !pincodeInput || !geocoder) return;
+
+      try {
+        const response = await geocoder.geocode({ location: { lat, lng } });
+        const result = response.results && response.results[0];
+        if (!result) return;
+
+        textInput.value = result.formatted_address || textInput.value;
+        const postal = result.address_components.find((c) => c.types.includes('postal_code'));
+        if (postal) pincodeInput.value = postal.long_name;
+      } catch (err) {
+        // Network hiccup, no match (ZERO_RESULTS), or billing/key issue — leave fields as-is.
+      }
+    }
+
+    async function reverseGeocodeNominatim(lat, lng) {
+      const textInput = drawer.querySelector('[data-address-text]');
+      const pincodeInput = drawer.querySelector('[data-address-pincode]');
+      if (!textInput || !pincodeInput) return;
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`,
+          { headers: { Accept: 'application/json' } },
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        const addr = data.address || {};
+
+        const parts = [
+          addr.house_number, addr.road || addr.pedestrian,
+          addr.suburb || addr.neighbourhood, addr.city || addr.town || addr.village,
+        ].filter(Boolean);
+        textInput.value = parts.length ? parts.join(', ') : (data.display_name || textInput.value);
+        if (addr.postcode) pincodeInput.value = addr.postcode;
+      } catch (err) {
+        // Network hiccup or Nominatim unavailable — leave fields as-is.
+      }
+    }
+
+    const locateMeBtn = drawer.querySelector('[data-locate-me]');
+    if (locateMeBtn) {
+      locateMeBtn.addEventListener('click', () => {
+        if (!navigator.geolocation) {
+          GB.showToast('Location isn’t available in this browser — drop a pin manually.');
+          return;
+        }
+        if (!map) {
+          GB.showToast('Map isn’t ready yet — please drop a pin manually.');
+          return;
+        }
+
+        const originalLabel = locateMeBtn.textContent;
+        locateMeBtn.disabled = true;
+        locateMeBtn.textContent = 'Locating…';
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude: lat, longitude: lng } = position.coords;
+            pendingPin = { lat, lng };
+            if (useGoogleMaps) {
+              const latlng = { lat, lng };
+              if (marker) marker.setPosition(latlng); else marker = new google.maps.Marker({ position: latlng, map });
+              map.setCenter(latlng);
+              map.setZoom(16);
+            } else {
+              const latlng = L.latLng(lat, lng);
+              if (marker) marker.setLatLng(latlng); else marker = L.marker(latlng).addTo(map);
+              map.setView(latlng, 16);
+            }
+            reverseGeocodePin(lat, lng);
+            locateMeBtn.disabled = false;
+            locateMeBtn.textContent = originalLabel;
+          },
+          () => {
+            GB.showToast('Couldn’t get your location — please drop a pin on the map manually.');
+            locateMeBtn.disabled = false;
+            locateMeBtn.textContent = originalLabel;
+          },
+          { enableHighAccuracy: true, timeout: 10000 },
+        );
+      });
     }
 
     const addressSaveBtn = drawer.querySelector('[data-address-save]');
@@ -165,7 +291,7 @@
       addressSaveBtn.disabled = true;
       let data;
       try {
-        const response = await fetch('/services-booking/addresses/', {
+        const response = await fetch('/booking/addresses/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
           body: JSON.stringify({
@@ -584,7 +710,7 @@
 
       let data;
       try {
-        const response = await fetch('/services-booking/book/', {
+        const response = await fetch('/booking/checkout/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
           body: JSON.stringify(payload),

@@ -496,15 +496,17 @@
   color: var(--ink-muted);
 }
 
-.field input, .field textarea {
+.field input, .field textarea, .field select {
   padding: 0.9rem 1.1rem;
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
+  color: inherit;
+  font: inherit;
   transition: border-color var(--dur-sm) var(--ease-soft);
 }
 
-.field input:focus, .field textarea:focus { border-color: var(--gold-deep); }
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--gold-deep); }
 
 .field textarea { resize: vertical; min-height: 120px; }
 

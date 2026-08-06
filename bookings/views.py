@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Avg, Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -13,7 +14,7 @@ from django.views.decorators.http import require_POST
 from catalog.models import Service
 from core import booking_data
 
-from .models import Booking, BookingItem
+from .models import Booking, BookingItem, Review
 
 # Mirrors booking.js's COUPONS dict — an accepted small duplication rather
 # than building a shared coupon API for three hardcoded codes. See
@@ -184,7 +185,7 @@ def bookings_dashboard(request):
     """
     bookings = list(
         request.user.bookings
-        .prefetch_related('items__service_variant__service')
+        .prefetch_related('items__service_variant__service', 'items__review')
         .all()
     )
     for booking in bookings:
@@ -233,4 +234,51 @@ def cancel_booking(request, booking_number):
         messages.success(request, f'Booking {booking.booking_number} has been cancelled.')
     else:
         messages.error(request, 'This booking can no longer be cancelled — either it’s already completed/cancelled, or it starts within 3 hours.')
+    return redirect('bookings_dashboard')
+
+
+@login_required
+@require_POST
+def submit_review(request, item_id):
+    """
+    Rates + reviews one completed booking's service — only reachable from
+    the "Completed" tab of the bookings dashboard (see
+    bookings_dashboard.html). `get_object_or_404(..., booking__user=...)`
+    doubles as the ownership check, same 404-not-403 pattern as
+    cancel_booking above.
+
+    Recomputes the Service's aggregate `rating`/`reviews_count` from real
+    Review rows on every submission, replacing whatever mock values it was
+    seeded with — see catalog/models.py.
+    """
+    item = get_object_or_404(BookingItem, id=item_id, booking__user=request.user, booking__status='completed')
+
+    if hasattr(item, 'review'):
+        messages.error(request, 'You already reviewed this service.')
+        return redirect('bookings_dashboard')
+
+    if not item.service_variant:
+        messages.error(request, 'This service is no longer available to review.')
+        return redirect('bookings_dashboard')
+
+    try:
+        rating = int(request.POST.get('rating', ''))
+    except ValueError:
+        rating = 0
+    if rating not in range(1, 6):
+        messages.error(request, 'Please select a rating from 1 to 5 stars.')
+        return redirect('bookings_dashboard')
+
+    service = item.service_variant.service
+    Review.objects.create(
+        booking_item=item, user=request.user, service=service,
+        rating=rating, comment=request.POST.get('comment', '').strip(),
+    )
+
+    agg = service.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
+    service.rating = round(agg['avg'] or 0, 1)
+    service.reviews_count = agg['count'] or 0
+    service.save(update_fields=['rating', 'reviews_count'])
+
+    messages.success(request, 'Thanks for your review!')
     return redirect('bookings_dashboard')

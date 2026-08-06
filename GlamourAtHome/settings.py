@@ -150,6 +150,14 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'  # collectstatic target for production
 
+# User-uploaded files (employee face-verification photos, job-site arrival
+# photos — see accounts.Employee / bookings.Booking). First real file
+# uploads in this project; served via urls.py's static() helper in DEBUG,
+# same as STATIC_URL above — needs a real storage backend (e.g. S3) before
+# production, since this local MEDIA_ROOT won't persist/scale there.
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
@@ -159,36 +167,45 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Site-wide constants (consumed by core.context_processors.site_meta).
 # Centralised here so brand/contact details are edited in exactly one place.
 # ---------------------------------------------------------------------------
-SITE_NAME = 'Glamour At Home'
-SITE_TAGLINE = 'Luxury beauty, at your doorstep.'
-SITE_DOMAIN = 'glamourathome.com'  # update for the real production domain
+SITE_NAME = 'Elix'
+SITE_TAGLINE = 'Premium Salon at Home'
+SITE_DOMAIN = 'elix.com'  # update for the real production domain
 SITE_DESCRIPTION = (
-    'Glamour At Home brings verified, professional beauticians and premium '
-    'products to your doorstep — salon-grade hair, skin, makeup and spa '
-    'services on your schedule, in your space.'
+    'Elix brings verified, professional beauticians and premium products '
+    'to your doorstep — salon-grade hair, skin, makeup and spa services on '
+    'your schedule, in your space.'
 )
 SITE_PHONE = '+91 90000 00000'
-SITE_EMAIL = 'hello@glamourathome.com'
-SITE_ADDRESS = 'Bengaluru, Karnataka, India'
+SITE_EMAIL = 'hello@elix.com'
+SITE_ADDRESS = 'Indore, Madhya Pradesh, India'
 SOCIAL_LINKS = {
-    'instagram': 'https://instagram.com/glamourathome',
-    'facebook': 'https://facebook.com/glamourathome',
-    'youtube': 'https://youtube.com/@glamourathome',
-    'linkedin': 'https://linkedin.com/company/glamourathome',
+    'instagram': 'https://instagram.com/elix',
+    'facebook': 'https://facebook.com/elix',
+    'youtube': 'https://youtube.com/@elix',
+    'linkedin': 'https://linkedin.com/company/elix',
 }
 APP_LINKS = {
-    'android': 'https://play.google.com/store/apps/details?id=com.glamourathome.app',
-    'ios': 'https://apps.apple.com/app/glamour-at-home/id0000000000',
+    'android': 'https://play.google.com/store/apps/details?id=com.elix.app',
+    'ios': 'https://apps.apple.com/app/elix/id0000000000',
 }
 
 # ---------------------------------------------------------------------------
-# Service Booking app (/services-booking/) — Phase 2 integration keys.
+# Service Booking app (/booking/) — Phase 2 integration keys.
 # Read from .env (gitignored; see .env.example), default to '' so Phase 1
 # (catalog/cart) runs with zero setup. Not consumed by any view yet — Phase 2
 # (booking drawer: Google Maps address step, Razorpay payment step) is what
 # will read these. See developed.md "Service Booking App" section.
 # ---------------------------------------------------------------------------
 GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
+# Off by default even with a real key set above — a key alone doesn't mean
+# Google Maps Platform actually works: it also requires billing enabled on
+# the Google Cloud project (a card on file), or every call (map render,
+# Geocoder) fails with REQUEST_DENIED ("This page can't load Google Maps
+# correctly"). Flip to True in .env once billing is confirmed enabled; the
+# free/keyless Leaflet + OpenStreetMap + Nominatim implementation (see
+# booking_drawer.js) stays in the codebase either way, never deleted, so
+# switching back is just flipping this flag again.
+USE_GOOGLE_MAPS_FOR_ADDRESS = config('USE_GOOGLE_MAPS_FOR_ADDRESS', default=False, cast=bool)
 RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID', default='')
 RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='')
 
@@ -206,8 +223,8 @@ ACCOUNT_EMAIL_VERIFICATION = 'optional'
 ACCOUNT_RATE_LIMITS = False  # dev-friendly; revisit before any real deploy
 ACCOUNT_LOGOUT_ON_GET = True  # Immediately log out on clicking Logout without confirmation page
 
-LOGIN_REDIRECT_URL = '/services-booking/'
-LOGOUT_REDIRECT_URL = '/services-booking/'
+LOGIN_REDIRECT_URL = '/booking/'
+LOGOUT_REDIRECT_URL = '/booking/'
 LOGIN_URL = '/accounts/login/'
 
 # Prints emails (password reset, optional verification) to the runserver

@@ -26,8 +26,8 @@
   min-height: 100svh;
   display: flex;
   align-items: center;
-  padding-top: calc(var(--space-2xl) + 3rem);
-  padding-bottom: var(--space-2xl);
+  padding-top: calc(var(--space-xl) + 3rem);
+  padding-bottom: var(--space-md);
   overflow: hidden;
   background: var(--ink);
 }
@@ -92,6 +92,175 @@
   gap: var(--space-sm);
 }
 
+/* --- Hero Split Grid Layout --- */
+.hero__split-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+@media (min-width: 992px) {
+  .hero__split-grid {
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 3rem;
+  }
+}
+
+.hero__trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: var(--space-md);
+}
+
+.hero__trust-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* --- Hero Semi-Circular Category Cards Arc (real categories, with photos) ---
+   Below 992px the arc collapses to a horizontal swipeable strip (not a
+   vertical stack) — a vertical stack of 6 pills routinely pushed the hero
+   past one viewport height, forcing a scroll to see the whole hero. */
+.hero__arc-col {
+  position: relative;
+  width: 100%;
+  min-width: 0; /* grid items default to a min-content min-width; without this the nowrap arc cards below force the grid track (and the whole page) wider than the viewport instead of scrolling inside .hero__arc-wrap */
+  min-height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero__arc-wrap {
+  position: relative;
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  gap: 1.1rem;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.hero__arc-wrap::-webkit-scrollbar { display: none; }
+
+.hero__arc-wrap .hero-arc-card { flex: 0 0 auto; max-width: 230px; }
+
+@media (min-width: 992px) {
+  .hero__arc-col { min-height: 530px; }
+
+  .hero__arc-wrap {
+    height: 530px;
+    display: block;
+    overflow: visible;
+  }
+
+  .hero-arc-card {
+    position: absolute;
+  }
+
+  .hero__arc-wrap .hero-arc-card { max-width: 340px; }
+
+  /* Staggered Semi-Circular Arc Positioning — spread further apart than a
+     tight fit would allow, using the spare height .hero__arc-col already
+     has versus .hero__content-col (see developed.md) so this doesn't grow
+     the row past the taller content column. */
+  .hero-arc-card--1 { top: 0%;    right: 20%; }
+  .hero-arc-card--2 { top: 18%;   right: 6%;  }
+  .hero-arc-card--3 { top: 35%;   right: 0%;  }
+  .hero-arc-card--4 { top: 53%;   right: 0%;  }
+  .hero-arc-card--5 { top: 70%;   right: 6%;  }
+  .hero-arc-card--6 { top: 88%;   right: 20%; }
+}
+
+.hero-arc-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  padding: 0.45rem 1.25rem 0.45rem 0.45rem;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
+  text-decoration: none;
+  color: #ffffff;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 340px;
+  white-space: nowrap;
+}
+
+.hero-arc-card:hover {
+  transform: scale(1.06) translateX(-10px);
+  background: rgba(30, 41, 59, 0.9);
+  border-color: #818cf8;
+  box-shadow: 0 20px 40px rgba(79, 70, 229, 0.45);
+  z-index: 10;
+}
+
+.hero-arc-card__img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 2px solid var(--gold-deep, #d97706);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.hero-arc-card__img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-arc-card__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-arc-card__info strong {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.hero-arc-card__info span {
+  font-size: 0.72rem;
+  color: #818cf8;
+  font-weight: 500;
+  margin-top: 0.15rem;
+}
+
+.hero-arc-card__arrow {
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.hero-arc-card:hover .hero-arc-card__arrow {
+  color: #818cf8;
+  transform: translateX(4px);
+}
+
 .hero__chips { display: none; }
 
 .hero__stats {
@@ -99,6 +268,35 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-lg);
+}
+
+/* Compact the hero on smaller screens so the whole thing (headline, arc
+   strip, stats) fits inside one viewport — see .hero__arc-wrap above for
+   the matching arc-strip change. */
+@media (max-width: 991.98px) {
+  .hero { padding-top: calc(var(--space-lg) + 4.25rem); padding-bottom: var(--space-xs); }
+  .hero__split-grid { gap: var(--space-md); }
+  .hero__subhead { margin-top: var(--space-sm); }
+  .hero__trust-strip { margin-top: var(--space-sm); gap: 0.4rem; }
+  .hero__trust-pill { padding: 0.3rem 0.6rem; font-size: 0.72rem; }
+  .hero__actions { margin-top: var(--space-sm); }
+  .hero__stats { margin-top: var(--space-md); gap: var(--space-md); flex-wrap: nowrap; }
+}
+
+/* Short desktop/laptop windows (e.g. a 1366x768 screen minus browser
+   chrome) — the two-column layout + full-height arc otherwise still
+   overflows a short-but-wide viewport even though width alone is desktop. */
+@media (min-width: 992px) and (max-height: 820px) {
+  .hero { padding-top: calc(var(--space-md) + 3.5rem); padding-bottom: var(--space-2xs); }
+  .hero__subhead { margin-top: var(--space-xs); }
+  .hero__actions { margin-top: var(--space-sm); }
+  .hero__stats { margin-top: var(--space-sm); }
+  .hero__arc-col { min-height: 480px; }
+  .hero__arc-wrap { height: 480px; }
+  .hero-arc-card { padding: 0.35rem 1rem 0.35rem 0.35rem; }
+  .hero-arc-card__img { width: 40px; height: 40px; }
+  .hero-arc-card__info strong { font-size: 0.82rem; }
+  .hero-arc-card__info span { font-size: 0.68rem; }
 }
 
 .hero__stat { display: flex; flex-direction: column; }

@@ -15,20 +15,17 @@ means the day the API ships, this is the only file that changes.
 def get_hero():
     """Endpoint: GET /api/v1/hero/  (rarely changes; safe to cache long)"""
     return {
-        'eyebrow': 'On-Demand Luxury Beauty',
-        'headline_lines': ['Your salon,', 'reimagined at', 'your address.'],
-        'subhead': (
-            'Verified beauticians. Premium products. Five-star rituals — '
-            'delivered to your home, on your schedule.'
-        ),
-        'primary_cta': {'label': 'Book a Ritual', 'href': '/services-booking/'},
-        'secondary_cta': {'label': 'How It Works', 'href': '#how-it-works'},
+        'eyebrow': '✨ LUXURY SALON AT HOME',
+        'headline_lines': ['Premium Salon', 'at Home.'],
+        'subhead': 'Certified female experts. Sealed single-use products. Delivered in 50 minutes.',
+        'primary_cta': {'label': 'Book Now →', 'href': '/booking/'},
+        'secondary_cta': {'label': 'Explore Packages', 'href': '/booking/?category=package'},
         'stats': [
             {'value': 50000, 'suffix': '+', 'label': 'Rituals Delivered'},
             {'value': 4.9, 'suffix': '/5', 'label': 'Average Rating'},
-            {'value': 120, 'suffix': '+', 'label': 'Cities Soon'},
+            {'value': 25, 'suffix': '+', 'label': 'Areas Covered in Indore'},
         ],
-        'floating_chips': ['Bridal Makeup', 'Deep Cleanse Facial', 'Keratin Spa', 'Manicure Ritual'],
+        'floating_chips': ['Threading', 'Body Wax', 'Facials', 'Packages'],
         'photo': 'images/hero-bg.jpg',
     }
 
@@ -342,7 +339,7 @@ def get_testimonials():
     return [
         {
             'name': 'Ritika Malhotra',
-            'location': 'Bengaluru',
+            'location': 'Vijay Nagar, Indore',
             'rating': 5,
             'quote': (
                 'It genuinely felt like a five-star spa walked into my living '
@@ -353,7 +350,7 @@ def get_testimonials():
         },
         {
             'name': 'Ayesha Khan',
-            'location': 'Hyderabad',
+            'location': 'Palasia, Indore',
             'rating': 5,
             'quote': (
                 'Booked my bridal trial at 9 PM after work — the team matched '
@@ -364,7 +361,7 @@ def get_testimonials():
         },
         {
             'name': 'Neha Kapoor',
-            'location': 'Mumbai',
+            'location': 'Rajwada, Indore',
             'rating': 5,
             'quote': (
                 'The hygiene protocol sold me — watching them unseal every '
@@ -374,7 +371,7 @@ def get_testimonials():
         },
         {
             'name': 'Priya Sharma',
-            'location': 'Delhi NCR',
+            'location': 'Bhawarkuan, Indore',
             'rating': 4,
             'quote': (
                 'Rebooked three times this month. Same artist, same quality, '
@@ -478,8 +475,9 @@ def get_faqs():
         {
             'question': 'Which cities do you currently serve?',
             'answer': (
-                'We are live in 25+ major Indian metros and expanding to '
-                '120+ cities this year. Enter your pincode at checkout to confirm.'
+                'We are currently live only in Indore. Enter your pincode at '
+                'checkout to confirm we cover your area — we are expanding to '
+                'more cities soon.'
             ),
         },
         {

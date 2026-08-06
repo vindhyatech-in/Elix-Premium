@@ -3,7 +3,7 @@
 <div class="chat-panel" id="chat-panel" data-chat-panel hidden>
   <div class="chat-panel__header">
     <div>
-      <strong>Glamour At Home</strong>
+      <strong>{{ SITE.name }}</strong>
       <span>Usually replies in a few minutes</span>
     </div>
     <button type="button" class="chat-panel__close" data-chat-close aria-label="Close chat">
@@ -13,7 +13,7 @@
 
   <div class="chat-panel__messages" data-chat-messages data-lenis-prevent>
     <div class="chat-bubble chat-bubble--bot">
-      Hi! I'm previewing the Glamour At Home assistant — full live chat and FAQ search are launching soon.
+      Hi! I'm previewing the {{ SITE.name }} assistant — full live chat and FAQ search are launching soon.
       For anything urgent right now, call <a href="tel:{{ SITE.phone }}">{{ SITE.phone }}</a>.
     </div>
   </div>

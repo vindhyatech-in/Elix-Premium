@@ -1,5 +1,5 @@
 /* ============================================================
-   SERVICE BOOKING APP — /services-booking/
+   SERVICE BOOKING APP — /booking/
    Own bundle, not appended to the marketing CSS (see developed.md
    "Service Booking App"). Imports tokens + reset only from the shared
    design system, then everything below is app-shell/catalog specific.
@@ -259,6 +259,12 @@ body.booking-app {
 }
 
 .app-navbar__dropdown-item:hover { background: var(--surface-1); }
+
+.app-navbar__dropdown-divider {
+  height: 1px;
+  background: var(--border-hairline);
+  margin: 0.4rem 0.2rem;
+}
 
 .dropdown-panel__header {
   padding: 0.5rem 0.85rem 0.75rem;
@@ -1553,6 +1559,7 @@ body.booking-app {
 .address-card.is-selected { border-color: var(--gold-deep); background: var(--surface-2); box-shadow: 0 0 0 2px var(--gold-deep) inset; }
 
 .address-form { margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border-hairline); }
+.address-form__locate { width: 100%; justify-content: center; margin-bottom: var(--space-sm); }
 .booking-map { height: 220px; border-radius: var(--radius-md); overflow: hidden; margin-bottom: 0.5rem; border: 1px solid var(--border-hairline); }
 .address-form__hint { font-size: var(--fs-xs); color: var(--ink-muted); margin-bottom: var(--space-sm); }
 .address-form__actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: var(--space-sm); }
@@ -1719,7 +1726,7 @@ body.booking-app {
 }
 
 /* ============================================================
-   BOOKINGS DASHBOARD — /services-booking/bookings/
+   BOOKINGS DASHBOARD — /booking/my-bookings/
    ============================================================ */
 .bookings-dashboard { max-width: 800px; margin-inline: auto; padding: var(--space-xl) var(--container-pad) var(--space-3xl); }
 
@@ -1770,9 +1777,29 @@ body.booking-app {
   letter-spacing: 0.04em;
 }
 .booking-card__status--upcoming { background: var(--gradient-gold); color: var(--ink); }
+.booking-card__status--on_the_way { background: rgba(155, 89, 182, 0.18); color: #9b59b6; }
+.booking-card__status--in_progress { background: rgba(255, 159, 64, 0.18); color: #ff9f40; }
 .booking-card__status--completed { background: var(--ink); color: var(--cream); }
 [data-theme="dark"] .booking-card__status--completed { background: var(--gold-light); color: var(--ink); }
 .booking-card__status--cancelled { background: rgba(199, 141, 134, 0.18); color: var(--rose); }
+
+.booking-card__otp {
+  margin-top: var(--space-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(155, 89, 182, 0.1);
+  border: 1px dashed rgba(155, 89, 182, 0.4);
+  border-radius: var(--radius-sm);
+}
+.booking-card__otp-label { font-size: var(--fs-xs); color: var(--text-body); }
+.booking-card__otp-code { font-size: 1.3rem; font-weight: 800; letter-spacing: 0.2em; color: #9b59b6; }
+
+@media (max-width: 480px) {
+  .booking-card__otp { flex-direction: column; align-items: flex-start; }
+}
 
 .booking-card__items { padding-block: var(--space-sm); display: flex; flex-direction: column; gap: 0.4rem; border-bottom: 1px solid var(--border-hairline); }
 .booking-card__item { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-sm); color: var(--text-body); }
@@ -1789,6 +1816,35 @@ body.booking-app {
 .booking-card__cancel:hover { background: var(--rose); color: var(--cream); border-color: var(--rose); }
 .booking-card__cancel-note { margin-top: var(--space-sm); text-align: center; font-size: var(--fs-xs); color: var(--ink-muted); }
 
+.booking-card__reviews {
+  margin-top: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  border-top: 1px dashed var(--border-hairline);
+  padding-top: var(--space-sm);
+}
+
+.booking-card__review-row { display: flex; flex-direction: column; gap: var(--space-3xs); }
+
+.booking-card__review-service { font-size: var(--fs-xs); font-weight: 600; color: var(--ink-muted); }
+
+.booking-card__review-given { display: flex; flex-direction: column; gap: var(--space-3xs); }
+.booking-card__review-stars { color: var(--gold-deep); letter-spacing: 0.1em; }
+.booking-card__review-comment { margin: 0; font-size: var(--fs-sm); color: var(--text-body); font-style: italic; }
+.booking-card__review-unavailable { margin: 0; font-size: var(--fs-xs); color: var(--ink-muted); }
+
+.booking-card__review-toggle summary { cursor: pointer; list-style: none; width: fit-content; }
+.booking-card__review-toggle summary::-webkit-details-marker { display: none; }
+
+.booking-card__review-form {
+  margin-top: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+.booking-card__review-form .field { margin-bottom: 0; }
+
 @media (max-width: 640px) {
   .booking-card__footer { flex-direction: column; align-items: stretch; gap: 0.5rem; }
   .booking-card__address { max-width: 100%; }
@@ -1796,7 +1852,7 @@ body.booking-app {
 }
 
 /* ============================================================
-   PROFILE PAGE — /services-booking/profile/
+   PROFILE PAGE — /booking/profile/
    ============================================================ */
 .profile-page { max-width: 640px; margin-inline: auto; padding: var(--space-xl) var(--container-pad) var(--space-3xl); display: flex; flex-direction: column; gap: var(--space-lg); }
 

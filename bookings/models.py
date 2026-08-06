@@ -19,11 +19,11 @@ CANCELLATION_CUTOFF = timedelta(hours=3)
 
 
 def _generate_booking_number():
-    """Same GAH###### shape the client-side mock used before real
+    """Same ELX###### shape the client-side mock used before real
     persistence existed — collision-checked since it's user-facing and
     must be unique, unlike the old Math.random()-based client id."""
     while True:
-        candidate = f'GAH{secrets.randbelow(900000) + 100000}'
+        candidate = f'ELX{secrets.randbelow(900000) + 100000}'
         if not Booking.objects.filter(booking_number=candidate).exists():
             return candidate
 
@@ -47,9 +47,16 @@ class Booking(models.Model):
         ('paid', 'Paid'),
         ('failed', 'Failed'),
     ]
+    # Labels only — DB values stay as-is (upcoming/in_progress) so every
+    # existing filter(status='upcoming')/etc. across views/templates/admin
+    # keeps working unchanged; 'on_the_way' is the one genuinely new value,
+    # inserted between them. See core/employee_dashboard_views.py for the
+    # full flow: Pending -> On The Way -> (arrival photo + customer OTP) ->
+    # Job Started -> Completed.
     STATUS_CHOICES = [
-        ('upcoming', 'Upcoming'),
-        ('in_progress', 'In Progress'),
+        ('upcoming', 'Pending'),
+        ('on_the_way', 'On The Way'),
+        ('in_progress', 'Job Started'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
     ]
@@ -86,6 +93,25 @@ class Booking(models.Model):
     coupon_code = models.CharField(max_length=30, blank=True)
 
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='upcoming')
+
+    # Arrival verification — deliberately NOT matched against
+    # Employee.face_photo_* by any ML/face-recognition today ("for now,
+    # just save the image" — a future upgrade, not implied by this field
+    # existing). It's a human-checkable record: if a customer disputes who
+    # showed up, the owner has a timestamped photo to look at. The actual
+    # gate that lets the employee move past "On The Way" is the OTP below,
+    # not this photo.
+    verification_photo = models.ImageField(upload_to='job_verification/%Y/%m/', null=True, blank=True)
+
+    # OTP the customer reads out to the employee to confirm they're ready
+    # to start — shown on the customer's own /booking/my-bookings/ page
+    # while status is 'on_the_way' (no SMS/email gateway configured yet,
+    # see developed.md; swapping in real SMS delivery later doesn't need
+    # to touch this field, just where/how it's shown to the customer).
+    start_otp = models.CharField(max_length=6, blank=True)
+    otp_generated_at = models.DateTimeField(null=True, blank=True)
+    otp_verified_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -132,3 +158,42 @@ class BookingItem(models.Model):
 
     def __str__(self):
         return f'{self.name_snapshot} x{self.quantity}'
+
+
+class Review(models.Model):
+    """
+    A customer's rating + comment for one completed booking item — see
+    bookings/views.py::submit_review. One review per item, enforced via
+    OneToOneField (not per Booking — a booking can contain several
+    different services, each earning its own rating).
+
+    `service` is denormalized here rather than reached via
+    `booking_item.service_variant.service` because `service_variant` is
+    nullable (SET_NULL — see BookingItem above): a review must keep
+    pointing at the right Service even after its originating variant is
+    deleted, since Service.rating/reviews_count are recomputed from real
+    Review rows on every submission (see submit_review).
+    """
+    booking_item = models.OneToOneField(BookingItem, on_delete=models.CASCADE, related_name='review')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reviews')
+    service = models.ForeignKey('catalog.Service', on_delete=models.CASCADE, related_name='reviews')
+    rating = models.PositiveSmallIntegerField()
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.service.name} — {self.rating}★ by {self.user}'
+
+    @property
+    def display_name(self):
+        """First name + last initial (e.g. 'Meera N.'), falling back to
+        the email's local part — avoids showing a customer's full email
+        or full name next to a public review."""
+        full_name = self.user.get_full_name().strip()
+        if full_name:
+            parts = full_name.split()
+            return f'{parts[0]} {parts[1][0]}.' if len(parts) > 1 else parts[0]
+        return self.user.email.split('@')[0]

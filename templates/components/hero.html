@@ -5,25 +5,58 @@
   <canvas class="hero__canvas" id="hero-canvas" aria-hidden="true"></canvas>
 
   <div class="container hero__inner">
-    <p class="eyebrow" data-aos="fade-up">{{ hero.eyebrow }}</p>
+    <div class="hero__split-grid">
 
-    <h1 class="hero__headline">
-      {% for line in hero.headline_lines %}
-        <span class="hero__line"><span class="hero__line-inner">{{ line }}</span></span>
-      {% endfor %}
-    </h1>
+      <!-- Left Content Column -->
+      <div class="hero__content-col">
+        <h1 class="hero__headline">
+          {% for line in hero.headline_lines %}
+            <span class="hero__line"><span class="hero__line-inner">{{ line }}</span></span>
+          {% endfor %}
+        </h1>
 
-    <p class="hero__subhead" data-aos="fade-up" data-aos-delay="150">{{ hero.subhead }}</p>
+        <p class="hero__subhead" data-aos="fade-up" data-aos-delay="150">{{ hero.subhead }}</p>
 
-    <div class="hero__actions" data-aos="fade-up" data-aos-delay="250">
-      <a href="{{ hero.primary_cta.href }}" class="btn btn--primary">{{ hero.primary_cta.label }}</a>
-      <a href="{{ hero.secondary_cta.href }}" class="btn btn--ghost-light">{{ hero.secondary_cta.label }}</a>
-    </div>
+        <!-- Trust Badges Strip -->
+        <div class="hero__trust-strip" data-aos="fade-up" data-aos-delay="200">
+          <div class="hero__trust-pill">
+            <span class="hero__trust-icon">🛡️</span>
+            <span>100% Mono-Dose Sealed Kits</span>
+          </div>
+          <div class="hero__trust-pill">
+            <span class="hero__trust-icon">⏱️</span>
+            <span>Express 50-Min Delivery</span>
+          </div>
+          <div class="hero__trust-pill">
+            <span class="hero__trust-icon">👩‍🎨</span>
+            <span>Background Verified Experts</span>
+          </div>
+        </div>
 
-    <div class="hero__chips" aria-hidden="true">
-      {% for chip in hero.floating_chips %}
-        <span class="chip chip--glass hero__chip hero__chip--{{ forloop.counter }}">{{ chip }}</span>
-      {% endfor %}
+        <div class="hero__actions" data-aos="fade-up" data-aos-delay="250">
+          <a href="{{ hero.primary_cta.href }}" class="btn btn--primary">{{ hero.primary_cta.label }}</a>
+          <a href="{% url 'services_booking' %}?category=package" class="btn btn--ghost-light">Explore Packages</a>
+        </div>
+      </div>
+
+      <!-- Right Visual Showcase Column (real categories, semi-circular arc) -->
+      <div class="hero__arc-col" data-aos="fade-left" data-aos-delay="200">
+        <div class="hero__arc-wrap">
+          {% for cat in service_categories %}
+            <a href="{% url 'services_booking' %}?category={{ cat.slug }}" class="hero-arc-card hero-arc-card--{{ forloop.counter }}">
+              <div class="hero-arc-card__img">
+                <img src="{% static cat.photo %}" alt="{{ cat.name }}">
+              </div>
+              <div class="hero-arc-card__info">
+                <strong>{{ cat.name }}</strong>
+                <span>{{ cat.services_count }} service{{ cat.services_count|pluralize }}</span>
+              </div>
+              <span class="hero-arc-card__arrow">→</span>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+
     </div>
 
     <div class="hero__stats">

@@ -2,7 +2,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#16120f">
-<title>{% block title %}{{ SITE.name }} — Luxury Beauty Services At Your Doorstep{% endblock %}</title>
+<title>{% block title %}{{ SITE.name }} — {{ SITE.tagline }}{% endblock %}</title>
 <meta name="description" content="{% block meta_description %}{{ SITE.description }}{% endblock %}">
 <meta name="keywords" content="at home salon, home beauty service, on-demand beautician, bridal makeup at home, home spa, {{ SITE.name }}">
 <meta name="author" content="{{ SITE.name }}">
@@ -12,7 +12,7 @@
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="{{ SITE.name }}">
-<meta property="og:title" content="{% block og_title %}{{ SITE.name }} — Luxury Beauty, At Your Doorstep{% endblock %}">
+<meta property="og:title" content="{% block og_title %}{{ SITE.name }} — {{ SITE.tagline }}{% endblock %}">
 <meta property="og:description" content="{{ SITE.description }}">
 <meta property="og:url" content="{{ request.build_absolute_uri }}">
 <meta property="og:image" content="{% static 'images/og-cover.svg' %}">
@@ -20,7 +20,7 @@
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{{ SITE.name }} — Luxury Beauty, At Your Doorstep">
+<meta name="twitter:title" content="{{ SITE.name }} — {{ SITE.tagline }}">
 <meta name="twitter:description" content="{{ SITE.description }}">
 <meta name="twitter:image" content="{% static 'images/og-cover.svg' %}">
 

@@ -20,5 +20,13 @@ def site_meta(request):
             'address': settings.SITE_ADDRESS,
             'social': settings.SOCIAL_LINKS,
             'apps': settings.APP_LINKS,
-        }
+        },
+        # Client-side Maps JS API key (restricted by HTTP referrer in the
+        # Google Cloud Console, not by secrecy — normal for this key type
+        # to be visible in rendered HTML). Powers the booking drawer's
+        # address-map step; see booking_base.html and booking_drawer.js.
+        # USE_GOOGLE_MAPS_FOR_ADDRESS picks between that and the free
+        # Leaflet/Nominatim fallback that's kept in the codebase either way.
+        'GOOGLE_MAPS_API_KEY': settings.GOOGLE_MAPS_API_KEY,
+        'USE_GOOGLE_MAPS_FOR_ADDRESS': settings.USE_GOOGLE_MAPS_FOR_ADDRESS,
     }

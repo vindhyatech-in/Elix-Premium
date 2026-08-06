@@ -1,5 +1,5 @@
 """
-Mock content for the Service Booking app (/services-booking/).
+Mock content for the Service Booking app (/booking/).
 
 Sibling to `mock_data.py` (which powers the marketing landing page only) —
 kept separate on purpose: this is a different product surface with its own

@@ -7,6 +7,7 @@ the endpoint map). Keeping data-shaping out of templates means swapping a
 mock function for `requests.get(...)` (or moving the fetch client-side) is
 a one-file change.
 """
+from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
@@ -17,6 +18,8 @@ from . import booking_data, mock_data
 
 
 def index(request):
+    catalog = booking_data.get_booking_catalog()
+
     context = {
         'hero': mock_data.get_hero(),
         'value_pillars': mock_data.get_value_pillars(),
@@ -25,7 +28,7 @@ def index(request):
         'packages': booking_data.get_landing_packages(),
         'booking_categories': booking_data.get_booking_categories(),
         'booking_offers': booking_data.get_booking_offers(),
-        'booking_catalog': booking_data.get_booking_catalog(),
+        'booking_catalog': catalog,
         'how_it_works': mock_data.get_how_it_works(),
         'trust_points': mock_data.get_trust_points(),
         'trust_badges': mock_data.get_trust_badges(),
@@ -98,33 +101,10 @@ def service_detail(request, slug):
                     'variants': inc_vars,
                 })
 
-    # Curated verified customer reviews
-    reviews = [
-        {
-            'author': 'Ananya R.',
-            'city': 'Bengaluru',
-            'rating': 5,
-            'date': '2 days ago',
-            'comment': 'Super clean and hygienic! The beautician arrived right on time with single-use kits.',
-            'verified': True,
-        },
-        {
-            'author': 'Priya Sharma',
-            'city': 'Mumbai',
-            'rating': 5,
-            'date': '1 week ago',
-            'comment': 'Extremely polite professional. Excellent service quality and great value package discount!',
-            'verified': True,
-        },
-        {
-            'author': 'Meera K.',
-            'city': 'Delhi NCR',
-            'rating': 5,
-            'date': '2 weeks ago',
-            'comment': 'Loved the convenience of home salon service. Sealed products opened right in front of me.',
-            'verified': True,
-        },
-    ]
+    # Real customer reviews — submitted from a completed booking's "Rate &
+    # Review" action (see bookings/views.py::submit_review). Every row here
+    # came from an actual completed BookingItem, so all are "verified".
+    reviews = service.reviews.select_related('user').order_by('-created_at')[:20]
 
     # Service FAQs
     faqs = [
@@ -165,7 +145,7 @@ def service_detail(request, slug):
     related_qs = Service.objects.filter(category=service.category, is_active=True).exclude(id=service.id)[:3]
 
     context = {
-        'page_title': f"{service.name} — Glamour At Home",
+        'page_title': f"{service.name} — {settings.SITE_NAME}",
         'service': service,
         'default_variant': default_var,
         'variants': service.variants.filter(is_active=True),

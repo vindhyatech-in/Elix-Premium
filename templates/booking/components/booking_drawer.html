@@ -27,8 +27,9 @@
       <button type="button" class="btn btn--ghost btn--sm" data-add-address-toggle>+ Add New Address</button>
 
       <div class="address-form" data-address-form hidden>
+        <button type="button" class="btn btn--ghost btn--sm address-form__locate" data-locate-me>📍 Use My Current Location</button>
         <div id="booking-map" class="booking-map" data-booking-map></div>
-        <p class="address-form__hint">Click anywhere on the map to drop a pin at your location.</p>
+        <p class="address-form__hint">Click anywhere on the map to drop a pin — we'll try to fill in the address below (double-check it before saving).</p>
         <div class="field">
           <label for="address-label">Label</label>
           <input type="text" id="address-label" data-address-label placeholder="Home, Office…">

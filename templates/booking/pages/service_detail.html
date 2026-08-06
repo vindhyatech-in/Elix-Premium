@@ -1,5 +1,5 @@
 {% extends 'booking/layouts/booking_base.html' %}
-{% load static %}
+{% load static glamour_extras %}
 
 {% block title %}{{ service.name }} — {{ SITE.name }}{% endblock %}
 
@@ -235,16 +235,20 @@
         {% for rev in reviews %}
           <div style="background: var(--surface-1); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-hairline); display: flex; flex-direction: column; gap: 0.5rem;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
-              <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-body);">{{ rev.author }}</span>
-              <span style="font-size: 0.75rem; color: var(--ink-muted);">{{ rev.date }}</span>
+              <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-body);">{{ rev.display_name }}</span>
+              <span style="font-size: 0.75rem; color: var(--ink-muted);">{{ rev.created_at|timesince }} ago</span>
             </div>
             <div style="color: #f59e0b; font-size: 0.85rem;">
-              ★★★★★ <span style="color: var(--green); font-size: 0.75rem; margin-left: 0.35rem; font-weight: 600;">✓ Verified Booking</span>
+              {% for _ in rev.rating|times %}★{% endfor %} <span style="color: var(--green); font-size: 0.75rem; margin-left: 0.35rem; font-weight: 600;">✓ Verified Booking</span>
             </div>
-            <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0; line-height: 1.4;">
-              "{{ rev.comment }}"
-            </p>
+            {% if rev.comment %}
+              <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0; line-height: 1.4;">
+                "{{ rev.comment }}"
+              </p>
+            {% endif %}
           </div>
+        {% empty %}
+          <p style="color: var(--ink-muted); font-size: 0.9rem;">No reviews yet — be the first to complete a booking and share your experience.</p>
         {% endfor %}
       </div>
     </div>

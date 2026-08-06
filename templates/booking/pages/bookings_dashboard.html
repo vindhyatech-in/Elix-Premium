@@ -1,5 +1,5 @@
 {% extends 'booking/layouts/booking_base.html' %}
-{% load static %}
+{% load static glamour_extras %}
 
 {% block title %}My Bookings — {{ SITE.name }}{% endblock %}
 
@@ -58,6 +58,13 @@
                 {% endfor %}
               </div>
 
+              {% if booking.status == 'on_the_way' and booking.start_otp and not booking.otp_verified_at %}
+                <div class="booking-card__otp">
+                  <span class="booking-card__otp-label">Your beautician has arrived — share this code to start the job:</span>
+                  <strong class="booking-card__otp-code">{{ booking.start_otp }}</strong>
+                </div>
+              {% endif %}
+
               <div class="booking-card__footer">
                 <p class="booking-card__address">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -80,6 +87,47 @@
                 {% endif %}
               {% elif booking.rebook_items %}
                 <button type="button" class="btn btn--ghost btn--sm booking-card__rebook" data-rebook data-booking-number="{{ booking.booking_number }}">Rebook</button>
+              {% endif %}
+
+              {% if booking.status == 'completed' %}
+                <div class="booking-card__reviews">
+                  {% for item in booking.items.all %}
+                    <div class="booking-card__review-row">
+                      <span class="booking-card__review-service">{{ item.name_snapshot }}</span>
+                      {% if item.review %}
+                        <div class="booking-card__review-given">
+                          <span class="booking-card__review-stars">{% for _ in item.review.rating|times %}★{% endfor %}</span>
+                          {% if item.review.comment %}<p class="booking-card__review-comment">“{{ item.review.comment }}”</p>{% endif %}
+                        </div>
+                      {% elif item.service_variant %}
+                        <details class="booking-card__review-toggle">
+                          <summary class="btn btn--ghost btn--sm">Rate &amp; Review</summary>
+                          <form method="post" action="{% url 'submit_review' item.id %}" class="booking-card__review-form">
+                            {% csrf_token %}
+                            <div class="field">
+                              <label for="review-rating-{{ item.id }}">Your rating</label>
+                              <select id="review-rating-{{ item.id }}" name="rating" required>
+                                <option value="" disabled selected>Choose a rating</option>
+                                <option value="5">★★★★★ Excellent</option>
+                                <option value="4">★★★★ Good</option>
+                                <option value="3">★★★ Okay</option>
+                                <option value="2">★★ Poor</option>
+                                <option value="1">★ Terrible</option>
+                              </select>
+                            </div>
+                            <div class="field">
+                              <label for="review-comment-{{ item.id }}">Your review (optional)</label>
+                              <textarea id="review-comment-{{ item.id }}" name="comment" rows="2" placeholder="Tell others about your experience…"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn--primary btn--sm">Submit Review</button>
+                          </form>
+                        </details>
+                      {% else %}
+                        <p class="booking-card__review-unavailable">This service is no longer in the catalog, so it can't be reviewed.</p>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                </div>
               {% endif %}
             </article>
           {% endfor %}

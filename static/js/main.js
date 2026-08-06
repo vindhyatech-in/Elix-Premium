@@ -331,7 +331,7 @@
   /* ---------------------------------------------------------
    * "Book Now" / "Choose <package>" CTAs (Featured Services, Packages) —
    * add the item straight to the Service Booking app's cart and hand off
-   * to /services-booking/, instead of just linking to the contact form.
+   * to /booking/, instead of just linking to the contact form.
    * Writes the exact same localStorage shape booking.js's cart expects
    * ([{id, qty}] under 'glamour_cart') — the marketing and booking pages
    * are separate bundles (see developed.md), so this is a small, self-
@@ -355,7 +355,7 @@
         const line = cart.find((l) => l.id === id);
         if (line) line.qty += 1; else cart.push({ id, qty: 1 });
         localStorage.setItem('glamour_cart', JSON.stringify(cart));
-        // No preventDefault — the <a href> navigation to /services-booking/
+        // No preventDefault — the <a href> navigation to /booking/
         // proceeds normally right after this synchronous write.
       });
     });

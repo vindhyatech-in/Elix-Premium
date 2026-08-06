@@ -13,6 +13,9 @@
     <div class="emp-customer-main">
       <strong>👤 {{ booking.user.first_name|default:booking.user.username }} {{ booking.user.last_name }}</strong>
       <span class="emp-customer-email">✉ {{ booking.user.email }}</span>
+      {% if booking.user.profile.phone %}
+        <a href="tel:{{ booking.user.profile.phone|cut:' ' }}" class="emp-customer-phone">📞 {{ booking.user.profile.phone }}</a>
+      {% endif %}
     </div>
 
     <!-- Location & Directions -->
@@ -20,9 +23,15 @@
       <div class="emp-location-text">
         📍 <strong>{{ booking.address_label }}:</strong> {{ booking.address_text }}
       </div>
-      <a href="https://www.google.com/maps/search/?api=1&query={{ booking.address_text|urlencode }}" target="_blank" class="emp-btn emp-btn--ghost emp-btn--xs">
-        🗺 Directions
-      </a>
+      {% if booking.address_lat and booking.address_lng %}
+        <a href="https://www.google.com/maps/search/?api=1&query={{ booking.address_lat }},{{ booking.address_lng }}" target="_blank" class="emp-btn emp-btn--ghost emp-btn--xs">
+          🗺 Directions
+        </a>
+      {% else %}
+        <a href="https://www.google.com/maps/search/?api=1&query={{ booking.address_text|urlencode }}" target="_blank" class="emp-btn emp-btn--ghost emp-btn--xs">
+          🗺 Directions
+        </a>
+      {% endif %}
     </div>
   </div>
 
@@ -45,11 +54,40 @@
     {% if booking.status == 'upcoming' %}
       <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form">
         {% csrf_token %}
-        <input type="hidden" name="action" value="update_booking_status">
+        <input type="hidden" name="action" value="mark_on_the_way">
         <input type="hidden" name="booking_id" value="{{ booking.id }}">
-        <input type="hidden" name="status" value="in_progress">
-        <button type="submit" class="emp-btn emp-btn--progress">▶ Start Job</button>
+        <button type="submit" class="emp-btn emp-btn--progress">🚗 On My Way</button>
       </form>
+
+    {% elif booking.status == 'on_the_way' %}
+      {% if not booking.verification_photo %}
+        <button
+          type="button"
+          class="emp-btn emp-btn--progress"
+          data-open-camera
+          data-camera-mode="verification"
+          data-booking-id="{{ booking.id }}"
+          data-booking-number="{{ booking.booking_number }}"
+        >📷 Take Arrival Photo</button>
+      {% else %}
+        <div class="emp-otp-block">
+          <p class="emp-otp-hint">Photo saved. Ask the customer for the code on their Bookings page:</p>
+          <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form emp-otp-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="verify_start_otp">
+            <input type="hidden" name="booking_id" value="{{ booking.id }}">
+            <input type="text" name="otp" inputmode="numeric" maxlength="6" placeholder="6-digit code" required class="emp-otp-input">
+            <button type="submit" class="emp-btn emp-btn--complete">✅ Start Job</button>
+          </form>
+          <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="regenerate_otp">
+            <input type="hidden" name="booking_id" value="{{ booking.id }}">
+            <button type="submit" class="emp-btn emp-btn--ghost emp-btn--xs">🔄 Get New Code</button>
+          </form>
+        </div>
+      {% endif %}
+
     {% elif booking.status == 'in_progress' %}
       <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form">
         {% csrf_token %}

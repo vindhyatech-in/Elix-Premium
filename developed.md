@@ -6,19 +6,20 @@ data flow, or scope changes.
 
 ## What this is
 
-A premium, single-page marketing/landing site for **Glamour At Home**, an
-on-demand home beauty service (verified beauticians + premium products,
-delivered to the customer's home). Built with **Django templates only** —
-no React/Vue, no frontend build step. Goal of this phase is explicitly
-**not booking** — it's brand trust, lead capture (contact form), and app
-installs. Every dynamic-looking section is architected to later swap its
-data source for a REST API without touching HTML structure.
+A premium, single-page marketing/landing site for **Elix** ("Premium Salon
+at Home"), an on-demand home beauty service (verified beauticians +
+premium products, delivered to the customer's home). Built with **Django
+templates only** — no React/Vue, no frontend build step. Goal of this
+phase is explicitly **not booking** — it's brand trust, lead capture
+(contact form), and app installs. Every dynamic-looking section is
+architected to later swap its data source for a REST API without touching
+HTML structure.
 
-A second, structurally distinct page now exists alongside it:
-**`/services-booking/`**, the actual booking application (catalog browsing +
-cart, Phase 1 of 3 — see "Service Booking App" further down). Everything in
-this section and up through "Placeholders" below describes the marketing
-page only; don't assume it applies to the booking app.
+A second, structurally distinct page now exists alongside it: **`/booking/`**,
+the actual booking application (catalog browsing + cart, Phase 1 of 3 — see
+"Service Booking App" further down). Everything in this section and up
+through "Placeholders" below describes the marketing page only; don't
+assume it applies to the booking app.
 
 ## Stack
 
@@ -559,9 +560,32 @@ and Phase 2 exist so far**.
   spec; don't add it even as a "nice to have".
 - **Addresses**: `glamour_addresses` in `localStorage` (own key, separate
   from cart/wishlist), each `{id, label, text, pincode, lat, lng}`. `lat`/
-  `lng` come from a Leaflet map click; there's no reverse-geocoding (no key
-  for that either), so the customer still types the address line manually
-  — the pin is just a visual/lat-lng convenience, not parsed into the text.
+  `lng` come from a map click, which also triggers a reverse-geocode to
+  prefill the address/pincode fields (added 2026-08-06 — see
+  `reverseGeocodePin()` in `booking_drawer.js`); both stay fully editable
+  since a geocode match can be wrong or missing. A "📍 Use My Current
+  Location" button (same date) calls the browser's `navigator.geolocation`
+  API, pans the map + drops the pin at the returned coordinates, then
+  reuses the exact same `reverseGeocodePin()` call — no separate code path.
+  Fails silently to a toast ("please drop a pin manually") on denied
+  permission or an unsupported browser; never blocks the form.
+  - **Two interchangeable map backends** (added 2026-08-06), switched by
+    `settings.USE_GOOGLE_MAPS_FOR_ADDRESS` (an env var, off by default):
+    free/keyless Leaflet + OpenStreetMap + Nominatim (`initLeafletMap()` /
+    `reverseGeocodeNominatim()`), or the Google Maps JS API + Geocoder
+    (`initGoogleMap()` / `reverseGeocodeGoogle()`) once a real
+    `GOOGLE_MAPS_API_KEY` is set. **A key alone is not enough** — Google
+    Maps Platform also requires billing enabled on the Cloud project (a
+    card on file, even to stay within the free monthly credit), or every
+    call fails with `REQUEST_DENIED` / "This page can't load Google Maps
+    correctly." Confirmed live: the key currently in `.env` loads the JS
+    API fine but the Geocoder returns `REQUEST_DENIED` — billing isn't
+    enabled yet. Both implementations are kept in the codebase
+    permanently, regardless of which is active — flipping the flag in
+    `.env` is the only step needed once billing is sorted, no code
+    changes. `booking_base.html` conditionally loads Leaflet's CSS/JS vs.
+    the Google Maps script tag based on the same flag (exposed to
+    templates via `core/context_processors.py`).
 - **Calendar**: hand-rolled month-grid (`renderCalendar()` in
   `booking_drawer.js`), not a library — consistent with this project's
   "no dependency for something easily hand-built" pattern (the FAQ
@@ -1225,4 +1249,280 @@ A dedicated, mobile-first job execution portal at `/emp-dashboard/` for field be
   - When customers switch variants for included services, `onCustomerPackageVariantChange()` in [static/js/booking.js](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/static/js/booking.js#L1118-L1150) updates the total MRP, package price, and total duration in real-time while keeping the package **discount % constant**.
 - **Marketing Landing Page Integration ([core/booking_data.py](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/core/booking_data.py#L60-L82) & [core/views.py](file:///Users/sachin/Documents/Poject/VindhyaTech/client_projects/GlamourAtHome/core/views.py#L25))**:
   - Replaced hardcoded static mock packages on the marketing home page (`/`) with real database packages query `get_landing_packages()`. Packages added or modified by the owner are now immediately visible live on the homepage with their real included services and calculated prices.
+
+## URL scheme rename to professional/industry-standard paths (added 2026-08-05)
+
+Renamed every non-standard-looking URL path. Only the path string changed —
+every `path(...)`'s `name=` kwarg was left untouched, so all `{% url %}` /
+`reverse()` / `redirect()` call sites needed zero changes. What *did* need
+manual fixes: raw path strings that don't go through Django's name-based
+reversal — `LOGIN_REDIRECT_URL`/`LOGOUT_REDIRECT_URL` in `settings.py`, and
+hardcoded `fetch()` URLs in `profile.js`/`booking_drawer.js` (the address
+API and checkout endpoint), plus `core/mock_data.py`'s hero CTA hrefs.
+
+| Old path | New path | `name=` (unchanged) |
+|---|---|---|
+| `/services-booking/` | `/booking/` | `services_booking` |
+| `/service/<slug>/` | `/services/<slug>/` | `service_detail` |
+| `/services-booking/profile/` | `/booking/profile/` | `profile` |
+| `/services-booking/addresses/` | `/booking/addresses/` | `addresses_api` |
+| `/services-booking/addresses/<id>/` | `/booking/addresses/<id>/` | `address_delete` |
+| `/services-booking/book/` | `/booking/checkout/` | `create_booking` |
+| `/services-booking/bookings/` | `/booking/my-bookings/` | `bookings_dashboard` |
+| `/services-booking/bookings/<n>/cancel/` | `/booking/my-bookings/<n>/cancel/` | `cancel_booking` |
+| `/owner-dashboard/...` | `/dashboard/...` | `admin_dashboard_*` |
+| `/emp-dashboard/` | `/employee/` | `employee_dashboard` |
+
+`/`, `/admin/`, `/accounts/...` (allauth), `/robots.txt`, `/sitemap.xml`
+were already fine and untouched. Rationale: `/booking/` groups the whole
+customer booking surface under one clean prefix instead of repeating the
+awkward "services-booking" compound on every route; `checkout` and
+`my-bookings` are the conventional e-commerce terms for "create an order"
+and "view my order history"; `/dashboard/` is the standard umbrella for a
+staff/owner back office (distinct from Django's own `/admin/`); `emp` was
+spelled out to `employee` for the same reason.
+
+## Rebrand: Glamour At Home → Elix (added 2026-08-05)
+
+Business name changed to **Elix**, tagline to **"Premium Salon at Home."**
+Almost every visible mention flows from `settings.py`'s `SITE_NAME`/
+`SITE_TAGLINE`/`SITE_DESCRIPTION`/etc. through `core/context_processors.py`'s
+`SITE` context var — most templates already consumed `{{ SITE.name }}`, so
+editing those constants in one place was enough for them. What had to be
+hand-fixed were the literal strings that don't flow through `SITE`:
+
+- **Logo wordmark**: every `Glamour<span>At</span>Home` (navbar, mobile
+  drawer, footer, auth pages) became `<span>E</span>lix` — a single short
+  word has no natural 3-part split like "Glamour / At / Home" did, so the
+  existing gold-italic accent span now highlights just the first letter
+  instead of a whole middle word. The admin sidebar's `Glamour<span>Admin</span>`
+  became `Elix<span>Admin</span>` — that one still splits naturally.
+- **`SITE.tagline` was dead code** — defined in settings/context processor
+  but never actually rendered anywhere. Wired it into
+  `templates/partials/meta.html`'s `<title>`, `og:title`, and
+  `twitter:title` (previously a hardcoded "Luxury Beauty Services At Your
+  Doorstep" string) so the tagline is now genuinely live, not just SEO
+  config nobody reads.
+- **Hero headline** (`core/mock_data.py::get_hero()`): `headline_lines`
+  changed from the old 3-line marketing copy to `['Premium Salon',
+  'at Home.']` — the actual tagline, split across two lines — so the most
+  prominent on-page text matches what the `<title>` tag now says instead
+  of contradicting it.
+- **Booking number prefix**: `GAH######` → `ELX######`
+  (`bookings/models.py::_generate_booking_number`) — customer-facing (shown
+  on confirmations, `/booking/my-bookings/`, the owner/employee
+  dashboards), so it needed to match the new brand too.
+- **`SITE_ADDRESS`** was also corrected from a stale `'Bengaluru,
+  Karnataka, India'` to `'Indore, Madhya Pradesh, India'` while touching
+  this block — bundled in since it's the same "brand identity" config and
+  was already known-wrong (see the earlier Indore-only fixes above).
+- Remaining literal mentions (`chat_panel.html`'s assistant name,
+  `why_us.html`'s eyebrow, `core/apps.py`'s `verbose_name`,
+  `core/views.py`'s one `page_title` f-string, CSS file header comments,
+  `README.md`'s title, an employee-email form placeholder) were fixed
+  individually — either switched to `{{ SITE.name }}` where a template var
+  was already in scope, or to `settings.SITE_NAME` in the one Python view
+  that builds a title string outside any template.
+
+**Deliberately left alone** — internal code identifiers invisible to site
+visitors, same reasoning as not renaming the Django project folder itself:
+the JS global `window.GlamourBooking` (set in `booking.js`, read in
+`booking_drawer.js`/`bookings_dashboard.js`/`profile.js`/
+`service_detail.html`) and the `GlamourAtHome` Python package/settings
+module name. Both are pure internal naming with real rename risk (a missed
+occurrence silently breaks cart/booking JS) and zero visible benefit — say
+so explicitly if a fully brand-consistent codebase (not just brand-consistent
+*site*) is wanted later.
+
+## Real ratings & reviews (added 2026-08-06)
+
+New `bookings.Review` model — one per completed `BookingItem` (not per
+`Booking`, since a single booking can contain several different
+services, each earning its own rating), `OneToOneField` so a customer
+can't review the same item twice. `service` is denormalized onto Review
+directly rather than reached via `booking_item.service_variant.service`
+because `service_variant` is nullable (`SET_NULL` on deletion) — a review
+must keep pointing at the right Service even after its originating
+variant is deactivated.
+
+- **Submit**: `bookings/views.py::submit_review` (`POST
+  /booking/my-bookings/reviews/<item_id>/`) — `get_object_or_404(...,
+  booking__user=request.user, booking__status='completed')` doubles as
+  both the ownership check and the "only completed bookings" gate, same
+  404-not-403 pattern as `cancel_booking`. Recomputes
+  `Service.rating`/`reviews_count` from real `Review` rows via
+  `Avg`/`Count` on every submission — these fields already existed on
+  `catalog.Service` but were previously just seeded/mock numbers.
+- **UI**: `bookings_dashboard.html` — each item in a `completed` booking
+  gets a `<details>`-based "Rate & Review" toggle (zero extra JS) with a
+  rating `<select>` + optional comment `<textarea>`; once reviewed, shows
+  the submitted stars + comment instead. Star rendering everywhere reuses
+  the existing `{% load glamour_extras %}` `times` filter
+  (`{% for _ in rating|times %}★{% endfor %}`) already used by
+  `testimonials.html` — not a new pattern.
+- **Display**: `core/views.py::service_detail`'s `reviews` context var
+  switched from a hardcoded 3-item mock list to
+  `service.reviews.select_related('user').order_by('-created_at')[:20]` —
+  the template's stars are now dynamic (were hardcoded `★★★★★` regardless
+  of actual rating) and there's a real empty state ("No reviews yet…")
+  instead of always showing fake reviews.
+- **Privacy**: `Review.display_name` shows first name + last initial
+  (falls back to the email's local part) rather than a full name or
+  email, since these reviews render on a public service page.
+
+Found but **not fixed** while in this area (out of scope for this
+change, flagging for later): `bookings/views.py::COUPON_RATES` still has
+`GLAM10` as a coupon code — a leftover from the Elix rebrand that the
+"Glamour"-literal grep sweep didn't catch since it's a partial/abbreviated
+match, not the full brand name.
+
+## Job status workflow, arrival photo + start-OTP gate, face reference photos (added 2026-08-06)
+
+Three related additions to the employee/beautician flow, all built together
+since they form one pipeline: a job now moves through
+**Pending → On The Way → (arrival photo + customer OTP) → Job Started →
+Completed** (or Cancelled from most states).
+
+**Media infra — new to this project.** No `MEDIA_ROOT`/`MEDIA_URL` or
+`ImageField` existed anywhere before this. `GlamourAtHome/settings.py`
+now defines `MEDIA_URL = '/media/'` / `MEDIA_ROOT = BASE_DIR / 'media'`;
+`GlamourAtHome/urls.py` serves it in `DEBUG` alongside static files. Pillow
+was already an installed dependency (unused until now). **Needs a real
+storage backend (e.g. S3) before production** — local disk under
+`MEDIA_ROOT` doesn't survive redeploys on most hosts.
+
+**Status labels, not values, changed.** `Booking.STATUS_CHOICES`
+label-only rename: `'upcoming'` now displays "Pending" (was "Upcoming"),
+`'in_progress'` now displays "Job Started" (was "In Progress") — the
+stored DB values are untouched, so every existing
+`filter(status='upcoming')`/etc. across the codebase kept working with no
+data migration. `'on_the_way'` is the one genuinely new stored value,
+inserted between them. `Booking.can_cancel` was left as-is (gates on
+`status == 'upcoming'` only) — correctly and harmlessly excludes
+`on_the_way` from customer self-cancel eligibility.
+
+**Arrival photo — deliberately not matched by any ML.** `Booking.
+verification_photo` just saves whatever the employee uploads when marking
+arrival; there is no face-recognition/matching against `Employee.
+face_photo_*` today. It exists purely as a human-checkable record (an
+owner can look at it if a customer disputes who showed up). A future
+upgrade could add real matching against the employee's reference photos
+below — nothing here assumes that will happen.
+
+**Start OTP — the actual gate past "On The Way".** Saving the arrival
+photo (`upload_verification` action) generates a 6-digit numeric
+`Booking.start_otp` (`secrets.choice`, same crypto-appropriate pattern as
+`_generate_booking_number`), stamps `otp_generated_at`, and clears any
+prior `otp_verified_at`. `OTP_VALIDITY = timedelta(minutes=20)` in
+`core/employee_dashboard_views.py`; `regenerate_otp` is the escape hatch
+once it lapses. `verify_start_otp` checks status/expiry/match before
+flipping the booking to `in_progress` and stamping `otp_verified_at`.
+
+**OTP delivery — in-app for now, SMS later by design.** No real SMS/email
+gateway exists in this project (`EMAIL_BACKEND` is still the dev-only
+console backend). Per explicit decision, the OTP is simply rendered on the
+customer's own `/booking/my-bookings/` page
+(`templates/booking/pages/bookings_dashboard.html`) whenever their booking
+is `on_the_way` with an unverified `start_otp` — no extra view context was
+needed since `bookings_dashboard` already passes real `Booking` instances
+to the template. **The swap point for a real SMS gateway later is exactly
+this one display condition** — nothing about `start_otp`/
+`otp_generated_at`/`otp_verified_at` needs to change, only where/how the
+code reaches the customer (send it via SMS at the moment
+`upload_verification` generates it, instead of/in addition to rendering it
+here).
+
+**Employee actions** (`core/employee_dashboard_views.py`): `mark_on_the_way`,
+`upload_verification`, `regenerate_otp`, `verify_start_otp`, and (for the
+face photos below) `upload_face_photos` — all follow the established
+`get_object_or_404(Booking, id=booking_id, assigned_beautician=employee)`
+ownership pattern. Fixed in passing: `update_booking_status` and
+`mark_paid` previously had **no ownership check at all** — any
+authenticated employee could modify any booking by id. Both now carry the
+same `assigned_beautician=employee` check as every other action.
+
+**Face reference photos.** `Employee` gained 5 `ImageField`s
+(`face_photo_front/left/right/top/bottom`, each with a `help_text`
+capture instruction) plus a `face_photos_complete` property. Uploaded from
+a new "Face Verification Photos" section in the employee dashboard's
+Profile tab (`templates/employee_dashboard/emp_dashboard.html`) — 5 slots,
+each with an inline-SVG instructional diagram (no real sample photos
+exist, so these are simple stylized diagrams, not photos), the pose
+instruction text, a live thumbnail preview once uploaded, and a file input
+that auto-submits on choose (`onchange="this.form.submit()"`, one slot at
+a time — `upload_face_photos` accepts any subset of the 5 field names so
+partial uploads work). Not matched against anything today — same
+no-ML-yet note as the arrival photo above; these are the reference set a
+future matching feature would compare against.
+
+**Verified end-to-end** via a Django test-`Client` script driving the
+full sequence (mark on-the-way → upload arrival photo → OTP appears on
+the customer's page → wrong OTP rejected → correct OTP starts the job →
+OTP disappears from the customer's page → regenerate OTP → expired OTP
+rejected → all 5 face photos upload individually and
+`face_photos_complete` flips correctly → a second employee gets a 404
+trying to act on someone else's booking), then a couple of direct
+`GET /employee/` checks for template-rendering correctness (no
+`TemplateSyntaxError`/`VariableDoesNotExist`, right buttons/badges present
+per status). Test users/bookings/uploaded media were all cleaned up after.
+
+**Follow-up fix (same day):** `upcoming_bookings` in
+`core/employee_dashboard_views.py` filtered `status__in=['upcoming',
+'in_progress']` — written before `on_the_way` existed. A job scheduled
+for a future date (so excluded from `today_bookings`, which only matches
+`scheduled_date == today`) that got marked on-the-way matched neither
+list and vanished from the dashboard entirely. Fixed by adding
+`'on_the_way'` to that filter. (Noted but not fixed, same class of bug:
+`core/admin_dashboard_views.py`'s `dashboard_bookings` status-filter
+dropdown is also still `['upcoming', 'in_progress', 'completed',
+'cancelled']` — an owner can't filter the bookings list by "On The Way"
+either.)
+
+**Follow-up change (same day): live-camera-only capture, no gallery
+upload.** Both the arrival/"face verification" photo and the 5 profile
+face-reference photos were originally plain `<input type="file"
+capture="user">` pickers — `capture` is only a *hint* on most
+browsers/OSes, and a determined user can still back out to their photo
+gallery and pick an old image, which defeats the point of "this proves
+someone was physically there right now." Replaced both with a shared
+in-browser camera modal (`#empCameraModal` in
+`templates/employee_dashboard/emp_dashboard.html`, opened by any
+`[data-open-camera]` button) built on `getUserMedia()` + `<canvas>` —
+there is no `<input type="file">` anywhere in either flow anymore, so
+there's no gallery-picker path to bypass live capture at all.
+
+- One button opens the modal for both use cases; `data-camera-mode`
+  ("verification" vs "face") on the clicked button tells the shared JS
+  what to POST on save: `data-booking-id`/`data-booking-number` for the
+  arrival photo (→ `upload_verification`), or `data-face-field` (e.g.
+  `face_photo_front`)/`data-face-label` for a profile slot (→
+  `upload_face_photos`). Same CSRF-cookie-read pattern (`getCsrfToken()`)
+  already used in `booking_drawer.js`/`profile.js`, reused here inline
+  rather than extracted to a shared file since this is the first fetch-
+  based POST in the employee dashboard.
+- Capture flow: live `<video>` (mirrored via CSS only, for a natural
+  selfie-preview feel) → "Capture" draws the current frame to a hidden
+  `<canvas>` → `canvas.toBlob('image/jpeg', 0.9)` → shown back as an
+  **unmirrored** `<img>` preview (so what's reviewed before saving
+  matches what's actually stored) → "Use This Photo" POSTs the blob via
+  `fetch()`/`FormData` and reloads the page on success; "Retake"
+  restarts the camera stream instead of re-opening the modal.
+- Camera permission/hardware failures surface inline
+  (`[data-camera-error]`) rather than silently failing — covers no
+  `getUserMedia` support and denied/unavailable camera.
+- **Backend endpoints (`upload_verification`, `upload_face_photos`)
+  didn't need to change at all** — they already just read whatever
+  arrived in `request.FILES`; a JPEG blob from `canvas.toBlob()` looks
+  identical to one from a file input at that layer. This is the same
+  "swap the front end, not the contract" shape as the OTP-delivery
+  design above.
+- Verified via real Chrome (not just the test-`Client` script) using
+  `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`
+  (synthetic camera feed, no real hardware/permission prompt needed) to
+  drive both flows end-to-end over CDP: open modal → confirm live video
+  has real frames (`videoWidth > 0`) → capture → confirm preview/Save
+  appear → save → confirm page reload shows the resulting state (OTP
+  input appeared; face-photo slot now shows a preview and its button
+  reads "Retake"). Test browser profile, server process, and uploaded
+  media were all cleaned up after.
 
