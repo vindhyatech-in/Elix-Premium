@@ -45,7 +45,7 @@
           {% for cat in service_categories %}
             <a href="{% url 'services_booking' %}?category={{ cat.slug }}" class="hero-arc-card hero-arc-card--{{ forloop.counter }}">
               <div class="hero-arc-card__img">
-                <img src="{% static cat.photo %}" alt="{{ cat.name }}">
+                <img src="{{ cat.photo_url }}" alt="{{ cat.name }}">
               </div>
               <div class="hero-arc-card__info">
                 <strong>{{ cat.name }}</strong>

@@ -1,11 +1,16 @@
+import hashlib
 import json
+import logging
 from datetime import timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Avg, Count
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
@@ -14,16 +19,11 @@ from django.views.decorators.http import require_POST
 from catalog.models import Service
 from core import booking_data
 
-from .models import Booking, BookingItem, Review
+from . import razorpay_client
+from .invoice import generate_booking_receipt_pdf
+from .models import Booking, BookingItem, Offer, Review
 
-# Mirrors booking.js's COUPONS dict — an accepted small duplication rather
-# than building a shared coupon API for three hardcoded codes. See
-# developed.md "Catalog & Bookings models".
-COUPON_RATES = {
-    'GLAM10': Decimal('0.10'),
-    'WEEKDAY15': Decimal('0.15'),
-    'BUNDLE20': Decimal('0.20'),
-}
+logger = logging.getLogger(__name__)
 
 # booking_drawer.js's data-payment-value uses hyphens; the model's choices
 # use underscores (more conventional for a Python/DB field).
@@ -31,6 +31,188 @@ PAYMENT_METHOD_MAP = {
     'pay-now': 'pay_now',
     'pay-at-home': 'pay_at_home',
 }
+
+
+class CartError(Exception):
+    """A cart line/coupon failed resolution — .message is the user-facing JSON error."""
+    def __init__(self, message):
+        self.message = message
+        super().__init__(message)
+
+
+def _resolve_cart_pricing(cart, coupon_code_raw):
+    """
+    Cart -> real ServiceVariant prices, server-side (never trust
+    client-sent totals) — shared by create_booking and
+    create_razorpay_order so the amount a customer actually pays through
+    Razorpay and the amount their booking is created for can never drift
+    apart from computing it two different ways.
+
+    A line's variantId (set once the quick-view variant picker exists —
+    see developed.md "Catalog & Bookings models") picks a specific
+    ServiceVariant; omitted/blank (packages, or a line added from the
+    marketing page, which has no picker) falls back to the service's
+    default variant, same as before variants were selectable.
+
+    Returns (line_items, subtotal, discount_amount, total_amount, coupon_code).
+    Raises CartError with a user-facing message on any invalid line.
+    """
+    if not cart:
+        raise CartError('Your cart is empty.')
+
+    line_items = []
+    subtotal = Decimal('0')
+    for line in cart:
+        slug = line.get('id')
+        variant_id = line.get('variantId')
+        try:
+            qty = max(1, int(line.get('qty') or 1))
+        except (TypeError, ValueError):
+            raise CartError('Invalid cart quantity.')
+        if qty > 20:
+            raise CartError('Quantity per item is capped at 20 — contact us for bulk bookings.')
+        service = Service.objects.filter(slug=slug, is_active=True).first()
+        if not service:
+            raise CartError(f'"{slug}" is no longer available.')
+        if variant_id:
+            variant = service.variants.filter(id=variant_id, is_active=True).first()
+        else:
+            variant = service.default_variant
+        if not variant:
+            raise CartError(f'"{slug}" is no longer available.')
+
+        price, duration, included_snapshot = variant.price, variant.duration_mins, []
+        if service.kind == 'package':
+            included_map = line.get('included') or {}
+            resolved, any_customized = [], False
+            for inc_service in service.included_services.filter(is_active=True):
+                inc_default = inc_service.default_variant
+                if not inc_default:
+                    continue
+                chosen_id = included_map.get(str(inc_service.id)) or included_map.get(inc_service.id)
+                chosen_variant = inc_service.variants.filter(id=chosen_id, is_active=True).first() if chosen_id else None
+                if not chosen_variant:
+                    chosen_variant = inc_default
+                elif chosen_variant.id != inc_default.id:
+                    any_customized = True
+                resolved.append((inc_service, chosen_variant))
+
+            if resolved:
+                included_snapshot = [
+                    {
+                        'name': inc.name,
+                        'variant_label': cv.label or '',
+                        'price': float(cv.price),
+                        'duration_mins': cv.duration_mins,
+                    }
+                    for inc, cv in resolved
+                ]
+            # Only override the package's own price/duration when the
+            # customer actually picked something other than every included
+            # service's default — an un-customized package keeps charging
+            # exactly what it always did (the ServiceVariant's own stored
+            # price), so this can never silently drift for the common case.
+            if any_customized:
+                total_mrp = sum((cv.price for _, cv in resolved), Decimal('0'))
+                total_duration = sum(cv.duration_mins for _, cv in resolved)
+                discount_pct = variant.discount_pct or 0
+                if discount_pct:
+                    price = (total_mrp * (Decimal(100) - Decimal(discount_pct)) / Decimal(100)).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+                else:
+                    price = total_mrp
+                duration = total_duration
+
+        line_items.append({'variant': variant, 'qty': qty, 'price': price, 'duration': duration, 'included_snapshot': included_snapshot})
+        subtotal += price * qty
+
+    coupon_code = (coupon_code_raw or '').strip().upper()
+    offer = Offer.objects.filter(code=coupon_code, is_active=True).first() if coupon_code else None
+    discount_rate = Decimal(offer.discount_pct) / Decimal(100) if offer else Decimal('0')
+    try:
+        discount_amount = (subtotal * discount_rate).quantize(Decimal('0.01'))
+    except InvalidOperation:
+        discount_amount = Decimal('0')
+    total_amount = subtotal - discount_amount
+
+    return line_items, subtotal, discount_amount, total_amount, (coupon_code if discount_rate else '')
+
+
+# How long a just-created Razorpay order is considered reusable for a
+# retried request with the exact same cart — long enough to cover a slow
+# network retry or an accidental refresh before paying, short enough that
+# a stale entry for an abandoned cart doesn't linger meaningfully.
+RAZORPAY_ORDER_CACHE_TTL = 15 * 60
+
+
+def _cart_signature(cart, coupon_code, total_amount):
+    payload = json.dumps({'cart': cart, 'coupon_code': coupon_code or '', 'total': str(total_amount)}, sort_keys=True)
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+@login_required
+@require_POST
+def create_razorpay_order(request):
+    """
+    Step before the Razorpay Checkout.js modal can open — creates a
+    Razorpay Order for the cart's server-computed total (never the
+    amount the client claims) and hands back just enough for the modal:
+    order_id, amount, and the public key_id. create_booking later
+    verifies the payment actually made against this same order.
+
+    Idempotent per user+cart (AUDIT_FINDINGS.md #7): a retried request for
+    the exact same cart — client timeout, page refresh before paying —
+    reuses the same still-open Razorpay order instead of minting a second,
+    disconnected one. Only a genuinely different cart, or a cart whose
+    cached order already got paid, mints a fresh order.
+    """
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body.'}, status=400)
+
+    cart = payload.get('cart') or []
+
+    try:
+        _, _, _, total_amount, coupon_code = _resolve_cart_pricing(cart, payload.get('coupon_code'))
+    except CartError as exc:
+        return JsonResponse({'ok': False, 'error': exc.message}, status=400)
+
+    if total_amount <= 0:
+        return JsonResponse({'ok': False, 'error': 'Cart total must be greater than zero.'}, status=400)
+
+    cache_key = f'razorpay_pending_order:{request.user.id}:{_cart_signature(cart, coupon_code, total_amount)}'
+    cached = cache.get(cache_key)
+
+    if cached:
+        try:
+            existing = razorpay_client.fetch_order(cached['order_id'])
+        except (razorpay_client.RazorpayError, Exception):
+            existing = None
+        if existing and existing.get('status') != 'paid':
+            return JsonResponse({
+                'ok': True,
+                'order_id': existing['id'],
+                'amount': existing['amount'],
+                'key_id': settings.RAZORPAY_KEY_ID,
+            })
+        cache.delete(cache_key)
+
+    try:
+        order = razorpay_client.create_order(
+            amount_paise=int((total_amount * 100).to_integral_value()),
+            receipt=f'user-{request.user.id}-{int(timezone.now().timestamp())}',
+        )
+    except (razorpay_client.RazorpayError, Exception):
+        return JsonResponse({'ok': False, 'error': "Couldn't start payment right now — please try again shortly."}, status=502)
+
+    cache.set(cache_key, {'order_id': order['id']}, RAZORPAY_ORDER_CACHE_TTL)
+
+    return JsonResponse({
+        'ok': True,
+        'order_id': order['id'],
+        'amount': order['amount'],
+        'key_id': settings.RAZORPAY_KEY_ID,
+    })
 
 
 @require_POST
@@ -60,8 +242,12 @@ def create_booking(request):
 
     if not address.get('text'):
         return JsonResponse({'ok': False, 'error': 'A saved address is required.'}, status=400)
-    if not cart:
-        return JsonResponse({'ok': False, 'error': 'Your cart is empty.'}, status=400)
+
+    try:
+        address_lat = float(address['lat']) if address.get('lat') is not None else None
+        address_lng = float(address['lng']) if address.get('lng') is not None else None
+    except (TypeError, ValueError):
+        return JsonResponse({'ok': False, 'error': 'Invalid address coordinates.'}, status=400)
     if booking_type not in ('regular', 'urgent'):
         return JsonResponse({'ok': False, 'error': 'Invalid booking type.'}, status=400)
     if not payment_method:
@@ -70,6 +256,8 @@ def create_booking(request):
     scheduled_date = parse_date(payload.get('date') or '')
     if not scheduled_date:
         return JsonResponse({'ok': False, 'error': 'Invalid date.'}, status=400)
+    if scheduled_date < timezone.now().date():
+        return JsonResponse({'ok': False, 'error': 'Scheduled date cannot be in the past.'}, status=400)
 
     time_slot = payload.get('time_slot') or ''
     exact_time = parse_time(payload.get('exact_time') or '') if booking_type == 'urgent' else None
@@ -97,70 +285,92 @@ def create_booking(request):
             if slot_end and min_allowed_time >= slot_end:
                 return JsonResponse({'ok': False, 'error': f'The selected {time_slot} slot is no longer available for today. Please select a later slot or date.'}, status=400)
 
-    # Resolve cart -> real ServiceVariant prices server-side. A line's
-    # variantId (set once the quick-view variant picker exists — see
-    # developed.md "Catalog & Bookings models") picks a specific
-    # ServiceVariant; omitted/blank (packages, or a line added from the
-    # marketing page, which has no picker) falls back to the service's
-    # default variant, same as before variants were selectable.
-    line_items = []
-    subtotal = Decimal('0')
-    for line in cart:
-        slug = line.get('id')
-        variant_id = line.get('variantId')
-        try:
-            qty = max(1, int(line.get('qty') or 1))
-        except (TypeError, ValueError):
-            return JsonResponse({'ok': False, 'error': 'Invalid cart quantity.'}, status=400)
-        service = Service.objects.filter(slug=slug, is_active=True).first()
-        if not service:
-            return JsonResponse({'ok': False, 'error': f'"{slug}" is no longer available.'}, status=400)
-        if variant_id:
-            variant = service.variants.filter(id=variant_id, is_active=True).first()
-        else:
-            variant = service.default_variant
-        if not variant:
-            return JsonResponse({'ok': False, 'error': f'"{slug}" is no longer available.'}, status=400)
-        line_items.append((variant, qty))
-        subtotal += variant.price * qty
-
-    coupon_code = (payload.get('coupon_code') or '').strip().upper()
-    discount_rate = COUPON_RATES.get(coupon_code, Decimal('0'))
     try:
-        discount_amount = (subtotal * discount_rate).quantize(Decimal('0.01'))
-    except InvalidOperation:
-        discount_amount = Decimal('0')
-    total_amount = subtotal - discount_amount
-
-    booking = Booking.objects.create(
-        user=request.user,
-        address_label=address.get('label') or 'Address',
-        address_text=address.get('text'),
-        address_pincode=address.get('pincode') or '',
-        address_lat=address.get('lat'),
-        address_lng=address.get('lng'),
-        scheduled_date=scheduled_date,
-        booking_type=booking_type,
-        time_slot=time_slot if booking_type == 'regular' else '',
-        exact_time=exact_time if booking_type == 'urgent' else None,
-        payment_method=payment_method,
-        payment_status='paid' if payment_method == 'pay_now' else 'pending',
-        subtotal=subtotal,
-        discount_amount=discount_amount,
-        total_amount=total_amount,
-        coupon_code=coupon_code if discount_rate else '',
-    )
-    BookingItem.objects.bulk_create([
-        BookingItem(
-            booking=booking,
-            service_variant=variant,
-            name_snapshot=f'{variant.service.name} — {variant.label}' if variant.label else variant.service.name,
-            price_snapshot=variant.price,
-            duration_snapshot=variant.duration_mins,
-            quantity=qty,
+        line_items, subtotal, discount_amount, total_amount, coupon_code = _resolve_cart_pricing(
+            cart, payload.get('coupon_code')
         )
-        for variant, qty in line_items
-    ])
+    except CartError as exc:
+        return JsonResponse({'ok': False, 'error': exc.message}, status=400)
+
+    razorpay_order_id = ''
+    razorpay_payment_id = ''
+    payment_status = 'pending'
+
+    if payment_method == 'pay_now':
+        razorpay_order_id = (payload.get('razorpay_order_id') or '').strip()
+        razorpay_payment_id = (payload.get('razorpay_payment_id') or '').strip()
+        razorpay_signature = (payload.get('razorpay_signature') or '').strip()
+
+        if not (razorpay_order_id and razorpay_payment_id and razorpay_signature):
+            return JsonResponse({'ok': False, 'error': 'Payment details are missing — please pay again.'}, status=400)
+        if not razorpay_client.verify_payment_signature(razorpay_order_id, razorpay_payment_id, razorpay_signature):
+            return JsonResponse({'ok': False, 'error': 'Payment could not be verified — please try again.'}, status=400)
+
+        # Re-fetch the order's amount from Razorpay itself rather than
+        # trusting anything client-supplied — confirms what was actually
+        # paid matches this cart's server-computed total right now (e.g.
+        # the cart can't have changed between opening the payment modal
+        # and this request without the two amounts disagreeing).
+        try:
+            order = razorpay_client.fetch_order(razorpay_order_id)
+        except Exception:
+            return JsonResponse({'ok': False, 'error': "Couldn't confirm payment right now — please try again shortly."}, status=502)
+        if order.get('amount') != int((total_amount * 100).to_integral_value()):
+            return JsonResponse({'ok': False, 'error': 'Paid amount does not match your cart — please try again.'}, status=400)
+
+        payment_status = 'paid'
+
+    # Payment (if any) is already verified as 'paid' above by this point —
+    # without atomicity, a failure partway through (e.g. bulk_create
+    # raising on a bad row) would leave an orphaned, already-paid Booking
+    # with zero items: real money collected, nothing actually booked. The
+    # try/except matches every other failure path in this view (clean
+    # JSON error, not a raw 500) — logged loudly specifically when payment
+    # was already collected, since there's no webhook/reconciliation
+    # system yet to catch this any other way (see AUDIT_FINDINGS.md #1).
+    try:
+        with transaction.atomic():
+            booking = Booking.objects.create(
+                user=request.user,
+                address_label=address.get('label') or 'Address',
+                address_text=address.get('text'),
+                address_pincode=address.get('pincode') or '',
+                address_lat=address_lat,
+                address_lng=address_lng,
+                scheduled_date=scheduled_date,
+                booking_type=booking_type,
+                time_slot=time_slot if booking_type == 'regular' else '',
+                exact_time=exact_time if booking_type == 'urgent' else None,
+                payment_method=payment_method,
+                payment_status=payment_status,
+                razorpay_order_id=razorpay_order_id,
+                razorpay_payment_id=razorpay_payment_id,
+                subtotal=subtotal,
+                discount_amount=discount_amount,
+                total_amount=total_amount,
+                coupon_code=coupon_code,
+            )
+            BookingItem.objects.bulk_create([
+                BookingItem(
+                    booking=booking,
+                    service_variant=li['variant'],
+                    name_snapshot=f"{li['variant'].service.name} — {li['variant'].label}" if li['variant'].label else li['variant'].service.name,
+                    price_snapshot=li['price'],
+                    duration_snapshot=li['duration'],
+                    included_snapshot=li['included_snapshot'],
+                    quantity=li['qty'],
+                )
+                for li in line_items
+            ])
+    except Exception:
+        if payment_status == 'paid':
+            logger.exception(
+                'Booking creation failed AFTER payment was verified (razorpay_order_id=%s, razorpay_payment_id=%s, user=%s) — payment collected, no booking created.',
+                razorpay_order_id, razorpay_payment_id, request.user.id,
+            )
+        else:
+            logger.exception('Booking creation failed for user=%s.', request.user.id)
+        return JsonResponse({'ok': False, 'error': "Something went wrong completing your booking — please contact support before trying again."}, status=500)
 
     return JsonResponse({'ok': True, 'booking_number': booking.booking_number})
 
@@ -194,6 +404,12 @@ def bookings_dashboard(request):
             for item in booking.items.all()
             if item.service_variant and item.service_variant.is_active and item.service_variant.service.is_active
         ]
+        # Client-side search match target (bookings_dashboard.js) — booking
+        # number plus every item name, so "haircut" or "ELX123456" both find
+        # the right card without a server round-trip for what's at most a
+        # few dozen of the signed-in user's own bookings.
+        item_names = ' '.join(item.name_snapshot for item in booking.items.all())
+        booking.search_blob = f'{booking.booking_number} {item_names} {booking.address_text}'.lower()
 
     # Same shared context services_booking() passes — app_navbar.html (its
     # Categories/Offers dropdowns, notification badge) and the floating
@@ -217,11 +433,12 @@ def bookings_dashboard(request):
 def cancel_booking(request, booking_number):
     """
     Cancels a booking — only allowed while `Booking.can_cancel` is True
-    (status still 'upcoming' AND more than CANCELLATION_CUTOFF (3h) before
-    its scheduled_start; see bookings/models.py). Re-checked here even
-    though the dashboard template only renders the Cancel button when
-    `can_cancel` was true at page-render time — that snapshot can go stale
-    if the user leaves the tab open past the cutoff before clicking it.
+    (status still 'upcoming', i.e. the beautician hasn't marked On The Way
+    yet; see bookings/models.py). Re-checked here even though the
+    dashboard template only renders the Cancel button when `can_cancel`
+    was true at page-render time — that snapshot can go stale if the user
+    leaves the tab open until the beautician marks on-the-way before
+    clicking it.
 
     `get_object_or_404(..., user=request.user)` doubles as the ownership
     check — a 404 (not a 403) for someone else's booking_number, so this
@@ -233,19 +450,41 @@ def cancel_booking(request, booking_number):
         booking.save(update_fields=['status', 'updated_at'])
         messages.success(request, f'Booking {booking.booking_number} has been cancelled.')
     else:
-        messages.error(request, 'This booking can no longer be cancelled — either it’s already completed/cancelled, or it starts within 3 hours.')
+        messages.error(request, 'This booking can no longer be cancelled — the beautician is already on the way or it’s completed/cancelled.')
     return redirect('bookings_dashboard')
+
+
+@login_required
+def booking_invoice(request, booking_number):
+    """
+    PDF receipt download for the signed-in user's own booking — gated on
+    payment_status='paid' since a receipt only makes sense for money
+    actually collected; there's nothing to hand a customer a receipt for
+    on a still-pending pay_at_home order.
+    """
+    booking = get_object_or_404(Booking, booking_number=booking_number, user=request.user)
+    if booking.payment_status != 'paid':
+        messages.error(request, 'A receipt is only available once payment is completed for this booking.')
+        return redirect('bookings_dashboard')
+
+    pdf_bytes = generate_booking_receipt_pdf(booking)
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="receipt-{booking.booking_number}.pdf"'
+    return response
 
 
 @login_required
 @require_POST
 def submit_review(request, item_id):
     """
-    Rates + reviews one completed booking's service — only reachable from
-    the "Completed" tab of the bookings dashboard (see
-    bookings_dashboard.html). `get_object_or_404(..., booking__user=...)`
-    doubles as the ownership check, same 404-not-403 pattern as
-    cancel_booking above.
+    Rates one completed booking's service — an inline star click on the
+    bookings dashboard, submitted via fetch the instant it's clicked (see
+    static/js/bookings_dashboard.js), not a form with its own Submit
+    button. Updatable: clicking a different star re-rates rather than
+    erroring "already reviewed", matching how every star-rating widget
+    elsewhere behaves. `get_object_or_404(..., booking__user=...)` doubles
+    as the ownership check, same 404-not-403 pattern as cancel_booking
+    above.
 
     Recomputes the Service's aggregate `rating`/`reviews_count` from real
     Review rows on every submission, replacing whatever mock values it was
@@ -253,26 +492,20 @@ def submit_review(request, item_id):
     """
     item = get_object_or_404(BookingItem, id=item_id, booking__user=request.user, booking__status='completed')
 
-    if hasattr(item, 'review'):
-        messages.error(request, 'You already reviewed this service.')
-        return redirect('bookings_dashboard')
-
     if not item.service_variant:
-        messages.error(request, 'This service is no longer available to review.')
-        return redirect('bookings_dashboard')
+        return JsonResponse({'ok': False, 'error': 'This service is no longer available to rate.'}, status=400)
 
     try:
         rating = int(request.POST.get('rating', ''))
     except ValueError:
         rating = 0
     if rating not in range(1, 6):
-        messages.error(request, 'Please select a rating from 1 to 5 stars.')
-        return redirect('bookings_dashboard')
+        return JsonResponse({'ok': False, 'error': 'Rating must be between 1 and 5 stars.'}, status=400)
 
     service = item.service_variant.service
-    Review.objects.create(
-        booking_item=item, user=request.user, service=service,
-        rating=rating, comment=request.POST.get('comment', '').strip(),
+    Review.objects.update_or_create(
+        booking_item=item,
+        defaults={'user': request.user, 'service': service, 'rating': rating},
     )
 
     agg = service.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
@@ -280,5 +513,21 @@ def submit_review(request, item_id):
     service.reviews_count = agg['count'] or 0
     service.save(update_fields=['rating', 'reviews_count'])
 
-    messages.success(request, 'Thanks for your review!')
-    return redirect('bookings_dashboard')
+    return JsonResponse({'ok': True, 'rating': rating})
+
+
+@login_required
+@require_POST
+def submit_booking_feedback(request, booking_number):
+    """
+    One free-text write-up for the whole order (see Booking.feedback_comment
+    docstring for why this is separate from each item's own star Review) —
+    submitted via fetch from the single shared textarea + button on a
+    completed booking's card. Updatable, same as submit_review.
+    """
+    booking = get_object_or_404(Booking, booking_number=booking_number, user=request.user, status='completed')
+    comment = request.POST.get('comment', '').strip()
+    booking.feedback_comment = comment
+    booking.feedback_submitted_at = timezone.now()
+    booking.save(update_fields=['feedback_comment', 'feedback_submitted_at'])
+    return JsonResponse({'ok': True})

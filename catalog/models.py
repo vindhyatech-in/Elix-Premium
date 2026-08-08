@@ -1,12 +1,26 @@
 from django.db import models
+from django.templatetags.static import static
 
 
 class Category(models.Model):
     """Endpoint: GET /api/v1/categories/ — same shape as the old
-    booking_data.get_booking_categories() mock (slug/name/icon)."""
+    booking_data.get_booking_categories() mock (slug/name/icon).
+
+    `description`/`image`/`image_url` back the landing page's category
+    grid (see core/booking_data.py::get_landing_categories()) — before
+    these existed, that photo/blurb was a hardcoded per-slug dict in
+    that function; now it's admin-editable (core/admin_dashboard_views.py::
+    dashboard_categories) and falls back to that same dict only for a
+    category that hasn't had one set yet, so pre-existing seeded
+    categories don't regress to a broken/blank image. `image` (an
+    upload) wins over `image_url` (a plain link) when both are set —
+    see `display_image_url`."""
     slug = models.SlugField(unique=True)
     name = models.CharField(max_length=60)
     icon = models.CharField(max_length=40, blank=True)
+    description = models.TextField(blank=True)
+    image = models.ImageField(upload_to='categories/%Y/%m/', null=True, blank=True)
+    image_url = models.URLField(max_length=500, blank=True)
 
     class Meta:
         verbose_name_plural = 'categories'
@@ -18,6 +32,16 @@ class Category(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def display_image_url(self):
+        """The uploaded file's URL, or the plain link, or None — callers
+        that need a guaranteed fallback (get_landing_categories, which
+        also has its own hardcoded per-slug defaults) handle that
+        themselves rather than baking a generic default in here."""
+        if self.image:
+            return self.image.url
+        return self.image_url or None
 
 
 class Service(models.Model):
@@ -43,7 +67,15 @@ class Service(models.Model):
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name='services')
     kind = models.CharField(max_length=10, choices=KIND_CHOICES, default='service')
     description = models.TextField()
-    photo = models.CharField(max_length=200, help_text="Static path, e.g. 'images/service-hair-spa.jpg'")
+    # `photo` predates admin-editable images (added 2026-08-08) — a static
+    # asset path seeded catalog rows ship with, kept as the last-resort
+    # fallback in `display_photo_url` below rather than backfilled, so
+    # existing rows don't need a data migration. New/edited services set
+    # `photo_image` (upload) or `photo_url` (link) instead, via
+    # core/admin_dashboard_views.py::dashboard_services.
+    photo = models.CharField(max_length=200, blank=True, help_text="Static path, e.g. 'images/service-hair-spa.jpg' — only used if neither photo below is set.")
+    photo_image = models.ImageField(upload_to='services/%Y/%m/', null=True, blank=True)
+    photo_url = models.URLField(max_length=500, blank=True)
     tone = models.CharField(max_length=20, blank=True, help_text='Fallback gradient class while the photo loads (espresso/blush/gold/rose)')
     rating = models.DecimalField(max_digits=2, decimal_places=1, default=0)
     reviews_count = models.PositiveIntegerField(default=0)
@@ -98,6 +130,21 @@ class Service(models.Model):
         just the pre-selected default."""
         return self.variants.filter(is_active=True, is_default=True).first() \
             or self.variants.filter(is_active=True).order_by('sort_order', 'id').first()
+
+    @property
+    def display_photo_url(self):
+        """The single source of truth every catalog/cart/detail consumer
+        should read instead of the raw `photo`/`photo_image`/`photo_url`
+        fields directly — an uploaded image wins over a plain link, which
+        wins over the legacy static `photo` path, which falls back to a
+        generic placeholder if even that's blank. Always a fully-resolved
+        URL (static, media, or external), never a bare relative path — so
+        templates render it with a plain `{{ }}`, no `{% static %}`."""
+        if self.photo_image:
+            return self.photo_image.url
+        if self.photo_url:
+            return self.photo_url
+        return static(self.photo) if self.photo else static('images/service-facial.jpg')
 
 
 class ServiceVariant(models.Model):

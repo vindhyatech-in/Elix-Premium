@@ -16,7 +16,6 @@
 
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const isFinePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-  const STATIC_URL = document.body.dataset.staticUrl || '/static/';
 
   const CART_KEY = 'glamour_cart';
   const RECENT_SEARCH_KEY = 'glamour_recent_searches';
@@ -99,6 +98,51 @@
     window.dispatchEvent(new CustomEvent('glamour:cart-changed'));
   }
 
+  // Single source of truth for "what does a customized package actually
+  // cost" — used by the catalog card's live preview
+  // (onCustomerPackageVariantChange), the cart panel's line price, and
+  // booking_drawer.js's cartTotal()/summary (via window.GlamourBooking),
+  // so all three can never drift from each other. `included` maps each
+  // included-service id to the variant id the customer picked for it
+  // (missing/invalid entries fall back to that service's own default
+  // variant) — mirrors the exact formula create_booking() in
+  // bookings/views.py replicates server-side, since the client's number
+  // is never trusted for the actual charge.
+  function computePackagePricing(item, included) {
+    let totalMrp = 0;
+    let totalDuration = 0;
+    const breakdown = (item.included_services || []).map((inc) => {
+      const chosenId = included && included[inc.id] != null ? Number(included[inc.id]) : null;
+      const chosenVariant = (inc.variants || []).find((v) => v.id === chosenId) || null;
+      const resolved = chosenVariant || {
+        id: inc.selected_variant_id, label: null, price: inc.price, duration_mins: inc.duration_mins,
+      };
+      totalMrp += resolved.price;
+      totalDuration += resolved.duration_mins;
+      return {
+        serviceId: inc.id, name: inc.name, variantId: resolved.id,
+        variantLabel: resolved.label || null, price: resolved.price, duration_mins: resolved.duration_mins,
+      };
+    });
+    const discountPct = item.discount_pct || 0;
+    const price = discountPct > 0 ? Math.round(totalMrp * (1 - discountPct / 100)) : totalMrp;
+    return { price, mrp: totalMrp, duration_mins: totalDuration, breakdown };
+  }
+
+  // Reads whichever variant the customer picked for each included service
+  // out of the DOM — every select/hidden-input in a package's "included
+  // services" box carries data-inc-id plus a value equal to a real
+  // ServiceVariant id, regardless of whether that service had one variant
+  // (a hidden input) or several (a select). Shared between the catalog
+  // card and the service detail page, which use identical markup shapes.
+  function gatherIncludedSelections(container) {
+    const included = {};
+    container.querySelectorAll('[data-inc-id]').forEach((el) => {
+      included[el.dataset.incId] = Number(el.value);
+    });
+    return included;
+  }
+
   function showToast(message) {
     const stack = document.querySelector('[data-toast-stack]');
     if (!stack) return;
@@ -112,6 +156,62 @@
       setTimeout(() => toast.remove(), 300);
     }, 2600);
   }
+
+  /* ---------------------------------------------------------
+   * Generic confirm/alert modal — replaces native window.confirm()/
+   * alert() everywhere on the customer-facing pages. Injects its own
+   * markup into <body> once, on first use, so every page gets it for
+   * free without needing its own copy in every template (unlike
+   * [data-toast-stack] above, which each page includes itself).
+   * --------------------------------------------------------- */
+  let confirmModalEls = null;
+  function ensureConfirmModal() {
+    if (confirmModalEls) return confirmModalEls;
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    const modal = document.createElement('div');
+    modal.className = 'confirm-modal';
+    modal.innerHTML = `
+      <p class="confirm-modal__message"></p>
+      <div class="confirm-modal__actions">
+        <button type="button" class="btn btn--ghost btn--sm" data-confirm-cancel>Cancel</button>
+        <button type="button" class="btn btn--primary btn--sm" data-confirm-ok>OK</button>
+      </div>`;
+    document.body.append(backdrop, modal);
+    confirmModalEls = {
+      backdrop, modal,
+      message: modal.querySelector('.confirm-modal__message'),
+      okBtn: modal.querySelector('[data-confirm-ok]'),
+      cancelBtn: modal.querySelector('[data-confirm-cancel]'),
+    };
+    return confirmModalEls;
+  }
+
+  function modalPrompt(message, showCancel) {
+    const els = ensureConfirmModal();
+    return new Promise((resolve) => {
+      els.message.textContent = message;
+      els.cancelBtn.hidden = !showCancel;
+      els.backdrop.classList.add('is-open');
+      els.modal.classList.add('is-open');
+
+      function cleanup(result) {
+        els.backdrop.classList.remove('is-open');
+        els.modal.classList.remove('is-open');
+        els.okBtn.removeEventListener('click', onOk);
+        els.cancelBtn.removeEventListener('click', onCancel);
+        els.backdrop.removeEventListener('click', onCancel);
+        resolve(result);
+      }
+      function onOk() { cleanup(true); }
+      function onCancel() { cleanup(false); }
+      els.okBtn.addEventListener('click', onOk);
+      els.cancelBtn.addEventListener('click', onCancel);
+      els.backdrop.addEventListener('click', onCancel);
+    });
+  }
+  function confirmModal(message) { return modalPrompt(message, true); }
+  function alertModal(message) { return modalPrompt(message, false); }
 
   /* ---------------------------------------------------------
    * Button ripple (micro-interaction) — event delegation so it
@@ -514,7 +614,7 @@
         const row = document.createElement('button');
         row.type = 'button';
         row.className = 'search-result';
-        row.innerHTML = `<img src="${STATIC_URL}${item.photo}" alt="">
+        row.innerHTML = `<img src="${item.photo}" alt="">
           <div><p class="search-result__name">${escapeHtml(item.name)}</p>
           <p class="search-result__meta">${escapeHtml(item.category)} · ${formatCurrency(item.price)}</p></div>`;
         row.addEventListener('click', () => selectTerm(item.name));
@@ -705,7 +805,7 @@
     }
 
     function open(item) {
-      modal.querySelector('[data-qv-photo]').src = `${STATIC_URL}${item.photo}`;
+      modal.querySelector('[data-qv-photo]').src = item.photo;
       modal.querySelector('[data-qv-photo]').alt = item.name;
       modal.querySelector('[data-qv-category]').textContent = item.category.charAt(0).toUpperCase() + item.category.slice(1);
       modal.querySelector('[data-qv-name]').textContent = item.name;
@@ -810,10 +910,32 @@
     function findVariant(item, variantId) {
       return (item.variants || []).find((v) => v.id === variantId) || null;
     }
-    function lineKey(id, variantId) { return `${id}::${variantId === null ? '' : variantId}`; }
+    // Stable string form of an {includedServiceId: variantId} map, sorted
+    // so key order never matters — part of the cart-line dedup key below,
+    // since two customizations of the same package (different picks) are
+    // separate lines, not one line whose qty gets bumped.
+    function serializeIncluded(included) {
+      if (!included) return '';
+      return Object.keys(included).map(Number).sort((a, b) => a - b).map((k) => `${k}:${included[k]}`).join(',');
+    }
+    function lineKey(id, variantId, included) {
+      return `${id}::${variantId === null ? '' : variantId}::${serializeIncluded(included)}`;
+    }
     function parseLineKey(key) {
-      const sep = key.lastIndexOf('::');
-      return { id: key.slice(0, sep), variantId: normalizedVariantId(key.slice(sep + 2) || null) };
+      const [id, variantPart, includedPart] = key.split('::');
+      const included = {};
+      if (includedPart) {
+        includedPart.split(',').forEach((pair) => {
+          const [svcId, varId] = pair.split(':');
+          included[svcId] = Number(varId);
+        });
+      }
+      return { id, variantId: normalizedVariantId(variantPart || null), included: includedPart ? included : null };
+    }
+    function lineMatches(line, id, variantId, included) {
+      return line.id === id
+        && normalizedVariantId(line.variantId) === variantId
+        && serializeIncluded(line.included) === serializeIncluded(included);
     }
 
     function render() {
@@ -828,21 +950,24 @@
         if (!item) return;
         const variantId = normalizedVariantId(line.variantId);
         const variant = findVariant(item, variantId);
-        const price = variant ? variant.price : item.price;
+        let price = variant ? variant.price : item.price;
         // Only worth naming the variant when it was an actual choice among
         // several — catalog.py falls back to duration_label ("3h") for a
         // single-variant service's blank label, which would otherwise show
         // a meaningless "(3h)" suffix on things like packages.
         const hasRealVariants = item.variants && item.variants.length > 1;
-        const name = variant && variant.label && hasRealVariants ? `${item.name} — ${variant.label}` : item.name;
-        const key = lineKey(item.id, variantId);
+        let name = variant && variant.label && hasRealVariants ? `${item.name} — ${variant.label}` : item.name;
+        if (item.kind === 'package' && line.included) {
+          price = computePackagePricing(item, line.included).price;
+        }
+        const key = lineKey(item.id, variantId, line.included);
         count += line.qty;
         subtotal += price * line.qty;
 
         const row = document.createElement('div');
         row.className = 'cart-line';
         row.innerHTML = `
-          <img src="${STATIC_URL}${item.photo}" alt="">
+          <img src="${item.photo}" alt="">
           <div class="cart-line__info">
             <p class="cart-line__name">${escapeHtml(name)}</p>
             <p class="cart-line__price">${formatCurrency(price)} × ${line.qty}</p>
@@ -885,11 +1010,18 @@
     // click, or the marketing-page ?open_cart=1 handoff below; it used to
     // pop open on every single Add to Cart click anywhere in the app,
     // which was disruptive when adding several items in a row.
-    function addItem(id, variantId) {
+    // `included` (an {includedServiceId: variantId} map) is only ever
+    // passed for packages — omitted entirely for everything else so
+    // existing cart lines' shape ({id, variantId, qty}) doesn't change.
+    function addItem(id, variantId, included) {
       variantId = normalizedVariantId(variantId);
       const cart = getCart();
-      const line = cart.find((l) => l.id === id && normalizedVariantId(l.variantId) === variantId);
-      if (line) line.qty += 1; else cart.push({ id, variantId, qty: 1 });
+      const line = cart.find((l) => lineMatches(l, id, variantId, included));
+      if (line) {
+        line.qty += 1;
+      } else {
+        cart.push(included && Object.keys(included).length ? { id, variantId, qty: 1, included } : { id, variantId, qty: 1 });
+      }
       saveCart(cart);
       const item = getCatalog().find((i) => i.id === id);
       const variant = item ? findVariant(item, variantId) : null;
@@ -899,17 +1031,17 @@
     }
 
     function changeQty(key, delta) {
-      const { id, variantId } = parseLineKey(key);
+      const { id, variantId, included } = parseLineKey(key);
       const cart = getCart();
-      const line = cart.find((l) => l.id === id && normalizedVariantId(l.variantId) === variantId);
+      const line = cart.find((l) => lineMatches(l, id, variantId, included));
       if (!line) return;
       line.qty += delta;
       saveCart(line.qty <= 0 ? cart.filter((l) => l !== line) : cart);
     }
 
     function removeItem(key) {
-      const { id, variantId } = parseLineKey(key);
-      saveCart(getCart().filter((l) => !(l.id === id && normalizedVariantId(l.variantId) === variantId)));
+      const { id, variantId, included } = parseLineKey(key);
+      saveCart(getCart().filter((l) => !lineMatches(l, id, variantId, included)));
     }
 
     function open() {
@@ -976,6 +1108,17 @@
       if (!id) return;
       const item = getCatalog().find((i) => i.id === id);
       const variants = (item && item.variants) || [];
+      if (item && item.kind === 'package') {
+        // Packages carry their own included-services picker right on the
+        // card (see gatherIncludedSelections) rather than needing Quick
+        // View — read whatever the customer currently has selected for
+        // each included service, defaulting quietly if they never touched
+        // any of them (the selects/hidden-inputs already start on each
+        // service's default variant).
+        const card = addBtn.closest('.catalog-card');
+        addItem(id, variants[0] ? variants[0].id : null, card ? gatherIncludedSelections(card) : {});
+        return;
+      }
       if (variants.length > 1) {
         // The card has no room for a picker — hand off to Quick View
         // instead of silently adding whichever variant happens to be
@@ -1008,6 +1151,33 @@
       url.searchParams.delete('open_cart');
       window.history.replaceState({}, '', url);
     }
+
+    // Small shared surface for booking_drawer.js (Phase 2) — keeps "catalog
+    // browsing" (this file) and "booking flow" (booking_drawer.js) as
+    // separate concerns instead of one growing file. See developed.md
+    // "Service Booking App" for the full rationale. Assigned here (inside
+    // initFloatingCart, not the outer DOMContentLoaded callback) because
+    // addItem only exists in this function's scope — referencing it from
+    // outside threw a ReferenceError that silently prevented
+    // window.GlamourBooking from ever being assigned at all, breaking
+    // every page that depends on it (service_detail.html's add-to-cart,
+    // and the entire booking drawer).
+    window.GlamourBooking = {
+      getCart,
+      saveCart,
+      getCatalog,
+      formatCurrency,
+      formatDuration,
+      showToast,
+      confirmModal,
+      alertModal,
+      addItem,
+      computePackagePricing,
+      gatherIncludedSelections,
+      getAppliedDiscountRate: () => (appliedCoupon ? COUPONS[appliedCoupon] : 0),
+      getAppliedCouponCode: () => appliedCoupon,
+      closeCartPanel: () => closeCartPanel?.(),
+    };
   }
 
   /* ---------------------------------------------------------
@@ -1121,65 +1291,23 @@
     initRipple();
     initSkeletonReveal();
     updateFilterBadge();
-
-    // Small shared surface for booking_drawer.js (Phase 2) — keeps "catalog
-    // browsing" (this file) and "booking flow" (booking_drawer.js) as
-    // separate concerns instead of one growing file. See developed.md
-    // "Service Booking App" for the full rationale.
-    window.GlamourBooking = {
-      getCart,
-      saveCart,
-      getCatalog,
-      formatCurrency,
-      showToast,
-      getAppliedDiscountRate: () => (appliedCoupon ? COUPONS[appliedCoupon] : 0),
-      getAppliedCouponCode: () => appliedCoupon,
-      closeCartPanel: () => closeCartPanel?.(),
-    };
   });
 
   window.onCustomerPackageVariantChange = function(selectEl) {
     const card = selectEl.closest('.catalog-card');
     if (!card) return;
-    const pkgBox = card.querySelector('.catalog-card__pkg-box');
-    if (!pkgBox) return;
+    const item = getCatalog().find((i) => i.id === card.dataset.catalogId);
+    if (!item) return;
 
-    const discountPct = parseFloat(pkgBox.dataset.pkgDiscount || 0);
-
-    let totalMrp = 0;
-    let totalDuration = 0;
-
-    card.querySelectorAll('.catalog-card__pkg-variant-select').forEach(sel => {
-      const selectedOpt = sel.options[sel.selectedIndex];
-      if (selectedOpt) {
-        totalMrp += parseFloat(selectedOpt.dataset.price || 0);
-        totalDuration += parseInt(selectedOpt.dataset.duration || 0, 10);
-      }
-    });
-
-    card.querySelectorAll('.catalog-card__pkg-single-val').forEach(inp => {
-      totalMrp += parseFloat(inp.dataset.price || 0);
-      totalDuration += parseInt(inp.dataset.duration || 0, 10);
-    });
-
-    let newPackagePrice = totalMrp;
-    if (discountPct > 0) {
-      newPackagePrice = Math.round(totalMrp * (1 - discountPct / 100));
-    }
-
-    const hours = Math.floor(totalDuration / 60);
-    const minutes = totalDuration % 60;
-    let durLabel = '';
-    if (hours > 0 && minutes > 0) durLabel = `${hours}h ${minutes}m`;
-    else if (hours > 0) durLabel = `${hours}h`;
-    else durLabel = `${minutes} min`;
+    const included = gatherIncludedSelections(card);
+    const { price, mrp, duration_mins } = computePackagePricing(item, included);
 
     const priceNowEl = card.querySelector('.catalog-card__price-now');
     const priceMrpEl = card.querySelector('.catalog-card__price-mrp');
     const durationEl = card.querySelector('.catalog-card__duration');
 
-    if (priceNowEl) priceNowEl.textContent = `₹${newPackagePrice}`;
-    if (priceMrpEl) priceMrpEl.textContent = `₹${totalMrp}`;
-    if (durationEl) durationEl.textContent = durLabel;
+    if (priceNowEl) priceNowEl.textContent = `₹${price}`;
+    if (priceMrpEl) priceMrpEl.textContent = `₹${mrp}`;
+    if (durationEl) durationEl.textContent = formatDuration(duration_mins);
   };
 })();

@@ -1,7 +1,11 @@
 {% load allauth %}
 {% comment %} djlint:off {% endcomment %}
 <{% if attrs.href %}a href="{{ attrs.href }}"{% else %}button{% endif %}
-  class="btn {% if attrs.tags and 'cancel' in attrs.tags or attrs.tags and 'link' in attrs.tags %}btn--ghost{% else %}btn--primary{% endif %} auth-card__btn"
+  {% if attrs.tags and 'cancel' in attrs.tags or attrs.tags and 'link' in attrs.tags or attrs.tags and 'secondary' in attrs.tags or attrs.tags and 'danger' in attrs.tags or attrs.tags and 'delete' in attrs.tags %}
+  class="btn btn--ghost auth-card__btn"
+  {% else %}
+  class="btn btn--primary auth-card__btn"
+  {% endif %}
   {% if attrs.form %}form="{{ attrs.form }}"{% endif %}
   {% if attrs.id %}id="{{ attrs.id }}"{% endif %}
   {% if attrs.name %}name="{{ attrs.name }}"{% endif %}

@@ -24,6 +24,11 @@ body.emp-body {
   box-sizing: border-box;
 }
 
+/* Purely a JS hook for AJAX content-swapping — invisible to .emp-shell's
+   flex layout, so its children lay out exactly as if this wrapper
+   weren't there. */
+#empDashboardRoot { display: contents; }
+
 /* --- Header --- */
 .emp-header {
   display: flex;
@@ -250,6 +255,30 @@ body.emp-body {
   color: var(--accent-gold);
 }
 
+.emp-bottom-nav__badge {
+  position: absolute;
+  top: 0; right: calc(50% - 1.1rem);
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding-inline: 0.2rem;
+  border-radius: var(--radius-pill);
+  background: var(--accent-gold);
+  color: var(--ink);
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* This media query's own .emp-bottom-nav__badge override below must stay
+   textually AFTER the base rule above — equal specificity means the
+   later rule in source order wins regardless of which media query
+   matched, so if the base (absolute) rule were last, it would silently
+   override this block's `position: static` at desktop widths too. That
+   was the actual bug: the badge never stopped being absolutely
+   positioned, so it floated above the icon instead of sitting inline
+   next to the label once the nav switched to its desktop row layout. */
 @media (min-width: 641px) {
   .emp-shell { padding-bottom: 1.25rem; }
 
@@ -286,22 +315,6 @@ body.emp-body {
     position: static;
     margin-left: 0.15rem;
   }
-}
-
-.emp-bottom-nav__badge {
-  position: absolute;
-  top: 0; right: calc(50% - 1.1rem);
-  min-width: 1.1rem;
-  height: 1.1rem;
-  padding-inline: 0.2rem;
-  border-radius: var(--radius-pill);
-  background: var(--accent-gold);
-  color: var(--ink);
-  font-size: 0.6rem;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* --- Job Cards --- */
@@ -370,15 +383,6 @@ body.emp-body {
   color: var(--ink-muted);
 }
 
-.emp-customer-phone {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--accent-gold);
-  text-decoration: none;
-  width: fit-content;
-}
-.emp-customer-phone:hover { text-decoration: underline; }
-
 .emp-job-location {
   display: flex;
   align-items: center;
@@ -413,6 +417,15 @@ body.emp-body {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+.emp-items-list__included {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--ink-muted);
 }
 
 .emp-job-total {
@@ -490,8 +503,12 @@ body.emp-body {
 .emp-otp-block {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.65rem;
   width: 100%;
+  background: var(--surface-1);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1rem;
 }
 
 .emp-otp-hint {
@@ -500,23 +517,41 @@ body.emp-body {
   margin: 0;
 }
 
+.emp-payment-note {
+  font-size: 0.8rem;
+  color: #ff9f40;
+  font-weight: 600;
+  margin: 0;
+}
+
 .emp-otp-form {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
 
 .emp-otp-input {
-  width: 8rem;
-  padding: 0.55rem 0.8rem;
+  width: 7.5rem;
+  padding: 0.6rem 0.7rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-hairline);
-  background: var(--surface-1);
+  border: 1.5px solid var(--border-hairline);
+  background: var(--surface-2);
   color: var(--text-body);
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.2em;
   text-align: center;
+}
+
+.emp-otp-input:focus {
+  outline: none;
+  border-color: #2ecc71;
+  box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.15);
+}
+
+.emp-otp-regenerate {
+  align-self: flex-end;
 }
 
 /* --- Arrival Photo Camera Modal --- */
@@ -586,20 +621,108 @@ body.emp-body {
   flex-wrap: wrap;
 }
 
-.emp-messages {
+/* Generic confirm/alert modal — replaces native window.confirm()/alert()
+   (see adjacent <script> in emp_dashboard.html for adminConfirm/adminAlert
+   equivalents, empConfirm/empAlert here). */
+.emp-confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.emp-confirm-modal__panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  width: 100%;
+  max-width: 380px;
   display: flex;
   flex-direction: column;
+  gap: 1rem;
+}
+
+.emp-confirm-modal__message {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-body);
+}
+
+.emp-confirm-modal__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
 }
 
-.emp-alert {
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
+/* Fixed toast banner in the top-right corner, not inline in the flex
+   column — position:fixed removes it from .emp-shell's flex flow
+   entirely, so it never pushes other content down or leaves a gap
+   behind once its messages are gone. Narrower than the dashboard column
+   (a toast, not a full-width bar) so it reads as a notification, not an
+   intrusive strip, and slides in from the right (see .emp-alert's
+   animation) rather than sitting on top of the header. */
+.emp-messages {
+  position: fixed;
+  top: calc(1rem + env(safe-area-inset-top));
+  right: 1rem;
+  width: calc(100% - 2rem);
+  max-width: 360px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  pointer-events: none;
 }
 
-.emp-alert--success { background: rgba(46, 204, 113, 0.15); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.3); }
-.emp-alert--error { background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 1px solid rgba(231, 76, 60, 0.3); }
+.emp-alert {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: var(--ink);
+  border: 1px solid var(--border-hairline-dark);
+  border-left: 4px solid currentColor;
+  color: var(--cream);
+  padding: 0.85rem 1.1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: var(--shadow-lg);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  animation: emp-alert-slide-in 0.3s ease;
+}
+.emp-alert::before {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: currentColor;
+  color: var(--ink);
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-top: 0.05rem;
+}
+.emp-alert.is-dismissing { opacity: 0; transform: translateX(40px); }
+
+.emp-alert--success { color: #2ecc71; }
+.emp-alert--success::before { content: '✓'; }
+.emp-alert--error { color: #e74c3c; }
+.emp-alert--error::before { content: '✕'; }
+
+@keyframes emp-alert-slide-in {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
 
 .emp-empty-state {
   text-align: center;

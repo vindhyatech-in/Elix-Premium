@@ -1,0 +1,114 @@
+{% extends "admin_dashboard/layouts/admin_base.html" %}
+
+{% block content %}
+  <!-- Toolbar -->
+  <div class="admin-toolbar">
+    <div class="admin-toolbar__title-text">
+      <h2>Offers & Coupons</h2>
+      <p class="admin-text-muted">Codes customers can apply at checkout — active offers also appear in the "Offers" menu on the booking app.</p>
+    </div>
+
+    <button type="button" class="admin-btn admin-btn--gold" onclick="document.getElementById('addOfferModal').style.display='flex'">
+      + Create Offer
+    </button>
+  </div>
+
+  <!-- Offers Table -->
+  <div class="admin-card-table-box">
+    {% if offers %}
+      <div class="admin-table-wrapper">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Title & Description</th>
+              <th>Discount</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for offer in offers %}
+              <tr>
+                <td><code>{{ offer.code }}</code></td>
+                <td>
+                  <strong>{{ offer.title }}</strong>
+                  {% if offer.description %}<div class="admin-text-muted" style="font-size: 0.8rem;">{{ offer.description|truncatechars:90 }}</div>{% endif %}
+                </td>
+                <td><strong class="admin-text-gold">{{ offer.discount_pct }}%</strong></td>
+                <td>
+                  <span class="admin-badge {% if offer.is_active %}admin-badge--emp-active{% else %}admin-badge--subtle{% endif %}">
+                    {% if offer.is_active %}Active{% else %}Inactive{% endif %}
+                  </span>
+                </td>
+                <td>
+                  <div class="admin-btn-group">
+                    <form method="post" action="{% url 'admin_dashboard_offers' %}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('{% if offer.is_active %}Deactivate{% else %}Activate{% endif %} offer &quot;{{ offer.code|escapejs }}&quot;?').then(ok => { if (ok) this.submit(); }); return false;">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_offer">
+                      <input type="hidden" name="offer_id" value="{{ offer.id }}">
+                      <button type="submit" class="admin-btn admin-btn--ghost admin-btn--xs">
+                        {% if offer.is_active %}Deactivate{% else %}Activate{% endif %}
+                      </button>
+                    </form>
+
+                    <form method="post" action="{% url 'admin_dashboard_offers' %}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('Delete offer &quot;{{ offer.code|escapejs }}&quot;? Any customer relying on this code will no longer be able to use it.').then(ok => { if (ok) this.submit(); }); return false;">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete_offer">
+                      <input type="hidden" name="offer_id" value="{{ offer.id }}">
+                      <button type="submit" class="admin-btn admin-btn--danger admin-btn--xs">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="admin-empty-state">
+        <p>No offers yet — create one to get started.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  {% include "admin_dashboard/partials/pagination.html" %}
+
+  <!-- Create Offer Modal -->
+  <div id="addOfferModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal">
+      <div class="admin-modal__head">
+        <h2>Create Offer</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('addOfferModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{% url 'admin_dashboard_offers' %}" class="admin-modal__body">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_offer">
+
+        <div class="admin-form-group">
+          <label>Coupon Code *</label>
+          <input type="text" name="code" required class="admin-input" placeholder="e.g. FESTIVE25" maxlength="20" style="text-transform: uppercase;">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Title *</label>
+            <input type="text" name="title" required class="admin-input" placeholder="e.g. 25% off this festive season">
+          </div>
+          <div class="admin-form-group">
+            <label>Discount (%) *</label>
+            <input type="number" name="discount_pct" required min="1" max="100" step="1" class="admin-input" placeholder="e.g. 25">
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Description</label>
+          <textarea name="description" class="admin-textarea" rows="2" placeholder="Shown to customers in the Offers menu…"></textarea>
+        </div>
+
+        <button type="submit" class="admin-btn admin-btn--primary">Create Offer</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

@@ -23,6 +23,15 @@
 <body class="emp-body">
 
   <div class="emp-shell">
+    <!-- Everything that can change after a POST action lives inside this
+         wrapper (header incl. duty toggle, tab nav incl. badge counts,
+         messages, stats, all 4 tabs) — the AJAX form handler below
+         replaces just this div's contents with the fresh server-rendered
+         version instead of navigating the browser, so the page never
+         resets to the first tab / loses scroll position on every action.
+         display:contents keeps it invisible to .emp-shell's own flex
+         layout, as if this wrapper weren't there at all. -->
+    <div id="empDashboardRoot">
     <!-- Header -->
     <header class="emp-header">
       <div class="emp-header__user">
@@ -407,7 +416,7 @@
                   </div>
                   {% if leave.reason %}<div class="emp-leave-reason">{{ leave.reason }}</div>{% endif %}
                 </div>
-                <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form" onsubmit="return confirm('Cancel this leave request?');">
+                <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form" data-confirm="Cancel this leave request?">
                   {% csrf_token %}
                   <input type="hidden" name="action" value="cancel_leave">
                   <input type="hidden" name="leave_id" value="{{ leave.id }}">
@@ -422,12 +431,23 @@
       </div>
     </div>
 
+    </div>
   </div>
 
   <!-- Arrival photo camera modal — live capture only, no file/gallery input
        exists here on purpose (see #empCameraModal script below): a face
        verification photo must be taken in the moment, not picked from
        an old photo. Shared/reused across every job card on the page. -->
+  <div id="empConfirmBackdrop" class="emp-confirm-modal" hidden>
+    <div class="emp-confirm-modal__panel">
+      <p class="emp-confirm-modal__message" id="empConfirmMessage"></p>
+      <div class="emp-confirm-modal__actions">
+        <button type="button" class="emp-btn emp-btn--ghost emp-btn--sm" id="empConfirmCancel">Cancel</button>
+        <button type="button" class="emp-btn emp-btn--complete" id="empConfirmOk">OK</button>
+      </div>
+    </div>
+  </div>
+
   <div id="empCameraModal" class="emp-camera-modal" hidden>
     <div class="emp-camera-modal__panel">
       <h3 class="emp-camera-modal__title" data-camera-title>Photo</h3>
@@ -449,52 +469,168 @@
   </div>
 
   <script>
+    // ------------------------------------------------------------------
+    // Tabs — tracked in a JS variable (not just CSS classes) because the
+    // AJAX handler below rebuilds #empDashboardRoot from scratch after
+    // every action; without this, every action would silently reset the
+    // visible tab back to whichever one the server renders open by
+    // default ("Today").
+    // ------------------------------------------------------------------
+    var currentEmpTab = 'tabToday';
+
     function switchEmpTab(btn, tabId) {
+      currentEmpTab = tabId;
       document.querySelectorAll('.emp-tab').forEach(t => t.classList.remove('is-active'));
       document.querySelectorAll('.emp-tab-content').forEach(c => c.style.display = 'none');
       btn.classList.add('is-active');
       document.getElementById(tabId).style.display = 'block';
     }
 
+    function showEmpTab(tabId) {
+      var btn = document.querySelector('.emp-tab[onclick*="\'' + tabId + '\'"]');
+      if (btn) switchEmpTab(btn, tabId);
+    }
+
+    function getCsrfToken() {
+      var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+      return match ? match[1] : '';
+    }
+
+    // Promise-based, replacing native window.confirm()/alert() — see the
+    // matching .emp-confirm-modal markup right after <body> below.
+    function _empModalPrompt(message, showCancel) {
+      return new Promise(function (resolve) {
+        var backdrop = document.getElementById('empConfirmBackdrop');
+        var msgEl = document.getElementById('empConfirmMessage');
+        var okBtn = document.getElementById('empConfirmOk');
+        var cancelBtn = document.getElementById('empConfirmCancel');
+
+        msgEl.textContent = message;
+        cancelBtn.hidden = !showCancel;
+        backdrop.hidden = false;
+
+        function cleanup(result) {
+          backdrop.hidden = true;
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          resolve(result);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+      });
+    }
+    function empConfirm(message) { return _empModalPrompt(message, true); }
+    function empAlert(message) { return _empModalPrompt(message, false); }
+
+    // Success/error banners used to render once and sit there forever —
+    // there was nothing to clear them since they only ever appeared via
+    // a full page load. Run on initial load AND after every AJAX swap
+    // below (fresh message elements need their own timer each time).
+    function autoHideEmpMessages() {
+      document.querySelectorAll('.emp-messages .emp-alert').forEach(function (el) {
+        setTimeout(function () {
+          el.classList.add('is-dismissing');
+          setTimeout(function () { el.remove(); }, 350);
+        }, 4000);
+      });
+    }
+    document.addEventListener('DOMContentLoaded', autoHideEmpMessages);
+
+    // ------------------------------------------------------------------
+    // AJAX form submission — every action on this page (duty toggle,
+    // status changes, OTP entry, leave requests, profile edits, ...)
+    // posts back to this same view and previously relied on a full
+    // browser navigation + redirect to show the result, which reset
+    // scroll position and snapped back to the "Today" tab regardless of
+    // where the employee actually was. Submitting via fetch instead and
+    // swapping in just the response's #empDashboardRoot keeps the page
+    // in place. Delegated on `document` (not bound per-form) so this
+    // keeps working on the freshly-swapped-in forms too, with no
+    // re-binding step needed after each swap.
+    // ------------------------------------------------------------------
+    function applyDashboardHtml(html) {
+      var freshRoot = new DOMParser().parseFromString(html, 'text/html').getElementById('empDashboardRoot');
+      var root = document.getElementById('empDashboardRoot');
+      if (!freshRoot || !root) return;
+      root.innerHTML = freshRoot.innerHTML;
+      showEmpTab(currentEmpTab);
+      autoHideEmpMessages();
+    }
+
+    document.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      if (!form.closest('#empDashboardRoot')) return;
+      e.preventDefault();
+
+      var proceed = form.dataset.confirm ? empConfirm(form.dataset.confirm) : Promise.resolve(true);
+      proceed.then(function (ok) {
+        if (!ok) return;
+        submitEmpForm(form);
+      });
+    });
+
+    function submitEmpForm(form) {
+      var submitBtn = form.querySelector('button[type=submit]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      // NOTE: every form here has <input name="action">, which shadows
+      // the form element's own `.action` IDL property (a named form
+      // control takes over the property of the same name) — `form.action`
+      // would silently return that <input> element instead of the URL
+      // string, breaking the request. getAttribute() reads the literal
+      // HTML attribute and isn't affected by this.
+      fetch(form.getAttribute('action'), {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCsrfToken() },
+        body: new FormData(form),
+      })
+        .then(function (resp) { return resp.text(); })
+        .then(applyDashboardHtml)
+        .catch(function () {
+          if (submitBtn) submitBtn.disabled = false;
+          empAlert('Something went wrong — check your connection and try again.');
+        });
+    }
+
     // Leave form: keep "To" from ever being before "From" (native min=
     // only guards against the past, not against the other field), and
     // show a live day-count so the employee sees what they're requesting
-    // before submitting instead of only after the page reloads.
-    document.addEventListener('DOMContentLoaded', function () {
+    // before submitting. Delegated on `document` since the date inputs
+    // get replaced whenever #empDashboardRoot is swapped after an
+    // unrelated action (e.g. marking a job paid while on the Profile tab).
+    document.addEventListener('change', function (e) {
+      if (e.target.id !== 'emp-leave-start' && e.target.id !== 'emp-leave-end') return;
       var startInput = document.getElementById('emp-leave-start');
       var endInput = document.getElementById('emp-leave-end');
       var preview = document.querySelector('[data-leave-duration-preview]');
       if (!startInput || !endInput || !preview) return;
 
-      function updateLeavePreview() {
-        if (startInput.value) endInput.min = startInput.value;
-        if (!startInput.value || !endInput.value) { preview.hidden = true; return; }
-        var start = new Date(startInput.value);
-        var end = new Date(endInput.value);
-        var days = Math.round((end - start) / 86400000) + 1;
-        if (days < 1) { preview.hidden = true; return; }
-        preview.textContent = days + ' day' + (days === 1 ? '' : 's');
-        preview.hidden = false;
-      }
-      startInput.addEventListener('change', updateLeavePreview);
-      endInput.addEventListener('change', updateLeavePreview);
+      if (startInput.value) endInput.min = startInput.value;
+      if (!startInput.value || !endInput.value) { preview.hidden = true; return; }
+      var start = new Date(startInput.value);
+      var end = new Date(endInput.value);
+      var days = Math.round((end - start) / 86400000) + 1;
+      if (days < 1) { preview.hidden = true; return; }
+      preview.textContent = days + ' day' + (days === 1 ? '' : 's');
+      preview.hidden = false;
     });
 
-    // Theme toggle script
-    document.addEventListener('DOMContentLoaded', function () {
-      var themeToggles = document.querySelectorAll('[data-theme-toggle]');
+    // Theme toggle — delegated for the same reason as above (the button
+    // lives inside the header, which is part of #empDashboardRoot).
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-theme-toggle]');
+      if (!btn) return;
       var root = document.documentElement;
-
-      themeToggles.forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var current = root.getAttribute('data-theme') || 'dark';
-          var next = current === 'dark' ? 'light' : 'dark';
-          root.setAttribute('data-theme', next);
-          localStorage.setItem('theme', next);
-        });
-      });
+      var current = root.getAttribute('data-theme') || 'dark';
+      var next = current === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
     });
 
+    // ------------------------------------------------------------------
     // Shared camera modal for both the arrival ("face verification") photo
     // and the 5 profile face-reference photos — deliberately no
     // <input type="file"> anywhere in either flow. getUserMedia +
@@ -502,7 +638,10 @@
     // is no gallery-picker path to bypass "live" capture with an old or
     // borrowed photo. Which action/fields get POSTed depends on
     // data-camera-mode ("verification" vs "face") on the button that
-    // opened the modal.
+    // opened the modal. The modal itself lives outside #empDashboardRoot
+    // (so it's never destroyed/rebuilt by an AJAX swap), but the buttons
+    // that open it live inside — hence the delegated click listener.
+    // ------------------------------------------------------------------
     document.addEventListener('DOMContentLoaded', function () {
       var modal = document.getElementById('empCameraModal');
       if (!modal) return;
@@ -522,11 +661,6 @@
       var activeMode = null;
       var activeBookingId = null;
       var activeFaceField = null;
-
-      function getCsrfToken() {
-        var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
-        return match ? match[1] : '';
-      }
 
       function showError(message) {
         errorEl.textContent = message;
@@ -567,28 +701,29 @@
         activeFaceField = null;
       }
 
-      document.querySelectorAll('[data-open-camera]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          activeMode = btn.dataset.cameraMode;
-          if (activeMode === 'face') {
-            activeFaceField = btn.dataset.faceField;
-            titleEl.textContent = 'Face Photo — ' + btn.dataset.faceLabel;
-          } else {
-            activeBookingId = btn.dataset.bookingId;
-            titleEl.textContent = 'Arrival Photo — #' + btn.dataset.bookingNumber;
-          }
-          resetToLiveView();
-          modal.hidden = false;
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-open-camera]');
+        if (!btn) return;
 
-          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            showError('Camera access isn\'t available in this browser.');
-            captureBtn.hidden = true;
-            return;
-          }
-          startStream().catch(function () {
-            showError('Couldn\'t access the camera — check camera permission for this site and try again.');
-            captureBtn.hidden = true;
-          });
+        activeMode = btn.dataset.cameraMode;
+        if (activeMode === 'face') {
+          activeFaceField = btn.dataset.faceField;
+          titleEl.textContent = 'Face Photo — ' + btn.dataset.faceLabel;
+        } else {
+          activeBookingId = btn.dataset.bookingId;
+          titleEl.textContent = 'Arrival Photo — #' + btn.dataset.bookingNumber;
+        }
+        resetToLiveView();
+        modal.hidden = false;
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showError('Camera access isn\'t available in this browser.');
+          captureBtn.hidden = true;
+          return;
+        }
+        startStream().catch(function () {
+          showError('Couldn\'t access the camera — check camera permission for this site and try again.');
+          captureBtn.hidden = true;
         });
       });
 
@@ -638,7 +773,11 @@
           headers: { 'X-CSRFToken': getCsrfToken() },
           body: formData,
         })
-          .then(function () { window.location.reload(); })
+          .then(function (resp) { return resp.text(); })
+          .then(function (html) {
+            closeModal();
+            applyDashboardHtml(html);
+          })
           .catch(function () {
             showError('Upload failed — check your connection and try again.');
             saveBtn.disabled = false;

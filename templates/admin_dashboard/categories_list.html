@@ -1,0 +1,207 @@
+{% extends "admin_dashboard/layouts/admin_base.html" %}
+
+{% block content %}
+  <!-- Toolbar -->
+  <div class="admin-toolbar">
+    <div class="admin-toolbar__title-text">
+      <h2>Categories</h2>
+      <p class="admin-text-muted">Add, edit, or remove catalog categories — each one's photo and description show on the marketing landing page's category grid.</p>
+    </div>
+
+    <button type="button" class="admin-btn admin-btn--gold" onclick="document.getElementById('addCategoryModal').style.display='flex'">
+      + Add Category
+    </button>
+  </div>
+
+  <!-- Categories Table -->
+  <div class="admin-card-table-box">
+    {% if categories %}
+      <div class="admin-table-wrapper">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Photo</th>
+              <th>Category</th>
+              <th>Description</th>
+              <th>Services</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cat in categories %}
+              <tr>
+                <td>
+                  {% if cat.display_image_url %}
+                    <img src="{{ cat.display_image_url }}" alt="{{ cat.name }}" class="admin-category-thumb">
+                  {% else %}
+                    <span class="admin-category-thumb admin-category-thumb--placeholder">{{ cat.icon|default:"🗂" }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <strong>{{ cat.name }}</strong>
+                  <div class="admin-text-muted" style="font-size: 0.8rem;">
+                    {% if cat.icon %}{{ cat.icon }} · {% endif %}<code>{{ cat.slug }}</code>
+                  </div>
+                </td>
+                <td>
+                  <span class="admin-text-muted">{{ cat.description|default:"—"|truncatechars:90 }}</span>
+                </td>
+                <td>
+                  <strong class="admin-text-gold">{{ cat.service_count }}</strong>
+                </td>
+                <td>
+                  <div class="admin-btn-group">
+                    <button
+                      type="button"
+                      class="admin-btn admin-btn--ghost admin-btn--xs"
+                      onclick="openEditCategoryModal('{{ cat.id }}', '{{ cat.name|escapejs }}', '{{ cat.icon|escapejs }}', '{{ cat.description|escapejs }}', '{% if cat.display_image_url %}{{ cat.display_image_url|escapejs }}{% endif %}')"
+                    >
+                      Edit
+                    </button>
+
+                    <form method="post" action="{% url 'admin_dashboard_categories' %}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('Delete category &quot;{{ cat.name|escapejs }}&quot;? This cannot be undone.').then(ok => { if (ok) this.submit(); }); return false;">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete_category">
+                      <input type="hidden" name="category_id" value="{{ cat.id }}">
+                      <button type="submit" class="admin-btn admin-btn--danger admin-btn--xs">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="admin-empty-state">
+        <p>No categories yet — add one to get started.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  {% include "admin_dashboard/partials/pagination.html" %}
+
+  <!-- Add Category Modal -->
+  <div id="addCategoryModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal">
+      <div class="admin-modal__head">
+        <h2>Add Category</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('addCategoryModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{% url 'admin_dashboard_categories' %}" class="admin-modal__body" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_category">
+
+        <div class="admin-form-group">
+          <label>Category Name *</label>
+          <input type="text" name="name" required class="admin-input" placeholder="e.g. Hair Care">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Icon (emoji, optional)</label>
+          <input type="text" name="icon" class="admin-input" placeholder="e.g. 💇" maxlength="40">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Description</label>
+          <textarea name="description" class="admin-textarea" rows="3" placeholder="Shown under the category photo on the landing page…"></textarea>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Photo — Upload</label>
+          <input type="file" name="image" accept="image/*" class="admin-input">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Photo — or Image URL</label>
+          <input type="url" name="image_url" class="admin-input" placeholder="https://example.com/photo.jpg">
+          <small class="admin-text-muted">Provide either one — an upload takes priority if both are given.</small>
+        </div>
+
+        <button type="submit" class="admin-btn admin-btn--primary">Create Category</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Category Modal -->
+  <div id="editCategoryModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal">
+      <div class="admin-modal__head">
+        <h2>Edit Category</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('editCategoryModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{% url 'admin_dashboard_categories' %}" class="admin-modal__body" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit_category">
+        <input type="hidden" name="category_id" id="editCategoryId">
+
+        <div class="admin-form-group">
+          <label>Category Name *</label>
+          <input type="text" name="name" id="editCategoryName" required class="admin-input">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Icon (emoji, optional)</label>
+          <input type="text" name="icon" id="editCategoryIcon" class="admin-input" maxlength="40">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Description</label>
+          <textarea name="description" id="editCategoryDescription" class="admin-textarea" rows="3"></textarea>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Current Photo</label>
+          <div>
+            <img id="editCategoryCurrentImage" src="" alt="" class="admin-category-thumb" style="display: none;">
+            <span id="editCategoryNoImage" class="admin-text-muted">No photo set yet.</span>
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Replace Photo — Upload</label>
+          <input type="file" name="image" accept="image/*" class="admin-input">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Replace Photo — or Image URL</label>
+          <input type="url" name="image_url" id="editCategoryImageUrl" class="admin-input" placeholder="https://example.com/photo.jpg">
+          <small class="admin-text-muted">Leave both blank to keep the current photo. An upload takes priority if both are given.</small>
+        </div>
+
+        <button type="submit" class="admin-btn admin-btn--primary">Save Changes</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_body %}
+  <script>
+    function openEditCategoryModal(id, name, icon, description, displayImageUrl) {
+      document.getElementById('editCategoryId').value = id;
+      document.getElementById('editCategoryName').value = name;
+      document.getElementById('editCategoryIcon').value = icon;
+      document.getElementById('editCategoryDescription').value = description;
+      // Deliberately left blank, not pre-filled with the category's
+      // current URL — this is a "replace" field, and pre-filling it
+      // would make an unrelated save (e.g. just editing the name)
+      // silently re-submit that URL as if it had been re-entered.
+      document.getElementById('editCategoryImageUrl').value = '';
+
+      const img = document.getElementById('editCategoryCurrentImage');
+      const noImg = document.getElementById('editCategoryNoImage');
+      if (displayImageUrl) {
+        img.src = displayImageUrl;
+        img.style.display = 'inline-block';
+        noImg.style.display = 'none';
+      } else {
+        img.style.display = 'none';
+        noImg.style.display = 'inline';
+      }
+
+      document.getElementById('editCategoryModal').style.display = 'flex';
+    }
+  </script>
+{% endblock %}

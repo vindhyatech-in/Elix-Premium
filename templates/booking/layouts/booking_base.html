@@ -74,6 +74,12 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   {% endif %}
 
+  <!-- Razorpay Checkout.js — powers the booking drawer's real "Pay Now"
+       step (see booking_drawer.js). Loading it unconditionally is fine
+       even with no real RAZORPAY_KEY_ID yet — it just sits unused until
+       someone actually picks Pay Now. -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
   <script src="{% static 'js/main.js' %}" defer></script>
   <script src="{% static 'js/booking.js' %}" defer></script>
   <script src="{% static 'js/booking_drawer.js' %}" defer></script>

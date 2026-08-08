@@ -59,6 +59,9 @@
                   <span class="admin-badge admin-badge--emp-{{ emp.status }}">
                     {{ emp.get_status_display }}
                   </span>
+                  {% if emp.user and not emp.user.is_active %}
+                    <div class="admin-text-muted" style="margin-top: 0.35rem; font-size: 0.75rem;">🔒 Login disabled</div>
+                  {% endif %}
                   {% if emp.upcoming_leaves %}
                     <div class="admin-text-muted" style="margin-top: 0.35rem; font-size: 0.75rem;">
                       🏖️ Leave:
@@ -78,7 +81,7 @@
                       Edit
                     </button>
 
-                    <form method="post" action="{% url 'admin_dashboard_employees' %}" class="admin-inline-form">
+                    <form method="post" action="{% url 'admin_dashboard_employees' %}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('Mark &quot;{{ emp.name|escapejs }}&quot; as {% if emp.status == 'active' %}on leave{% else %}active{% endif %}?').then(ok => { if (ok) this.submit(); }); return false;">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="toggle_status">
                       <input type="hidden" name="employee_id" value="{{ emp.id }}">
@@ -94,6 +97,22 @@
                         <input type="hidden" name="employee_id" value="{{ emp.id }}">
                         <button type="submit" class="admin-btn admin-btn--ghost admin-btn--xs">Generate Login</button>
                       </form>
+                    {% else %}
+                      <form method="post" action="{% url 'admin_dashboard_employees' %}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('Reset the login password for &quot;{{ emp.name|escapejs }}&quot;? Their current password will stop working immediately.').then(ok => { if (ok) this.submit(); }); return false;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="reset_password">
+                        <input type="hidden" name="employee_id" value="{{ emp.id }}">
+                        <button type="submit" class="admin-btn admin-btn--ghost admin-btn--xs">Reset Password</button>
+                      </form>
+
+                      <form method="post" action="{% url 'admin_dashboard_employees' %}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('{% if emp.user.is_active %}Disable the login for &quot;{{ emp.name|escapejs }}&quot;? They won\'t be able to sign in until it\'s re-enabled.{% else %}Re-enable the login for &quot;{{ emp.name|escapejs }}&quot;?{% endif %}').then(ok => { if (ok) this.submit(); }); return false;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="toggle_login">
+                        <input type="hidden" name="employee_id" value="{{ emp.id }}">
+                        <button type="submit" class="admin-btn admin-btn--ghost admin-btn--xs">
+                          {% if emp.user.is_active %}Disable Login{% else %}Enable Login{% endif %}
+                        </button>
+                      </form>
                     {% endif %}
                   </div>
                 </td>
@@ -108,6 +127,8 @@
       </div>
     {% endif %}
   </div>
+
+  {% include "admin_dashboard/partials/pagination.html" %}
 
   <!-- Add Employee Modal -->
   <div id="addEmployeeModal" class="admin-modal-backdrop" style="display: none;">

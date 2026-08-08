@@ -93,7 +93,7 @@ def service_detail(request, slug):
                 included_services_data.append({
                     'id': inc.id,
                     'name': inc.name,
-                    'photo': inc.photo or 'images/portfolio-5.jpg',
+                    'photo': inc.display_photo_url,
                     'selected_variant_id': inc_default.id,
                     'price': float(inc_default.price),
                     'duration_mins': inc_default.duration_mins,

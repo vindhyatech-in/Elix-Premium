@@ -2,8 +2,15 @@
 
 {% block content %}
   <!-- Toolbar -->
-  <div class="admin-toolbar">
+  <div class="admin-toolbar admin-toolbar--sticky">
+    <div class="admin-filter-tabs">
+      <a href="?kind=all{% if search_query %}&q={{ search_query }}{% endif %}{% if category_slug != 'all' %}&category={{ category_slug }}{% endif %}{% if sort != '-created_at' %}&sort={{ sort }}{% endif %}" class="admin-filter-tab {% if kind_filter == 'all' %}is-active{% endif %}">All</a>
+      <a href="?kind=service{% if search_query %}&q={{ search_query }}{% endif %}{% if category_slug != 'all' %}&category={{ category_slug }}{% endif %}{% if sort != '-created_at' %}&sort={{ sort }}{% endif %}" class="admin-filter-tab {% if kind_filter == 'service' %}is-active{% endif %}">Services</a>
+      <a href="?kind=package{% if search_query %}&q={{ search_query }}{% endif %}{% if category_slug != 'all' %}&category={{ category_slug }}{% endif %}{% if sort != '-created_at' %}&sort={{ sort }}{% endif %}" class="admin-filter-tab {% if kind_filter == 'package' %}is-active{% endif %}">Packages</a>
+    </div>
+
     <form method="get" action="{% url 'admin_dashboard_services' %}" class="admin-toolbar__form">
+      <input type="hidden" name="kind" value="{{ kind_filter }}">
       <div class="admin-toolbar__group">
         <input
           type="text"
@@ -20,8 +27,17 @@
           {% endfor %}
         </select>
 
+        <select name="sort" class="admin-select" onchange="this.form.submit()">
+          <option value="-created_at" {% if sort == '-created_at' %}selected{% endif %}>Newest First</option>
+          <option value="created_at" {% if sort == 'created_at' %}selected{% endif %}>Oldest First</option>
+          <option value="name" {% if sort == 'name' %}selected{% endif %}>Name (A-Z)</option>
+          <option value="-name" {% if sort == '-name' %}selected{% endif %}>Name (Z-A)</option>
+          <option value="price" {% if sort == 'price' %}selected{% endif %}>Price (Low to High)</option>
+          <option value="-price" {% if sort == '-price' %}selected{% endif %}>Price (High to Low)</option>
+        </select>
+
         <button type="submit" class="admin-btn admin-btn--primary">Filter</button>
-        {% if search_query or category_slug != 'all' %}
+        {% if search_query or category_slug != 'all' or sort != '-created_at' or kind_filter != 'all' %}
           <a href="{% url 'admin_dashboard_services' %}" class="admin-btn admin-btn--ghost">Clear</a>
         {% endif %}
       </div>
@@ -74,7 +90,7 @@
 
             <div class="admin-service-card__actions">
               <!-- Toggle Active -->
-              <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-inline-form">
+              <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('Are you sure you want to {% if service.is_active %}disable{% else %}enable{% endif %} &quot;{{ service.name|escapejs }}&quot;?').then(ok => { if (ok) this.submit(); }); return false;">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle_service">
                 <input type="hidden" name="service_id" value="{{ service.id }}">
@@ -87,7 +103,7 @@
               <button
                 type="button"
                 class="admin-btn admin-btn--ghost admin-btn--xs"
-                onclick="openEditServiceModal('{{ service.id }}', '{{ service.name|escapejs }}', '{{ service.category.id }}', '{{ service.kind }}', '{{ service.description|escapejs }}', '{{ service.badges|join:", "|escapejs }}', [{% for inc in service.included_services.all %}{{ inc.id }}{% if not forloop.last %},{% endif %}{% endfor %}])"
+                onclick="openEditServiceModal('{{ service.id }}', '{{ service.name|escapejs }}', '{{ service.category.id }}', '{{ service.kind }}', '{{ service.description|escapejs }}', '{{ service.badges|join:", "|escapejs }}', [{% for inc in service.included_services.all %}{{ inc.id }}{% if not forloop.last %},{% endif %}{% endfor %}], '{{ service.display_photo_url|escapejs }}')"
               >
                 ✏ Edit Service
               </button>
@@ -104,7 +120,7 @@
               {% endif %}
 
               <!-- Delete Service -->
-              <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-inline-form" onsubmit="return confirm('Are you sure you want to delete service &quot;{{ service.name|escapejs }}&quot;? This action cannot be undone.');">
+              <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('Are you sure you want to delete service &quot;{{ service.name|escapejs }}&quot;? This action cannot be undone.').then(ok => { if (ok) this.submit(); }); return false;">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="delete_service">
                 <input type="hidden" name="service_id" value="{{ service.id }}">
@@ -164,7 +180,7 @@
                           </button>
 
                           {% if service.variants.count > 1 %}
-                            <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-inline-form" onsubmit="return confirm('Delete this variant?');">
+                            <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('Delete this variant?').then(ok => { if (ok) this.submit(); }); return false;">
                               {% csrf_token %}
                               <input type="hidden" name="action" value="delete_variant">
                               <input type="hidden" name="variant_id" value="{{ variant.id }}">
@@ -204,6 +220,8 @@
     {% endif %}
   </div>
 
+  {% include "admin_dashboard/partials/pagination.html" %}
+
   <!-- Add Service Modal (With Dynamic Variants) -->
   <div id="addServiceModal" class="admin-modal-backdrop" style="display: none;">
     <div class="admin-modal admin-modal--large">
@@ -212,7 +230,7 @@
         <button type="button" class="admin-modal__close" onclick="document.getElementById('addServiceModal').style.display='none'">×</button>
       </div>
 
-      <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-modal__body">
+      <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-modal__body" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="action" value="add_service">
 
@@ -238,6 +256,18 @@
             </select>
           </div>
         </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Photo — Upload</label>
+            <input type="file" name="photo_image" accept="image/*" class="admin-input">
+          </div>
+          <div class="admin-form-group">
+            <label>Photo — or Image URL</label>
+            <input type="url" name="photo_url" class="admin-input" placeholder="https://example.com/photo.jpg">
+          </div>
+        </div>
+        <small class="admin-text-muted" style="display: block; margin-top: -0.5rem; margin-bottom: 0.75rem;">Provide either one — an upload takes priority if both are given. Leave both blank to use a generic placeholder photo.</small>
 
         <div class="admin-form-group" id="packageIncludedServicesGroup_add" style="display: none;">
           <label>Select Included Services (For Package Auto-Calculation) *</label>
@@ -300,8 +330,8 @@
         <!-- Variants Container -->
         <div class="admin-variants-section">
           <div class="admin-variants-section__head">
-            <h3>Service Variants & Prices *</h3>
-            <button type="button" class="admin-btn admin-btn--ghost admin-btn--xs" onclick="addVariantRow('variantsContainer')">+ Add Another Variant</button>
+            <h3 id="addVariantsSectionTitle">Service Variants & Prices *</h3>
+            <button type="button" id="addAnotherVariantBtn" class="admin-btn admin-btn--ghost admin-btn--xs" onclick="addVariantRow('variantsContainer')">+ Add Another Variant</button>
           </div>
 
           <div id="variantsContainer" class="admin-variant-rows">
@@ -343,7 +373,7 @@
         <button type="button" class="admin-modal__close" onclick="document.getElementById('editServiceModal').style.display='none'">×</button>
       </div>
 
-      <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-modal__body">
+      <form method="post" action="{% url 'admin_dashboard_services' %}" class="admin-modal__body" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="action" value="edit_service">
         <input type="hidden" name="service_id" id="editServiceId">
@@ -370,6 +400,25 @@
             </select>
           </div>
         </div>
+
+        <div class="admin-form-group">
+          <label>Current Photo</label>
+          <div>
+            <img id="editServiceCurrentPhoto" src="" alt="" class="admin-category-thumb">
+          </div>
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Replace Photo — Upload</label>
+            <input type="file" name="photo_image" accept="image/*" class="admin-input">
+          </div>
+          <div class="admin-form-group">
+            <label>Replace Photo — or Image URL</label>
+            <input type="url" name="photo_url" id="editServicePhotoUrl" class="admin-input" placeholder="https://example.com/photo.jpg">
+          </div>
+        </div>
+        <small class="admin-text-muted" style="display: block; margin-top: -0.5rem; margin-bottom: 0.75rem;">Leave both blank to keep the current photo. An upload takes priority if both are given.</small>
 
         <div class="admin-form-group" id="packageIncludedServicesGroup_edit" style="display: none;">
           <label>Included Single Services in Package *</label>
@@ -582,12 +631,19 @@
       const kindSelect = mode === 'add' ? document.getElementById('addServiceKind') : document.getElementById('editServiceKind');
       const group = mode === 'add' ? document.getElementById('packageIncludedServicesGroup_add') : document.getElementById('packageIncludedServicesGroup_edit');
       const summary = mode === 'add' ? document.getElementById('addPackageTotalsSummary') : document.getElementById('editPackageTotalsSummary');
-      const variantsSection = mode === 'add' ? document.querySelector('#addServiceModal .admin-variants-section') : null;
+      // The price/MRP/duration row stays visible either way — a package
+      // still needs its own selling price entered manually (only MRP and
+      // duration get auto-filled from the included services below); it
+      // just doesn't need the "add another variant" option, since a
+      // package has exactly one price, not several.
+      const addAnotherBtn = mode === 'add' ? document.getElementById('addAnotherVariantBtn') : null;
+      const sectionTitle = mode === 'add' ? document.getElementById('addVariantsSectionTitle') : null;
       const isPackage = kindSelect && kindSelect.value === 'package';
 
       if (group) group.style.display = isPackage ? 'block' : 'none';
       if (summary) summary.style.display = isPackage ? 'block' : 'none';
-      if (variantsSection) variantsSection.style.display = isPackage ? 'none' : 'block';
+      if (addAnotherBtn) addAnotherBtn.style.display = isPackage ? 'none' : 'inline-flex';
+      if (sectionTitle) sectionTitle.textContent = isPackage ? 'Package Price *' : 'Service Variants & Prices *';
 
       if (isPackage) recalculatePackageTotals(mode);
     }
@@ -615,13 +671,19 @@
       }
     }
 
-    function openEditServiceModal(id, name, categoryId, kind, description, badges, includedIds) {
+    function openEditServiceModal(id, name, categoryId, kind, description, badges, includedIds, currentPhotoUrl) {
       document.getElementById('editServiceId').value = id;
       document.getElementById('editServiceName').value = name;
       document.getElementById('editServiceCategoryId').value = categoryId;
       document.getElementById('editServiceKind').value = kind;
       document.getElementById('editServiceDescription').value = description;
       document.getElementById('editServiceBadges').value = badges;
+      document.getElementById('editServiceCurrentPhoto').src = currentPhotoUrl;
+      // Deliberately left blank, not pre-filled with the service's own
+      // current URL — this is a "replace" field, and pre-filling it
+      // would make an unrelated save (e.g. just editing the name)
+      // silently re-submit that URL as if it had been re-entered.
+      document.getElementById('editServicePhotoUrl').value = '';
 
       const editGroup = document.getElementById('packageIncludedServicesGroup_edit');
       if (editGroup) {

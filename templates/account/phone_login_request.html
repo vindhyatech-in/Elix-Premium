@@ -1,0 +1,55 @@
+{% extends "allauth/layouts/base.html" %}
+{% load i18n %}
+
+{% block head_title %}{% trans "Sign In" %}{% endblock head_title %}
+
+{% block content %}
+  <div class="auth-card__header">
+    <h1 class="auth-card__title">{% trans "Sign In with Phone" %}</h1>
+    <p class="auth-card__text">
+      {% trans "We'll send a one-time code to verify your number." %}
+    </p>
+  </div>
+
+  {% if form.non_field_errors %}
+    <div class="auth-card__alert">
+      {% for error in form.non_field_errors %}
+        <p>{{ error }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" class="auth-card__form" novalidate>
+    {% csrf_token %}
+
+    <div class="auth-group">
+      <label for="id_phone" class="auth-label">{% trans "PHONE NUMBER:" %}</label>
+      <input
+        type="text"
+        name="phone"
+        id="id_phone"
+        class="auth-input {% if form.phone.errors %}is-invalid{% endif %}"
+        placeholder="9876543210"
+        value="{{ form.phone.value|default:'' }}"
+        required
+        autofocus
+        autocomplete="tel"
+      >
+      {% if form.phone.errors %}
+        <ul class="auth-field-errors">
+          {% for error in form.phone.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <button type="submit" class="auth-submit-btn">
+      {% trans "Send Code" %}
+    </button>
+  </form>
+
+  <div class="auth-tier3__back">
+    <a href="{% url 'account_login' %}" class="auth-forgot-link">{% trans "Other sign-in options" %}</a>
+  </div>
+{% endblock content %}

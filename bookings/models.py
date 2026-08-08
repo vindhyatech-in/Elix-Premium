@@ -1,21 +1,8 @@
 import secrets
-from datetime import datetime, time, timedelta
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.utils import timezone
-
-# Each regular time_slot's own start time — used to compute a concrete
-# datetime a booking is "for", since only exact_time exists on urgent
-# bookings. Mirrors the windows in Booking.SLOT_CHOICES below.
-SLOT_START_TIMES = {
-    'morning': time(8, 0),
-    'afternoon': time(12, 0),
-    'evening': time(16, 0),
-}
-
-# How far ahead of the scheduled time a booking can still be cancelled.
-CANCELLATION_CUTOFF = timedelta(hours=3)
 
 
 def _generate_booking_number():
@@ -62,7 +49,12 @@ class Booking(models.Model):
     ]
 
     booking_number = models.CharField(max_length=20, unique=True, editable=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bookings')
+    # SET_NULL, not CASCADE — a customer deleting their own account (see
+    # accounts/views.py::delete_account) must not also erase real revenue/
+    # order history; the booking row (and its items/amounts) survives with
+    # user=None. Reviews still cascade away with the account (Review.user
+    # stays CASCADE) since those are opinion, not a financial record.
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='bookings')
     assigned_beautician = models.ForeignKey(
         'accounts.Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_bookings'
     )
@@ -83,6 +75,11 @@ class Booking(models.Model):
 
     payment_method = models.CharField(max_length=15, choices=PAYMENT_METHOD_CHOICES)
     payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS_CHOICES, default='pending')
+    # Populated only for payment_method='pay_now', after the signature
+    # verification in bookings/views.py::create_booking passes — kept for
+    # support/refund lookups against the Razorpay dashboard.
+    razorpay_order_id = models.CharField(max_length=40, blank=True)
+    razorpay_payment_id = models.CharField(max_length=40, blank=True)
 
     # Snapshotted amounts — recomputed server-side at booking time from real
     # ServiceVariant prices, then frozen here. A later price/coupon change
@@ -111,6 +108,20 @@ class Booking(models.Model):
     start_otp = models.CharField(max_length=6, blank=True)
     otp_generated_at = models.DateTimeField(null=True, blank=True)
     otp_verified_at = models.DateTimeField(null=True, blank=True)
+    # A 6-digit code with no attempt cap is guessable within its 20-minute
+    # validity window at a high enough request rate — locks out after 5
+    # wrong guesses (see employee_dashboard_views.py::verify_start_otp),
+    # reset to 0 whenever a fresh code is generated.
+    otp_failed_attempts = models.PositiveSmallIntegerField(default=0)
+
+    # One overall write-up for the whole order — separate from each
+    # BookingItem's own star `Review` (see Review model below). A
+    # multi-item order earning 5 individual star ratings but only one
+    # free-text comment about the visit as a whole reads far more
+    # naturally than the same text repeated under every item, or forcing
+    # a customer to write several near-identical paragraphs.
+    feedback_comment = models.TextField(blank=True)
+    feedback_submitted_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -127,21 +138,25 @@ class Booking(models.Model):
         return self.booking_number
 
     @property
-    def scheduled_start(self):
-        """The concrete datetime this booking is actually for — a regular
-        booking only stores a time_slot (a window, not a moment), so this
-        uses that slot's own start time; an urgent booking already has a
-        real exact_time. Only meaningful thing this is used for today is
-        can_cancel below (USE_TZ=False, so plain naive datetimes throughout
-        — no timezone.make_aware() needed)."""
-        slot_time = self.exact_time if self.booking_type == 'urgent' and self.exact_time else SLOT_START_TIMES.get(self.time_slot, time(0, 0))
-        return datetime.combine(self.scheduled_date, slot_time)
+    def can_cancel(self):
+        """Cancellable any time up until the beautician marks arrival —
+        once status leaves 'upcoming' (on_the_way/in_progress/etc.), the
+        job is already in motion and can no longer be self-cancelled."""
+        return self.status == 'upcoming'
 
     @property
-    def can_cancel(self):
-        """Only an 'upcoming' booking, and only until CANCELLATION_CUTOFF
-        (3h) before it starts — see developed.md "Bookings dashboard"."""
-        return self.status == 'upcoming' and timezone.now() <= self.scheduled_start - CANCELLATION_CUTOFF
+    def customer_display_name(self):
+        """First name (falling back to username), or a placeholder once
+        the account has been deleted (user=None — see accounts/views.py::
+        delete_account, and Booking.user's on_delete=SET_NULL). Exists
+        because `{{ booking.user.first_name|default:booking.user.username }}`
+        crashes once `booking.user` can be None: Django's `default` filter
+        evaluates its argument as its own variable lookup, and a lookup
+        that bottoms out at None (unlike one that's simply missing) isn't
+        caught silently the way the bare value is."""
+        if not self.user:
+            return 'Deleted user'
+        return self.user.first_name or self.user.username
 
 
 class BookingItem(models.Model):
@@ -156,16 +171,30 @@ class BookingItem(models.Model):
     duration_snapshot = models.PositiveIntegerField()
     quantity = models.PositiveSmallIntegerField(default=1)
 
+    # Only populated for a package item — a snapshot of each included
+    # service's name/variant/price/duration at booking time (see
+    # bookings/views.py::create_booking), since Service.included_services
+    # only defines what a package *can* include, not what a specific past
+    # booking actually had — that's what lets job cards/dashboards list a
+    # package's contents instead of showing just its one line.
+    included_snapshot = models.JSONField(default=list, blank=True)
+
     def __str__(self):
         return f'{self.name_snapshot} x{self.quantity}'
 
 
 class Review(models.Model):
     """
-    A customer's rating + comment for one completed booking item — see
-    bookings/views.py::submit_review. One review per item, enforced via
-    OneToOneField (not per Booking — a booking can contain several
+    A customer's star rating for one completed booking item — see
+    bookings/views.py::submit_review (one click on a star, submitted via
+    AJAX, updatable — not a one-shot form). One review per item, enforced
+    via OneToOneField (not per Booking — a booking can contain several
     different services, each earning its own rating).
+
+    `comment` predates the one-shared-comment-per-order redesign (see
+    Booking.feedback_comment) — kept, still populated on older rows, but
+    the current UI only ever writes `rating` here; free-text feedback is
+    collected once for the whole order instead.
 
     `service` is denormalized here rather than reached via
     `booking_item.service_variant.service` because `service_variant` is
@@ -197,3 +226,30 @@ class Review(models.Model):
             parts = full_name.split()
             return f'{parts[0]} {parts[1][0]}.' if len(parts) > 1 else parts[0]
         return self.user.email.split('@')[0]
+
+
+class Offer(models.Model):
+    """
+    A real, admin-manageable coupon — replaces the hardcoded
+    `COUPON_RATES` dict that used to live in bookings/views.py (kept the
+    same three seeded codes, see the 0010 migration, so nothing already
+    advertised in marketing copy silently stops working). `code` is what
+    a customer types at checkout (see _resolve_cart_pricing); `title`/
+    `description` are what's shown in the "Offers" navbar dropdown (see
+    core/booking_data.py::get_booking_offers()).
+    """
+    code = models.CharField(max_length=20, unique=True)
+    title = models.CharField(max_length=140)
+    description = models.TextField(blank=True)
+    discount_pct = models.PositiveSmallIntegerField(
+        help_text='Whole percent off the cart subtotal, 1-100.',
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.code} — {self.discount_pct}% off'

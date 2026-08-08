@@ -1,0 +1,39 @@
+{% if page_obj.paginator.count %}
+  <div class="admin-pagination">
+    <div class="admin-pagination__info-row">
+      <span class="admin-pagination__info">
+        Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+      </span>
+      <label class="admin-pagination__per-page">
+        Show
+        <select
+          class="admin-select admin-select--sm"
+          onchange="window.location.href = '?per_page=' + this.value + '&page=1{% if other_params %}&{{ other_params }}{% endif %}'"
+        >
+          <option value="10" {% if page_obj.paginator.per_page == 10 %}selected{% endif %}>10</option>
+          <option value="20" {% if page_obj.paginator.per_page == 20 %}selected{% endif %}>20</option>
+          <option value="50" {% if page_obj.paginator.per_page == 50 %}selected{% endif %}>50</option>
+        </select>
+        per page
+      </label>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="admin-pagination__controls">
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}{% if other_params %}&{{ other_params }}{% endif %}" class="admin-btn admin-btn--ghost admin-btn--sm">← Prev</a>
+        {% else %}
+          <span class="admin-btn admin-btn--ghost admin-btn--sm admin-pagination__disabled">← Prev</span>
+        {% endif %}
+
+        <span class="admin-pagination__pages">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}{% if other_params %}&{{ other_params }}{% endif %}" class="admin-btn admin-btn--ghost admin-btn--sm">Next →</a>
+        {% else %}
+          <span class="admin-btn admin-btn--ghost admin-btn--sm admin-pagination__disabled">Next →</span>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+{% endif %}

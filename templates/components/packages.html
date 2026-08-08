@@ -1,4 +1,3 @@
-{% load static %}
 <section class="packages section" id="packages" data-api="/api/v1/packages/" aria-labelledby="packages-title">
   <div class="container">
     <div class="section-head section-head--center" data-aos="fade-up">
@@ -11,7 +10,7 @@
       {% for package in packages %}
         <a href="{% url 'services_booking' %}?category=package" class="category-card" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
           <div class="category-card__media">
-            <img src="{% static package.photo|default:'images/portfolio-6.jpg' %}" alt="{{ package.name }}" loading="lazy">
+            <img src="{{ package.photo }}" alt="{{ package.name }}" loading="lazy">
             {% if package.featured %}<span class="category-card__count">Most Loved</span>{% endif %}
           </div>
           <div class="category-card__body">

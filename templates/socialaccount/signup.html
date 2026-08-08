@@ -1,0 +1,65 @@
+{% extends "allauth/layouts/base.html" %}
+{% load i18n %}
+
+{% block head_title %}{% trans "Sign Up" %}{% endblock head_title %}
+
+{% block content %}
+  <div class="auth-card__header">
+    <h1 class="auth-card__title">{% trans "Almost Done" %}</h1>
+    <p class="auth-card__text">
+      {% blocktrans with provider_name=account.get_provider.name %}You're signing in with {{ provider_name }} — just a couple more details to finish creating your account.{% endblocktrans %}
+    </p>
+  </div>
+
+  {% if form.non_field_errors %}
+    <div class="auth-card__alert">
+      {% for error in form.non_field_errors %}
+        <p>{{ error }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" action="{% url 'socialaccount_signup' %}" class="auth-card__form" novalidate>
+    {% csrf_token %}
+    {% if redirect_field_value %}
+      <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+    {% endif %}
+
+    <div class="auth-group-row">
+      <div class="auth-group">
+        <label for="id_first_name" class="auth-label">{% trans "FIRST NAME:" %}</label>
+        <input type="text" name="first_name" id="id_first_name" class="auth-input {% if form.first_name.errors %}is-invalid{% endif %}" value="{{ form.first_name.value|default:'' }}" required autocomplete="given-name">
+        {% if form.first_name.errors %}<ul class="auth-field-errors">{% for error in form.first_name.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+      <div class="auth-group">
+        <label for="id_last_name" class="auth-label">{% trans "LAST NAME:" %}</label>
+        <input type="text" name="last_name" id="id_last_name" class="auth-input {% if form.last_name.errors %}is-invalid{% endif %}" value="{{ form.last_name.value|default:'' }}" autocomplete="family-name">
+        {% if form.last_name.errors %}<ul class="auth-field-errors">{% for error in form.last_name.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+    </div>
+
+    {% if form.email %}
+      <div class="auth-group">
+        <label for="id_email" class="auth-label">{% trans "EMAIL:" %}</label>
+        <input type="email" name="email" id="id_email" class="auth-input {% if form.email.errors %}is-invalid{% endif %}" value="{{ form.email.value|default:'' }}" required autocomplete="email">
+        {% if form.email.errors %}<ul class="auth-field-errors">{% for error in form.email.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+    {% endif %}
+
+    <div class="auth-group">
+      <label for="id_phone" class="auth-label">{% trans "PHONE NUMBER:" %}</label>
+      <input type="text" name="phone" id="id_phone" class="auth-input {% if form.phone.errors %}is-invalid{% endif %}" placeholder="9876543210" value="{{ form.phone.value|default:'' }}" required autocomplete="tel">
+      {% if form.phone.errors %}<ul class="auth-field-errors">{% for error in form.phone.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+
+    <div class="auth-group">
+      <label for="id_age" class="auth-label">{% trans "AGE:" %}</label>
+      <input type="number" name="age" id="id_age" min="13" max="120" class="auth-input {% if form.age.errors %}is-invalid{% endif %}" value="{{ form.age.value|default:'' }}" required>
+      {% if form.age.errors %}<ul class="auth-field-errors">{% for error in form.age.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+
+    <button type="submit" class="auth-submit-btn">
+      {% trans "Complete Sign Up" %}
+    </button>
+  </form>
+{% endblock content %}

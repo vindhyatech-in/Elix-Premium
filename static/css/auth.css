@@ -285,6 +285,85 @@ body.auth-page {
   margin: 0 !important;
 }
 
+/* "OR" divider between two alternative fields (password reset: username/email) */
+.auth-tier3__divider {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  margin: 0.25rem 0 1.1rem !important;
+  color: var(--ink-muted) !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+}
+.auth-tier3__divider::before,
+.auth-tier3__divider::after {
+  content: '' !important;
+  flex: 1 !important;
+  height: 1px !important;
+  background: var(--border-hairline) !important;
+}
+
+.auth-card__text--footnote {
+  margin-top: 1.5rem !important;
+  text-align: center !important;
+}
+
+/* Two-column field row (signup: first/last name) */
+.auth-group-row {
+  display: flex !important;
+  gap: 1rem !important;
+}
+.auth-group-row .auth-group {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+}
+
+/* Tier 3 (de-emphasized username/password fallback on the login page) */
+.auth-tier3 {
+  width: 100% !important;
+  margin-top: 0.5rem !important;
+}
+
+.auth-tier3__summary {
+  cursor: pointer !important;
+  list-style: none !important;
+  font-size: 0.875rem !important;
+  color: var(--ink-muted) !important;
+  text-align: center !important;
+  padding: 0.5rem 0 !important;
+  transition: color 0.2s ease !important;
+}
+.auth-tier3__summary::-webkit-details-marker {
+  display: none !important;
+}
+.auth-tier3__summary:hover {
+  color: var(--accent-gold) !important;
+}
+.auth-tier3[open] .auth-tier3__summary {
+  margin-bottom: 1rem !important;
+}
+
+.auth-tier3__back {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 0.6rem !important;
+  margin-top: 1.5rem !important;
+}
+
+.auth-resend-form {
+  margin: 0 !important;
+}
+
+.auth-resend-btn {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  font-family: inherit !important;
+}
+
 .auth-shell__back {
   font-size: 0.9rem !important;
   color: var(--ink-muted) !important;
@@ -293,4 +372,101 @@ body.auth-page {
 }
 .auth-shell__back:hover {
   color: var(--accent-gold) !important;
+}
+
+/* Account-management pages (change password, email list, connections) —
+   these render through allauth's {% element form/fields/field %} system
+   instead of a hand-written page template, so the shared classes below
+   back the elements/*.html overrides in templates/allauth/elements/. */
+.auth-input.is-invalid {
+  border-color: #ff8a80 !important;
+}
+
+.auth-card__subtitle {
+  font-family: var(--font-display) !important;
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+  color: var(--text-body) !important;
+  margin: 1.75rem 0 1rem !important;
+}
+
+.auth-card__form-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.75rem !important;
+  margin-top: 0.5rem !important;
+}
+
+.auth-card__form-actions .auth-card__btn {
+  margin-top: 0 !important;
+}
+
+/* Radio rows — email-address list (email.html) and connected-account
+   list (connections.html), both driven by {% element field type="radio" %} */
+.auth-radio-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  padding: 0.85rem 1rem !important;
+  border: 1px solid var(--border-hairline) !important;
+  border-radius: 12px !important;
+  margin-bottom: 0.6rem !important;
+  cursor: pointer !important;
+  background: var(--surface-1) !important;
+}
+
+.auth-radio-row__input {
+  width: 17px !important;
+  height: 17px !important;
+  accent-color: var(--gold-deep) !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+}
+
+.auth-radio-row__label {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 0.5rem !important;
+  font-size: 0.925rem !important;
+  color: var(--text-body) !important;
+}
+
+.auth-badge {
+  display: inline-block !important;
+  padding: 0.15rem 0.6rem !important;
+  border-radius: var(--radius-pill) !important;
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  background: var(--surface-3) !important;
+  color: var(--ink-muted) !important;
+}
+
+.auth-badge--success {
+  background: var(--green-light) !important;
+  color: var(--green-deep) !important;
+}
+
+.auth-badge--warning {
+  background: rgba(217, 119, 6, 0.12) !important;
+  color: #b45309 !important;
+}
+
+.auth-badge--primary {
+  background: var(--gold-light) !important;
+  color: var(--gold-deep) !important;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }

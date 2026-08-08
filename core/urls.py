@@ -13,6 +13,8 @@ urlpatterns = [
     path('dashboard/bookings/', admin_dashboard_views.dashboard_bookings, name='admin_dashboard_bookings'),
     path('dashboard/services/', admin_dashboard_views.dashboard_services, name='admin_dashboard_services'),
     path('dashboard/employees/', admin_dashboard_views.dashboard_employees, name='admin_dashboard_employees'),
+    path('dashboard/categories/', admin_dashboard_views.dashboard_categories, name='admin_dashboard_categories'),
+    path('dashboard/offers/', admin_dashboard_views.dashboard_offers, name='admin_dashboard_offers'),
     # Employee / Beautician Dashboard
     path('employee/', employee_dashboard_views.employee_dashboard, name='employee_dashboard'),
 ]

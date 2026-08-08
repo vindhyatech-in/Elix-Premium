@@ -11,7 +11,7 @@
       {% for cat in categories %}
         <a href="{% url 'services_booking' %}?category={{ cat.slug }}" class="category-card" data-aos="fade-up" data-aos-delay="{{ forloop.counter0|add:'0' }}00">
           <div class="category-card__media">
-            <img src="{% static cat.photo %}" alt="{{ cat.name }}" loading="lazy">
+            <img src="{{ cat.photo_url }}" alt="{{ cat.name }}" loading="lazy">
             <span class="category-card__count">{{ cat.services_count }} Services</span>
           </div>
           <div class="category-card__body">

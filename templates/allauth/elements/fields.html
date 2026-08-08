@@ -1,0 +1,13 @@
+{% comment %} djlint:off {% endcomment %}{% load allauth %}
+{% for bfield in attrs.form %}
+  {% if bfield.is_hidden %}
+    {{ bfield }}
+  {% else %}
+    {% element field type=bfield.field.widget.input_type|default:"text" id=bfield.id_for_label name=bfield.html_name value=bfield.value required=bfield.field.required disabled=bfield.field.disabled errors=bfield.errors autocomplete=bfield.field.widget.attrs.autocomplete placeholder=bfield.field.widget.attrs.placeholder unlabeled=attrs.unlabeled %}
+      {% slot label %}{{ bfield.label }}{% endslot %}
+      {% if bfield.help_text %}
+        {% slot help_text %}{{ bfield.help_text|safe }}{% endslot %}
+      {% endif %}
+    {% endelement %}
+  {% endif %}
+{% endfor %}

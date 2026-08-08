@@ -6,10 +6,11 @@
  *
  * Depends on window.GlamourBooking (set by booking.js's DOMContentLoaded
  * handler, which always runs first — both scripts are `defer`, executed in
- * source order, so listener registration order guarantees this). No
- * Razorpay key exists yet, so the payment step's "Pay Now" simulates a
- * checkout (processing → success), same pattern as main.js's
- * contact/newsletter form handlers.
+ * source order, so listener registration order guarantees this). The
+ * payment step's "Pay Now" opens a real Razorpay Checkout.js modal —
+ * see bookings/views.py::create_razorpay_order/create_booking and
+ * bookings/razorpay_client.py for the order-creation + signature-
+ * verification side of this.
  *
  * The address step's map (added 2026-08-06) supports two interchangeable
  * backends, switched by settings.USE_GOOGLE_MAPS_FOR_ADDRESS (read here via
@@ -54,6 +55,7 @@
     let state = {
       step: 1, addressId: null, date: null, type: 'regular',
       slot: null, urgentTime: null, payment: null, paymentConfirmed: false,
+      razorpayOrderId: null, razorpayPaymentId: null, razorpaySignature: null,
     };
     let calendarMonth, calendarYear;
     let map, marker, geocoder;
@@ -559,6 +561,18 @@
       return (item.variants || []).find((v) => v.id === Number(line.variantId)) || null;
     }
 
+    // A customized package's price comes from GB.computePackagePricing
+    // (the exact same formula the mini-cart and create_booking() use),
+    // not the package's own flat variant price — otherwise this summary
+    // would show one total and the server would charge a different one.
+    function linePrice(item, line) {
+      if (item.kind === 'package' && line.included) {
+        return GB.computePackagePricing(item, line.included).price;
+      }
+      const variant = lineVariant(item, line);
+      return variant ? variant.price : item.price;
+    }
+
     function cartTotal() {
       const cart = GB.getCart();
       const catalog = GB.getCatalog();
@@ -566,8 +580,7 @@
       cart.forEach((line) => {
         const item = catalog.find((i) => i.id === line.id);
         if (!item) return;
-        const variant = lineVariant(item, line);
-        subtotal += (variant ? variant.price : item.price) * line.qty;
+        subtotal += linePrice(item, line) * line.qty;
       });
       const rate = GB.getAppliedDiscountRate();
       const discount = Math.round(subtotal * rate);
@@ -590,16 +603,66 @@
       updateNextButtonState();
     }));
 
-    drawer.querySelector('[data-pay-now-simulate]').addEventListener('click', (e) => {
+    drawer.querySelector('[data-pay-now-trigger]').addEventListener('click', async (e) => {
       const btn = e.currentTarget;
+      if (typeof Razorpay === 'undefined') {
+        GB.showToast('Payment isn’t available right now — please try again shortly.');
+        return;
+      }
+
       btn.disabled = true;
-      paymentStatusEl.textContent = 'Processing payment…';
-      setTimeout(() => {
-        state.paymentConfirmed = true;
-        paymentStatusEl.textContent = '✓ Payment successful';
+      paymentStatusEl.textContent = 'Starting secure checkout…';
+
+      let order;
+      try {
+        const response = await fetch('/booking/razorpay/order/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+          body: JSON.stringify({ cart: GB.getCart(), coupon_code: GB.getAppliedCouponCode() || '' }),
+        });
+        order = await response.json();
+        if (!response.ok || !order.ok) {
+          paymentStatusEl.textContent = '';
+          btn.disabled = false;
+          GB.showToast(order.error || 'Couldn’t start payment — please try again.');
+          return;
+        }
+      } catch (err) {
+        paymentStatusEl.textContent = '';
         btn.disabled = false;
-        updateNextButtonState();
-      }, 1200);
+        GB.showToast('Network error — please try again.');
+        return;
+      }
+
+      const rzp = new Razorpay({
+        key: order.key_id,
+        amount: order.amount,
+        currency: 'INR',
+        order_id: order.order_id,
+        name: 'Elix',
+        description: 'Beauty service booking',
+        theme: { color: '#c9a15a' },
+        handler(response) {
+          state.razorpayOrderId = response.razorpay_order_id;
+          state.razorpayPaymentId = response.razorpay_payment_id;
+          state.razorpaySignature = response.razorpay_signature;
+          state.paymentConfirmed = true;
+          paymentStatusEl.textContent = '✓ Payment successful';
+          btn.disabled = false;
+          updateNextButtonState();
+        },
+        modal: {
+          ondismiss() {
+            paymentStatusEl.textContent = 'Payment cancelled — tap Pay to try again.';
+            btn.disabled = false;
+          },
+        },
+      });
+      rzp.on('payment.failed', () => {
+        paymentStatusEl.textContent = 'Payment failed — tap Pay to try again.';
+        btn.disabled = false;
+      });
+      rzp.open();
     });
 
     /* --- Summary (step 5) --- */
@@ -631,7 +694,7 @@
         const item = catalog.find((i) => i.id === line.id);
         if (!item) return '';
         const variant = lineVariant(item, line);
-        const price = variant ? variant.price : item.price;
+        const price = linePrice(item, line);
         // Only worth naming the variant when it was an actual choice among
         // several — see the matching comment in booking.js's cart render().
         const hasRealVariants = item.variants && item.variants.length > 1;
@@ -676,6 +739,16 @@
       });
       backBtn.disabled = step === 1;
       nextBtn.textContent = step === 5 ? 'Confirm Booking' : 'Next';
+      // Re-check every time step 3 (booking type & time) is entered, not
+      // just on a calendar click/type toggle — a same-day booking left on
+      // its default date (today, pre-selected, never explicitly clicked)
+      // would otherwise show every slot as available regardless of how
+      // much of the day has already passed, since nothing else would
+      // have triggered this check yet.
+      if (step === 3) {
+        if (state.type === 'urgent') populateUrgentTimeDropdown();
+        else updateRegularSlotsAvailability();
+      }
       if (step === 5) renderSummary();
       updateNextButtonState();
       drawer.querySelector('.booking-drawer__body').scrollTop = 0;
@@ -704,6 +777,12 @@
         coupon_code: GB.getAppliedCouponCode() || '',
         cart: GB.getCart(),
       };
+
+      if (state.payment === 'pay-now') {
+        payload.razorpay_order_id = state.razorpayOrderId;
+        payload.razorpay_payment_id = state.razorpayPaymentId;
+        payload.razorpay_signature = state.razorpaySignature;
+      }
 
       nextBtn.disabled = true;
       nextBtn.textContent = 'Confirming…';
@@ -756,7 +835,11 @@
     });
 
     function resetState() {
-      state = { step: 1, addressId: null, date: toISODate(new Date()), type: 'regular', slot: null, urgentTime: null, payment: null, paymentConfirmed: false };
+      state = {
+        step: 1, addressId: null, date: toISODate(new Date()), type: 'regular',
+        slot: null, urgentTime: null, payment: null, paymentConfirmed: false,
+        razorpayOrderId: null, razorpayPaymentId: null, razorpaySignature: null,
+      };
       justConfirmed = false;
       confirmationEl.hidden = true;
       footer.hidden = false;

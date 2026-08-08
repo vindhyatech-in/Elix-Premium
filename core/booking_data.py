@@ -15,6 +15,9 @@ consumer needed zero changes. See developed.md "Catalog & Bookings models".
 `get_booking_offers()`/`get_notifications_mock()`/`get_trending_searches()`
 below remain genuine mock data — not asked to become models yet.
 """
+from django.templatetags.static import static
+
+from bookings.models import Offer
 from catalog.models import Category, Service
 
 
@@ -27,7 +30,15 @@ def get_booking_categories():
 
 
 def get_landing_categories():
-    """Category list with descriptions, service counts, and photos for the landing page grid."""
+    """
+    Category list with descriptions, service counts, and photos for the
+    landing page grid. `description`/`image`/`image_url` are real,
+    admin-editable `Category` fields now (added 2026-08-08, see
+    core/admin_dashboard_views.py::dashboard_categories) — this dict was
+    the ONLY source before that, so it's kept as the fallback for any
+    category that hasn't had its own photo/blurb set yet, rather than
+    those categories regressing to a blank image.
+    """
     category_defaults = {
         'threading': {'photo': 'images/portfolio-5.jpg', 'desc': 'Precision shaping & smooth hair removal for face & eyebrows.'},
         'peel-off-wax': {'photo': 'images/portfolio-3.jpg', 'desc': 'Painless peel-off waxing for facial & delicate areas.'},
@@ -44,15 +55,24 @@ def get_landing_categories():
             continue
         first_svc = cat.services.first()
         defaults = category_defaults.get(cat.slug, {})
-        photo = defaults.get('photo') or (first_svc.photo if first_svc else 'images/service-facial.jpg')
-        desc = defaults.get('desc', 'Professional at-home salon services by certified beauticians.')
-        
+
+        if cat.display_image_url:
+            photo_url = cat.display_image_url
+        elif defaults.get('photo'):
+            photo_url = static(defaults['photo'])
+        elif first_svc:
+            photo_url = first_svc.display_photo_url
+        else:
+            photo_url = static('images/service-facial.jpg')
+
+        description = cat.description or defaults.get('desc', 'Professional at-home salon services by certified beauticians.')
+
         categories.append({
             'slug': cat.slug,
             'name': cat.name,
             'services_count': cat.services.count(),
-            'photo': photo,
-            'description': desc,
+            'photo_url': photo_url,
+            'description': description,
         })
     return categories
 
@@ -76,31 +96,21 @@ def get_landing_packages():
             'mrp': float(v.mrp) if v.mrp else None,
             'discount_pct': v.discount_pct,
             'featured': 'Bestseller' in (pkg.badges or []) or pkg.popularity_score > 80,
-            'photo': pkg.photo or 'images/portfolio-6.jpg',
+            'photo': pkg.display_photo_url,
             'features': features,
         })
     return packages
 
 
 def get_booking_offers():
-    """Endpoint: GET /api/v1/offers/"""
-    return [
-        {
-            'code': 'GLAM10',
-            'title': '10% off your first booking',
-            'description': 'Applies to any single service or package. New customers only.',
-        },
-        {
-            'code': 'BUNDLE20',
-            'title': '20% off when you book 2+ services',
-            'description': 'Add any two catalog items to your cart to unlock this automatically.',
-        },
-        {
-            'code': 'WEEKDAY15',
-            'title': '15% off Monday-Thursday slots',
-            'description': 'Book a regular (non-urgent) weekday appointment and save.',
-        },
-    ]
+    """Endpoint: GET /api/v1/offers/ — real `bookings.Offer` rows now
+    (added 2026-08-08; admin-managed, see core/admin_dashboard_views.py::
+    dashboard_offers), not mock data. Kept in this module rather than
+    inlined at each call site since app_navbar.html's Offers dropdown is
+    the one thing shared across every page that includes it."""
+    return list(
+        Offer.objects.filter(is_active=True).values('code', 'title', 'description')
+    )
 
 
 def get_booking_catalog():
@@ -162,7 +172,7 @@ def get_booking_catalog():
                     included_services_data.append({
                         'id': inc.id,
                         'name': inc.name,
-                        'photo': inc.photo or 'images/portfolio-5.jpg',
+                        'photo': inc.display_photo_url,
                         'selected_variant_id': inc_default.id,
                         'price': float(inc_default.price),
                         'duration_mins': inc_default.duration_mins,
@@ -185,7 +195,7 @@ def get_booking_catalog():
             'badges': service.badges,
             'available_today': service.available_today,
             'tone': service.tone,
-            'photo': service.photo,
+            'photo': service.display_photo_url,
             'discount_pct': variant.discount_pct,
             'duration_label': variant.duration_label,
             'included_services': included_services_data,

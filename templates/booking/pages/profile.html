@@ -85,6 +85,18 @@
           </div>
         </div>
       </div>
+
+      <div class="profile-page__card profile-page__card--danger">
+        <h2>Delete Account</h2>
+        <p class="profile-page__danger-text">
+          Permanently deletes your account, profile, saved addresses, and reviews. This cannot be undone.
+          Your past orders are kept for our records but will no longer be linked to your account.
+        </p>
+        <form method="post" action="{% url 'delete_account' %}" data-delete-account-form>
+          {% csrf_token %}
+          <button type="submit" class="btn btn--danger btn--sm" data-delete-account>Delete My Account</button>
+        </form>
+      </div>
     </section>
   </main>
 

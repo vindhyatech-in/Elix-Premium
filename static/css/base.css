@@ -24,6 +24,15 @@ body {
 
 img, svg, video { display: block; max-width: 100%; height: auto; }
 
+/* Any element-level `display` rule above (or on any class elsewhere —
+   .emp-btn, .emp-camera-modal, etc.) is an *author* rule, which always
+   wins over the browser's own [hidden] { display: none } default even
+   when that default's selector would otherwise "match harder" — author
+   styles beat user-agent styles regardless of specificity. Without this,
+   toggling the `hidden` attribute via JS silently does nothing visually
+   on any element that also carries a class setting `display`. */
+[hidden] { display: none !important; }
+
 a { color: inherit; text-decoration: none; }
 
 ul, ol { margin: 0; padding: 0; list-style: none; }

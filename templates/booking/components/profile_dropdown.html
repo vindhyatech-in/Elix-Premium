@@ -1,7 +1,7 @@
 <div class="app-navbar__dropdown-panel" id="profile-panel" data-dropdown-panel role="menu" aria-label="Profile menu">
   {% if user.is_authenticated %}
     <div class="dropdown-panel__header">
-      <strong>{{ user.email }}</strong>
+      <strong>{{ user.first_name|default:user.email }}</strong>
       <span>Signed in</span>
     </div>
     <a href="{% url 'profile' %}" class="app-navbar__dropdown-item" role="menuitem">Profile</a>
@@ -10,12 +10,12 @@
     <button type="button" class="app-navbar__dropdown-item" data-coming-soon="Notifications settings" role="menuitem">Notification Settings</button>
     <button type="button" class="app-navbar__dropdown-item" data-coming-soon="Support" role="menuitem">Support</button>
 
-    {% if user.is_staff or user.employee_profile %}
+    {% if user.is_staff or user.employee_profile or user.is_superuser %}
       <div class="app-navbar__dropdown-divider"></div>
       {% if user.is_staff %}
         <a href="{% url 'admin_dashboard_overview' %}" class="app-navbar__dropdown-item" role="menuitem">Owner Dashboard</a>
       {% endif %}
-      {% if user.employee_profile %}
+      {% if user.employee_profile or user.is_superuser %}
         <a href="{% url 'employee_dashboard' %}" class="app-navbar__dropdown-item" role="menuitem">Beautician Dashboard</a>
       {% endif %}
     {% endif %}

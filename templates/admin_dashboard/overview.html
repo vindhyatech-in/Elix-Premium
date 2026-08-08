@@ -94,7 +94,7 @@
                 <td><strong>{{ booking.booking_number }}</strong></td>
                 <td>
                   <div class="admin-customer-info">
-                    <span class="admin-customer-name">{{ booking.user.first_name|default:booking.user.username }}</span>
+                    <span class="admin-customer-name">{{ booking.customer_display_name }}</span>
                     <span class="admin-customer-email">{{ booking.user.email }}</span>
                   </div>
                 </td>

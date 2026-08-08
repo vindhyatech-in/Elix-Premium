@@ -1,0 +1,107 @@
+{% extends "allauth/layouts/base.html" %}
+{% load i18n %}
+
+{% block head_title %}{% trans "Sign In" %}{% endblock head_title %}
+
+{% block content %}
+  <div class="auth-card__header">
+    <h1 class="auth-card__title">{% trans "Enter Sign-In Code" %}</h1>
+    <p class="auth-card__text">
+      {% blocktranslate %}We've sent a code to <a href="tel:{{ phone }}">{{ phone }}</a>.{% endblocktranslate %}
+    </p>
+  </div>
+
+  {% if form.non_field_errors %}
+    <div class="auth-card__alert">
+      {% for error in form.non_field_errors %}
+        <p>{{ error }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" class="auth-card__form" novalidate>
+    {% csrf_token %}
+
+    <div class="auth-group">
+      <label for="id_code" class="auth-label">{% trans "CODE:" %}</label>
+      <input
+        type="text"
+        name="code"
+        id="id_code"
+        class="auth-input {% if form.code.errors %}is-invalid{% endif %}"
+        placeholder="{% trans '6-digit code' %}"
+        inputmode="numeric"
+        autocomplete="one-time-code"
+        required
+        autofocus
+      >
+      {% if form.code.errors %}
+        <ul class="auth-field-errors">
+          {% for error in form.code.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <button type="submit" class="auth-submit-btn">
+      {% trans "Confirm" %}
+    </button>
+  </form>
+
+  <div class="auth-tier3__back">
+    <form method="post" class="auth-resend-form" data-otp-resend-form data-otp-sent-at="{{ sent_at }}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="resend">
+      <button type="submit" class="auth-forgot-link auth-resend-btn" data-otp-resend-btn>{% trans "Request new code" %}</button>
+    </form>
+    <a href="{% url 'phone_login_request' %}" class="auth-forgot-link">{% trans "Use a different number" %}</a>
+  </div>
+{% endblock content %}
+
+{% block extra_body %}
+  <script>
+    // Client-side cooldown only — a UX nicety so a fresh click doesn't
+    // just bounce off the server's real rate limit
+    // (ACCOUNT_RATE_LIMITS['phone_login_resend'], settings.py) with a
+    // generic error. `sent_at` is a server timestamp (session-backed, see
+    // accounts/phone_login_views.py) so the countdown resumes correctly
+    // across the resend form's own page reload, not just within one
+    // in-memory page view.
+    (function () {
+      var COOLDOWN_SECONDS = 30;
+      var form = document.querySelector('[data-otp-resend-form]');
+      var btn = document.querySelector('[data-otp-resend-btn]');
+      if (!form || !btn) return;
+
+      var defaultLabel = btn.textContent;
+      var timerId = null;
+
+      function tick(remaining) {
+        if (remaining <= 0) {
+          clearInterval(timerId);
+          timerId = null;
+          btn.disabled = false;
+          btn.textContent = defaultLabel;
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'Resend in ' + remaining + 's';
+      }
+
+      function startCountdown(sentAtSeconds) {
+        if (!sentAtSeconds) return;
+        var elapsed = (Date.now() / 1000) - sentAtSeconds;
+        var remaining = Math.ceil(COOLDOWN_SECONDS - elapsed);
+        if (remaining <= 0) return;
+        tick(remaining);
+        timerId = setInterval(function () {
+          remaining -= 1;
+          tick(remaining);
+        }, 1000);
+      }
+
+      startCountdown(parseFloat(form.dataset.otpSentAt));
+    })();
+  </script>
+{% endblock extra_body %}

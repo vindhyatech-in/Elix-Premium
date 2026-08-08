@@ -23,6 +23,23 @@
       {% endif %}
 
       {% if bookings %}
+        <div class="bookings-dashboard__filters">
+          <input
+            type="search"
+            class="bookings-dashboard__search"
+            data-bookings-search
+            placeholder="Search by order ID, service, or address…"
+            aria-label="Search bookings"
+          >
+          <input
+            type="date"
+            class="bookings-dashboard__date"
+            data-bookings-date
+            aria-label="Filter by service date"
+          >
+          <button type="button" class="btn btn--ghost btn--sm" data-bookings-filter-clear>Clear</button>
+        </div>
+
         <div class="bookings-dashboard__tabs" role="tablist" aria-label="Filter by status">
           <button type="button" class="sort-pill is-active" data-booking-tab="all" role="tab" aria-selected="true">All</button>
           <button type="button" class="sort-pill" data-booking-tab="upcoming" role="tab" aria-selected="false">Upcoming</button>
@@ -33,7 +50,7 @@
         <div class="bookings-dashboard__list">
           {% for booking in bookings %}
             {{ booking.rebook_items|json_script:booking.booking_number }}
-            <article class="booking-card" data-booking-status="{{ booking.status }}">
+            <article class="booking-card" data-booking-status="{{ booking.status }}" data-booking-search="{{ booking.search_blob }}" data-booking-date="{{ booking.scheduled_date|date:'Y-m-d' }}">
               <div class="booking-card__header">
                 <div>
                   <p class="booking-card__number">{{ booking.booking_number }}</p>
@@ -49,12 +66,35 @@
                 <span class="booking-card__status booking-card__status--{{ booking.status }}">{{ booking.get_status_display }}</span>
               </div>
 
+              {% if booking.assigned_beautician %}
+                <div class="booking-card__beautician">
+                  {% if booking.assigned_beautician.face_photo_front %}
+                    <img src="{{ booking.assigned_beautician.face_photo_front.url }}" alt="{{ booking.assigned_beautician.name }}" class="booking-card__beautician-photo">
+                  {% elif booking.assigned_beautician.photo %}
+                    <img src="{% static booking.assigned_beautician.photo %}" alt="{{ booking.assigned_beautician.name }}" class="booking-card__beautician-photo">
+                  {% else %}
+                    <span class="booking-card__beautician-photo booking-card__beautician-photo--placeholder" aria-hidden="true">💇</span>
+                  {% endif %}
+                  <div class="booking-card__beautician-info">
+                    <span class="booking-card__beautician-label">Your Beautician</span>
+                    <strong>{{ booking.assigned_beautician.name }}</strong>
+                  </div>
+                </div>
+              {% endif %}
+
               <div class="booking-card__items">
                 {% for item in booking.items.all %}
                   <div class="booking-card__item">
                     <span>{{ item.name_snapshot }} × {{ item.quantity }}</span>
                     <span>₹{{ item.price_snapshot|floatformat:"-2" }}</span>
                   </div>
+                  {% if item.included_snapshot %}
+                    <ul class="booking-card__item-included">
+                      {% for inc in item.included_snapshot %}
+                        <li>{{ inc.name }}{% if inc.variant_label %} ({{ inc.variant_label }}){% endif %}</li>
+                      {% endfor %}
+                    </ul>
+                  {% endif %}
                 {% endfor %}
               </div>
 
@@ -76,64 +116,70 @@
                 </div>
               </div>
 
-              {% if booking.status == 'upcoming' %}
+              <div class="booking-card__quick-actions">
+                {% if booking.payment_status == 'paid' %}
+                  <a href="{% url 'booking_invoice' booking.booking_number %}" class="btn btn--ghost btn--sm">🧾 Download Receipt</a>
+                {% endif %}
                 {% if booking.can_cancel %}
                   <form method="post" action="{% url 'cancel_booking' booking.booking_number %}" data-cancel-booking-form>
                     {% csrf_token %}
                     <button type="submit" class="btn btn--ghost btn--sm booking-card__cancel" data-cancel-booking>Cancel Booking</button>
                   </form>
-                {% else %}
-                  <p class="booking-card__cancel-note">Can't be cancelled — starts within 3 hours.</p>
+                {% elif booking.status == 'completed' or booking.status == 'cancelled' %}
+                  {% if booking.rebook_items %}
+                    <button type="button" class="btn btn--ghost btn--sm booking-card__rebook" data-rebook data-booking-number="{{ booking.booking_number }}">Rebook</button>
+                  {% endif %}
                 {% endif %}
-              {% elif booking.rebook_items %}
-                <button type="button" class="btn btn--ghost btn--sm booking-card__rebook" data-rebook data-booking-number="{{ booking.booking_number }}">Rebook</button>
-              {% endif %}
+
+                {% if booking.status == 'completed' or booking.status == 'cancelled' %}
+                  <button type="button" class="btn btn--ghost btn--sm" data-dummy-action="help">🆘 Help</button>
+                {% elif booking.assigned_beautician %}
+                  <button type="button" class="btn btn--ghost btn--sm" data-dummy-action="call">📞 Call Beautician</button>
+                {% endif %}
+              </div>
 
               {% if booking.status == 'completed' %}
                 <div class="booking-card__reviews">
+                  <span class="booking-card__reviews-heading">Rate the services</span>
                   {% for item in booking.items.all %}
                     <div class="booking-card__review-row">
                       <span class="booking-card__review-service">{{ item.name_snapshot }}</span>
-                      {% if item.review %}
-                        <div class="booking-card__review-given">
-                          <span class="booking-card__review-stars">{% for _ in item.review.rating|times %}★{% endfor %}</span>
-                          {% if item.review.comment %}<p class="booking-card__review-comment">“{{ item.review.comment }}”</p>{% endif %}
+                      {% if item.service_variant %}
+                        <div
+                          class="booking-card__star-picker"
+                          data-star-picker
+                          data-rating="{{ item.review.rating|default:0 }}"
+                          data-review-url="{% url 'submit_review' item.id %}"
+                        >
+                          {% for n in "12345" %}
+                            <button type="button" class="booking-card__star" data-star-value="{{ n }}" aria-label="Rate {{ n }} star{{ n|pluralize }}">★</button>
+                          {% endfor %}
                         </div>
-                      {% elif item.service_variant %}
-                        <details class="booking-card__review-toggle">
-                          <summary class="btn btn--ghost btn--sm">Rate &amp; Review</summary>
-                          <form method="post" action="{% url 'submit_review' item.id %}" class="booking-card__review-form">
-                            {% csrf_token %}
-                            <div class="field">
-                              <label for="review-rating-{{ item.id }}">Your rating</label>
-                              <select id="review-rating-{{ item.id }}" name="rating" required>
-                                <option value="" disabled selected>Choose a rating</option>
-                                <option value="5">★★★★★ Excellent</option>
-                                <option value="4">★★★★ Good</option>
-                                <option value="3">★★★ Okay</option>
-                                <option value="2">★★ Poor</option>
-                                <option value="1">★ Terrible</option>
-                              </select>
-                            </div>
-                            <div class="field">
-                              <label for="review-comment-{{ item.id }}">Your review (optional)</label>
-                              <textarea id="review-comment-{{ item.id }}" name="comment" rows="2" placeholder="Tell others about your experience…"></textarea>
-                            </div>
-                            <button type="submit" class="btn btn--primary btn--sm">Submit Review</button>
-                          </form>
-                        </details>
                       {% else %}
-                        <p class="booking-card__review-unavailable">This service is no longer in the catalog, so it can't be reviewed.</p>
+                        <p class="booking-card__review-unavailable">This service is no longer in the catalog, so it can't be rated.</p>
                       {% endif %}
                     </div>
                   {% endfor %}
+
+                  <div class="booking-card__feedback" data-feedback-block data-feedback-url="{% url 'submit_booking_feedback' booking.booking_number %}">
+                    <div class="field">
+                      <label for="feedback-{{ booking.id }}">Overall feedback (optional)</label>
+                      <textarea id="feedback-{{ booking.id }}" data-feedback-input rows="2" placeholder="Tell us about your overall experience…">{{ booking.feedback_comment }}</textarea>
+                    </div>
+                    <div class="booking-card__feedback-actions">
+                      <button type="button" class="btn btn--primary btn--sm" data-feedback-submit>
+                        {% if booking.feedback_submitted_at %}Update Feedback{% else %}Submit Feedback{% endif %}
+                      </button>
+                      <span class="booking-card__feedback-status" data-feedback-status {% if not booking.feedback_submitted_at %}hidden{% endif %}>✓ Saved</span>
+                    </div>
+                  </div>
                 </div>
               {% endif %}
             </article>
           {% endfor %}
         </div>
 
-        <p class="bookings-dashboard__tab-empty" data-bookings-tab-empty hidden>No bookings in this category.</p>
+        <p class="bookings-dashboard__tab-empty" data-bookings-tab-empty hidden>No bookings match your filters.</p>
       {% else %}
         <div class="bookings-dashboard__empty">
           <p>You don't have any bookings yet.</p>

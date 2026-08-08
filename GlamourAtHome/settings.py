@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 
-from decouple import config
+from decouple import Csv, config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,12 +22,58 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-^sroozd3j&^fm6s5m!%ro@q#f92q2sffk+lmdchs-65h21t&(5'
+# Was hardcoded in source (committed to git) — moved to .env, same pattern
+# as every other credential in this file. The literal below is ONLY the
+# default used when .env doesn't set one, so local dev keeps working with
+# zero setup; a real deploy MUST set SECRET_KEY in its own environment.
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-^sroozd3j&^fm6s5m!%ro@q#f92q2sffk+lmdchs-65h21t&(5')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Default stays True so nothing changes for local dev unless .env
+# explicitly sets DEBUG=False — see .env.example.
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['*','0.0.0.0','localhost','0.0.0.0:8005']
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*,0.0.0.0,localhost,0.0.0.0:8005', cast=Csv())
+
+# Needed to test this over a devtunnels/ngrok-style HTTPS tunnel (the tunnel
+# terminates TLS and forwards plain HTTP to this dev server) — without
+# these two, Django thinks every request is insecure over plain HTTP:
+# - CSRF_TRUSTED_ORIGINS: otherwise every POST (login/signup forms, not
+#   just OAuth) fails CSRF verification, since Django checks the request's
+#   Origin header against this list for any "unsafe" request.
+# - SECURE_PROXY_SSL_HEADER: otherwise request.build_absolute_uri() (which
+#   allauth uses to build the Google/Apple OAuth callback URL) reports
+#   http:// instead of https://, mismatching whatever https:// redirect URI
+#   is registered in Google Cloud Console.
+# While devtunnels port-forwarding is active on 8003/8004, it tags *all*
+# traffic through that port as forwarded-https — even a direct
+# http://localhost:8003 or http://127.0.0.1:8004 hit, not just genuine
+# tunnel traffic — since the forwarder can't tell them apart. That makes
+# Django expect an https:// origin for a request whose real Origin header
+# says http://, so both schemes are listed here for each local dev host/port.
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8003', 'https://localhost:8003',
+    'http://localhost:8004', 'https://localhost:8004',
+    'http://127.0.0.1:8003', 'https://127.0.0.1:8003',
+    'http://127.0.0.1:8004', 'https://127.0.0.1:8004',
+]
+if DEBUG:
+    # devtunnels mints a random subdomain per session — a real wildcard
+    # trust like this is only appropriate for a throwaway dev tunnel, not
+    # a real deployment (anyone with *any* devtunnels subdomain could
+    # satisfy this Origin check), so it's gated on DEBUG rather than
+    # listed unconditionally above with the fixed local ports.
+    CSRF_TRUSTED_ORIGINS.append('https://*.devtunnels.ms')
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Cookie/transport hardening — gated on `not DEBUG` so local dev (plain
+# HTTP on localhost) is completely unaffected; only takes effect once a
+# real deploy sets DEBUG=False, at which point the site should only ever
+# be served over HTTPS anyway.
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_SSL_REDIRECT = not DEBUG
+SECURE_CONTENT_TYPE_NOSNIFF = True
 
 
 # Application definition
@@ -54,6 +100,7 @@ INSTALLED_APPS = [
     'accounts',
     'catalog',
     'bookings',
+    'api',
 ]
 
 MIDDLEWARE = [
@@ -211,21 +258,81 @@ RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='')
 
 # ---------------------------------------------------------------------------
 # Authentication (django-allauth) — see developed.md "Authentication".
-# Email-based login/signup (no username field), password reset via email,
-# plus Google/Apple social login. Google/Apple credentials below follow the
-# exact same "reserved .env slot, default empty, wire up later" pattern as
-# GOOGLE_MAPS_API_KEY/RAZORPAY_KEY_ID above — the buttons render now, actual
-# sign-in only works once real values are dropped into .env.
+# Three-tier login/signup: Google/Apple first, phone OTP second,
+# username-or-email + password third. Google/Apple credentials below
+# follow the exact same "reserved .env slot, default empty, wire up
+# later" pattern as GOOGLE_MAPS_API_KEY/RAZORPAY_KEY_ID above — the
+# buttons render now, actual sign-in only works once real values are
+# dropped into .env.
 # ---------------------------------------------------------------------------
-ACCOUNT_LOGIN_METHODS = {'username', 'email'}
-ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+ACCOUNT_ADAPTER = 'accounts.adapter.AccountAdapter'
+ACCOUNT_FORMS = {
+    'signup': 'accounts.forms.CustomSignupForm',
+    'reset_password': 'accounts.forms.CustomResetPasswordForm',
+}
+SOCIALACCOUNT_FORMS = {'signup': 'accounts.forms.CustomSocialSignupForm'}
+
+ACCOUNT_LOGIN_METHODS = {'username', 'email', 'phone'}
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'phone*', 'password1*', 'password2*']
 ACCOUNT_EMAIL_VERIFICATION = 'optional'
-ACCOUNT_RATE_LIMITS = False  # dev-friendly; revisit before any real deploy
+# Tier-2 login ("Continue with Phone Number") no longer uses allauth's own
+# login-by-code — MessageCentral's Verify Now product generates and
+# validates its own OTP (accounts/phone_login_views.py +
+# accounts/messagecentral.py), so allauth's parallel implementation of
+# the same idea is switched off to avoid two competing phone-OTP paths.
+ACCOUNT_LOGIN_BY_CODE_ENABLED = False
+# Would insert a MANDATORY "verify your phone" stage on every single
+# login (any method — password, Google, even phone-code) for any account
+# whose phone isn't marked verified, which isn't what "three alternative
+# ways to log in" meant. Phone still gets marked verified automatically
+# the moment someone actually completes the MessageCentral phone-login
+# flow once (see accounts/phone_login_views.py).
+ACCOUNT_PHONE_VERIFICATION_ENABLED = False
+# Was `False` ("dev-friendly") — that leaves login, phone-OTP request/
+# confirm, and password reset completely unthrottled, which is what
+# actually makes credential-stuffing/OTP-brute-force practical rather
+# than just theoretical. There is no boolean "on" for this setting
+# though — allauth's app_settings.RATE_LIMITS property does
+# `ret.update(rls)` on whatever this is, and `dict.update(True)` raises
+# TypeError, taking down every allauth view that checks a rate limit
+# (login, signup, password reset...). Leaving this as a dict (even
+# empty) makes allauth fall back to its own sane built-in per-action
+# defaults for its own views; the two keys below are OUR custom
+# actions (accounts/phone_login_views.py's MessageCentral-backed tier-2
+# login, which isn't an allauth view at all) — added here because
+# allauth.core.ratelimit.consume() reads rates from this exact same
+# merged dict for ANY action name, not just its own.
+ACCOUNT_RATE_LIMITS = {
+    'phone_login_request': '20/m/ip,3/m/key',
+    'phone_login_resend': '5/m/key',
+}
 ACCOUNT_LOGOUT_ON_GET = True  # Immediately log out on clicking Logout without confirmation page
+
+# MessageCentral "Verify Now" (phone-OTP send + validate) — see
+# accounts/messagecentral.py. The customerId is decoded out of this key
+# itself (it's a JWT carrying it), so no second .env value is needed for
+# that. MESSAGECENTRAL_PASSWORD is a separate credential though — per
+# their own onboarding guide, send/validate need a session token from
+# /auth/v1/authentication/token first, and THAT call needs the actual
+# dashboard login password (base64-encoded), not this "Auth Token".
+MESSAGECENTRAL_AUTH_TOKEN = config('SMS_KEY', default='')
+# False -> accounts/messagecentral.py prints the OTP to the console
+# instead of calling the real gateway (no real send/receive round trip,
+# no credits spent) — same "console fallback for dev" pattern as
+# EMAIL_BACKEND above. True -> real MessageCentral send/validate calls.
+OTP_GATEWAY = config('OTP_GATEWAY', default=False, cast=bool)
+MESSAGECENTRAL_PASSWORD = config('MESSAGECENTRAL_PASSWORD', default='')
 
 LOGIN_REDIRECT_URL = '/booking/'
 LOGOUT_REDIRECT_URL = '/booking/'
 LOGIN_URL = '/accounts/login/'
+
+# Skip allauth's own "You are about to sign in via Google/Apple — Continue"
+# confirmation page — go straight to the provider instead. Safe here since
+# our own login/signup templates already ask for explicit confirmation (the
+# user clicks "Continue with Google/Apple" themselves); allauth's extra
+# click was a redundant second confirmation, not a security boundary.
+SOCIALACCOUNT_LOGIN_ON_GET = True
 
 # Prints emails (password reset, optional verification) to the runserver
 # console instead of actually sending — see developed.md for the real-SMTP swap.
@@ -240,6 +347,12 @@ SOCIALACCOUNT_PROVIDERS = {
             'key': '',
         },
         'SCOPE': ['profile', 'email'],
+        # Without this, Google silently reuses whichever Google account is
+        # already logged into the browser and never shows the account
+        # chooser — logging out of this site does nothing to change that,
+        # since it's Google's own session cookie, not ours. Forces the
+        # picker every time so switching accounts actually works.
+        'AUTH_PARAMS': {'prompt': 'select_account'},
     },
     'apple': {
         'APP': {

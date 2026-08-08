@@ -1,8 +1,7 @@
-{% load static %}
 <article class="catalog-card" data-catalog-card data-catalog-id="{{ item.id }}" data-category="{{ item.category }}" data-kind="{{ item.kind }}">
   <div class="catalog-card__media">
     <a href="{% url 'service_detail' item.id %}" style="display: block; width: 100%; height: 100%;">
-      <img src="{% static item.photo %}" alt="{{ item.name }}" loading="lazy">
+      <img src="{{ item.photo }}" alt="{{ item.name }}" loading="lazy">
     </a>
 
     <div class="catalog-card__badges">
@@ -39,9 +38,9 @@
         <small style="font-weight: 700; color: var(--text-body); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em;">Included Services:</small>
         <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.35rem;">
           {% for inc in item.included_services %}
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.78rem; padding: 0.25rem 0.4rem; background: var(--surface-1); border-radius: 6px; border: 1px solid var(--border-hairline);">
-              <div style="display: flex; align-items: center; gap: 0.4rem; min-width: 0;">
-                <img src="{% static inc.photo|default:'images/portfolio-5.jpg' %}" alt="{{ inc.name }}" style="width: 28px; height: 28px; object-fit: cover; border-radius: 4px; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.35rem 0.5rem; font-size: 0.78rem; padding: 0.25rem 0.4rem; background: var(--surface-1); border-radius: 6px; border: 1px solid var(--border-hairline);">
+              <div style="display: flex; align-items: center; gap: 0.4rem; flex: 1 1 100px; min-width: 100px;">
+                <img src="{{ inc.photo }}" alt="{{ inc.name }}" style="width: 28px; height: 28px; object-fit: cover; border-radius: 4px; flex-shrink: 0;">
                 <span style="font-weight: 600; color: var(--text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.78rem;">{{ inc.name }}</span>
               </div>
               {% if inc.variants|length > 1 %}
@@ -49,10 +48,10 @@
                   class="catalog-card__pkg-variant-select"
                   data-inc-id="{{ inc.id }}"
                   onchange="onCustomerPackageVariantChange(this)"
-                  style="font-size: 0.72rem; padding: 0.15rem 0.35rem; border-radius: 4px; border: 1px solid var(--border-hairline); background: var(--surface-2); color: var(--text-body); cursor: pointer; font-weight: 600;"
+                  style="font-size: 0.72rem; padding: 0.15rem 0.35rem; border-radius: 4px; border: 1px solid var(--border-hairline); background: var(--surface-2); color: var(--text-body); cursor: pointer; font-weight: 600; max-width: 150px; flex-shrink: 0;"
                 >
                   {% for v in inc.variants %}
-                    <option value="{{ v.id }}" data-price="{{ v.price }}" data-duration="{{ v.duration_mins }}">
+                    <option value="{{ v.id }}" data-price="{{ v.price }}" data-duration="{{ v.duration_mins }}" {% if v.id == inc.selected_variant_id %}selected{% endif %}>
                       {{ v.label }} (₹{{ v.price|floatformat:0 }})
                     </option>
                   {% endfor %}
@@ -61,7 +60,7 @@
                 <span style="font-size: 0.72rem; color: var(--ink-muted); white-space: nowrap; font-weight: 600;">
                   ₹{{ inc.price|floatformat:0 }}
                 </span>
-                <input type="hidden" class="catalog-card__pkg-single-val" data-price="{{ inc.price }}" data-duration="{{ inc.duration_mins }}">
+                <input type="hidden" class="catalog-card__pkg-single-val" data-inc-id="{{ inc.id }}" value="{{ inc.selected_variant_id }}" data-price="{{ inc.price }}" data-duration="{{ inc.duration_mins }}">
               {% endif %}
             </div>
           {% endfor %}

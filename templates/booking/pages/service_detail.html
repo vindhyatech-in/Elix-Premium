@@ -1,5 +1,5 @@
 {% extends 'booking/layouts/booking_base.html' %}
-{% load static glamour_extras %}
+{% load glamour_extras %}
 
 {% block title %}{{ service.name }} — {{ SITE.name }}{% endblock %}
 
@@ -16,7 +16,7 @@
       <div style="background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); position: sticky; top: 110px;">
         <div style="position: relative; width: 100%; aspect-ratio: 4/3; overflow: hidden; background: #0f172a;">
           <img
-            src="{% static service.photo %}"
+            src="{{ service.display_photo_url }}"
             alt="{{ service.name }}"
             style="width: 100%; height: 100%; object-fit: cover;"
             id="detailMainPhoto"
@@ -117,10 +117,10 @@
 
             <div style="display: flex; flex-direction: column; gap: 0.75rem;">
               {% for inc in included_services %}
-                <div class="detail-pkg-inc-row" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.85rem; padding: 0.5rem 0.65rem; background: var(--surface-2); border-radius: 8px; border: 1px solid var(--border-hairline); box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-                  <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 0;">
+                <div class="detail-pkg-inc-row" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem 0.75rem; font-size: 0.85rem; padding: 0.5rem 0.65rem; background: var(--surface-2); border-radius: 8px; border: 1px solid var(--border-hairline); box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                  <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1 1 140px; min-width: 140px;">
                     <img
-                      src="{% static inc.photo %}"
+                      src="{{ inc.photo }}"
                       alt="{{ inc.name }}"
                       style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--surface-1);"
                     >
@@ -132,11 +132,12 @@
                   {% if inc.variants|length > 1 %}
                     <select
                       class="detail-pkg-variant-select"
-                      style="font-size: 0.78rem; padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-hairline); background: var(--surface-1); color: var(--text-body); cursor: pointer; font-weight: 600; max-width: 175px;"
+                      data-inc-id="{{ inc.id }}"
+                      style="font-size: 0.78rem; padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-hairline); background: var(--surface-1); color: var(--text-body); cursor: pointer; font-weight: 600; max-width: 175px; flex-shrink: 0;"
                       onchange="recalculateDetailPackageTotal()"
                     >
                       {% for v in inc.variants %}
-                        <option value="{{ v.id }}" data-price="{{ v.price }}" data-duration="{{ v.duration_mins }}">
+                        <option value="{{ v.id }}" data-price="{{ v.price }}" data-duration="{{ v.duration_mins }}" {% if v.id == inc.selected_variant_id %}selected{% endif %}>
                           {{ v.label }} (₹{{ v.price|floatformat:0 }})
                         </option>
                       {% endfor %}
@@ -145,7 +146,7 @@
                     <span style="font-size: 0.78rem; color: var(--ink-muted); font-weight: 700; white-space: nowrap; background: var(--surface-1); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--border-hairline);">
                       ₹{{ inc.price|floatformat:0 }} · {{ inc.duration_label }}
                     </span>
-                    <input type="hidden" class="detail-pkg-single-val" data-price="{{ inc.price }}" data-duration="{{ inc.duration_mins }}">
+                    <input type="hidden" class="detail-pkg-single-val" data-inc-id="{{ inc.id }}" value="{{ inc.selected_variant_id }}" data-price="{{ inc.price }}" data-duration="{{ inc.duration_mins }}">
                   {% endif %}
                 </div>
               {% endfor %}
@@ -320,68 +321,43 @@
     }
   }
 
+  // Both functions below defer the actual pricing math to
+  // window.GlamourBooking.computePackagePricing (booking.js) — the exact
+  // same formula the mini-cart and booking summary use for this same
+  // package, so this page's live preview can never drift from what
+  // actually gets added to cart or charged.
   function recalculateDetailPackageTotal() {
-    const box = document.getElementById('detailPricingBox');
-    if (!box) return;
-    const discountPct = parseFloat(box.dataset.pkgDiscount || 0);
+    const GB = window.GlamourBooking;
+    if (!GB) return;
+    const item = GB.getCatalog().find((i) => i.id === '{{ service.slug }}');
+    if (!item) return;
 
-    let totalMrp = 0;
-    let totalDur = 0;
-
-    document.querySelectorAll('.detail-pkg-inc-row').forEach(row => {
-      const sel = row.querySelector('.detail-pkg-variant-select');
-      if (sel) {
-        const opt = sel.options[sel.selectedIndex];
-        if (opt) {
-          totalMrp += parseFloat(opt.dataset.price || 0);
-          totalDur += parseInt(opt.dataset.duration || 0, 10);
-        }
-      } else {
-        const inp = row.querySelector('.detail-pkg-single-val');
-        if (inp) {
-          totalMrp += parseFloat(inp.dataset.price || 0);
-          totalDur += parseInt(inp.dataset.duration || 0, 10);
-        }
-      }
-    });
-
-    let newPrice = totalMrp;
-    if (discountPct > 0) {
-      newPrice = Math.round(totalMrp * (1 - discountPct / 100));
-    }
-
-    const hours = Math.floor(totalDur / 60);
-    const mins = totalDur % 60;
-    let durLabel = '';
-    if (hours > 0 && mins > 0) durLabel = `${hours}h ${mins}m`;
-    else if (hours > 0) durLabel = `${hours}h`;
-    else durLabel = `${mins} min`;
+    const included = GB.gatherIncludedSelections(document);
+    const { price, mrp, duration_mins } = GB.computePackagePricing(item, included);
 
     const priceNowEl = document.getElementById('detailPriceNow');
     const priceMrpEl = document.getElementById('detailPriceMrp');
     const durationEl = document.getElementById('detailDurationLabel');
 
-    if (priceNowEl) priceNowEl.textContent = `₹${newPrice}`;
-    if (priceMrpEl) priceMrpEl.textContent = `₹${totalMrp}`;
-    if (durationEl) durationEl.textContent = `⏱ ${durLabel}`;
+    if (priceNowEl) priceNowEl.textContent = `₹${price}`;
+    if (priceMrpEl) priceMrpEl.textContent = `₹${mrp}`;
+    if (durationEl) durationEl.textContent = `⏱ ${GB.formatDuration(duration_mins)}`;
   }
 
   function addDetailItemToCart() {
     const itemSlug = '{{ service.slug }}';
-    if (window.GlamourBooking && window.GlamourBooking.getCart) {
-      const cart = window.GlamourBooking.getCart();
-      const existing = cart.find(i => i.id === itemSlug && i.variantId === activeVariantId);
-      if (existing) {
-        existing.qty += 1;
-      } else {
-        cart.push({ id: itemSlug, variantId: activeVariantId ? parseInt(activeVariantId, 10) : null, qty: 1 });
-      }
-      window.GlamourBooking.saveCart(cart);
-      if (window.GlamourBooking.showToast) {
-        window.GlamourBooking.showToast('Added {{ service.name|escapejs }} to cart!');
-      }
+    const GB = window.GlamourBooking;
+    if (!GB || !GB.addItem) {
+      // GB missing/broken means nothing was actually added — an alert
+      // claiming success here would just be lying to the customer.
+      console.error('GlamourBooking cart is unavailable — could not add to cart.');
+      return;
+    }
+    const variantId = activeVariantId ? parseInt(activeVariantId, 10) : null;
+    if ('{{ service.kind }}' === 'package') {
+      GB.addItem(itemSlug, variantId, GB.gatherIncludedSelections(document));
     } else {
-      alert('Added {{ service.name|escapejs }} to cart!');
+      GB.addItem(itemSlug, variantId);
     }
   }
 </script>

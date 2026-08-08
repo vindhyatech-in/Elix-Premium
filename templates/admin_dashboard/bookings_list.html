@@ -4,6 +4,7 @@
   <!-- Filter Toolbar -->
   <div class="admin-toolbar">
     <form method="get" action="{% url 'admin_dashboard_bookings' %}" class="admin-toolbar__form">
+      <input type="hidden" name="status" value="{{ status_filter }}">
       <div class="admin-toolbar__group">
         <input
           type="text"
@@ -17,7 +18,7 @@
           type="date"
           name="date"
           value="{{ date_filter }}"
-          class="admin-input"
+          class="admin-input admin-input--date"
         >
 
         <button type="submit" class="admin-btn admin-btn--primary">Search</button>
@@ -28,11 +29,11 @@
 
       <!-- Status Filter Tabs -->
       <div class="admin-filter-tabs">
-        <a href="?status=all{% if search_query %}&q={{ search_query }}{% endif %}" class="admin-filter-tab {% if status_filter == 'all' %}is-active{% endif %}">All Orders</a>
-        <a href="?status=upcoming{% if search_query %}&q={{ search_query }}{% endif %}" class="admin-filter-tab {% if status_filter == 'upcoming' %}is-active{% endif %}">Upcoming</a>
-        <a href="?status=in_progress{% if search_query %}&q={{ search_query }}{% endif %}" class="admin-filter-tab {% if status_filter == 'in_progress' %}is-active{% endif %}">In Progress</a>
-        <a href="?status=completed{% if search_query %}&q={{ search_query }}{% endif %}" class="admin-filter-tab {% if status_filter == 'completed' %}is-active{% endif %}">Completed</a>
-        <a href="?status=cancelled{% if search_query %}&q={{ search_query }}{% endif %}" class="admin-filter-tab {% if status_filter == 'cancelled' %}is-active{% endif %}">Cancelled</a>
+        <a href="?status=all{% if search_query %}&q={{ search_query }}{% endif %}{% if date_filter %}&date={{ date_filter }}{% endif %}" class="admin-filter-tab {% if status_filter == 'all' %}is-active{% endif %}">All Orders</a>
+        <a href="?status=upcoming{% if search_query %}&q={{ search_query }}{% endif %}{% if date_filter %}&date={{ date_filter }}{% endif %}" class="admin-filter-tab {% if status_filter == 'upcoming' %}is-active{% endif %}">Upcoming</a>
+        <a href="?status=in_progress{% if search_query %}&q={{ search_query }}{% endif %}{% if date_filter %}&date={{ date_filter }}{% endif %}" class="admin-filter-tab {% if status_filter == 'in_progress' %}is-active{% endif %}">In Progress</a>
+        <a href="?status=completed{% if search_query %}&q={{ search_query }}{% endif %}{% if date_filter %}&date={{ date_filter }}{% endif %}" class="admin-filter-tab {% if status_filter == 'completed' %}is-active{% endif %}">Completed</a>
+        <a href="?status=cancelled{% if search_query %}&q={{ search_query }}{% endif %}{% if date_filter %}&date={{ date_filter }}{% endif %}" class="admin-filter-tab {% if status_filter == 'cancelled' %}is-active{% endif %}">Cancelled</a>
       </div>
     </form>
   </div>
@@ -65,7 +66,7 @@
                 <!-- Customer & Address -->
                 <td>
                   <div class="admin-customer-box">
-                    <div class="admin-customer-name">{{ booking.user.first_name|default:booking.user.username }} {{ booking.user.last_name }}</div>
+                    <div class="admin-customer-name">{{ booking.customer_display_name }} {{ booking.user.last_name }}</div>
                     <div class="admin-customer-email">✉ {{ booking.user.email }}</div>
                     <div class="admin-customer-address">📍 <strong>{{ booking.address_label }}:</strong> {{ booking.address_text }}</div>
                   </div>
@@ -101,11 +102,11 @@
                     <input type="hidden" name="action" value="assign_beautician">
                     <input type="hidden" name="booking_id" value="{{ booking.id }}">
                     
-                    <select name="beautician_id" class="admin-select admin-select--sm" onchange="this.form.submit()">
+                    <select name="beautician_id" class="admin-select admin-select--sm" onchange="this.form.requestSubmit()">
                       <option value="">-- Unassigned --</option>
                       {% for emp in employees %}
                         <option value="{{ emp.id }}" {% if booking.assigned_beautician_id == emp.id %}selected{% endif %}>
-                          {{ emp.name }} ({% if emp.status == 'active' %}Available{% else %}{{ emp.get_status_display }}{% endif %})
+                          {{ emp.name }} ({% if emp.status == 'active' %}Available{% else %}{{ emp.get_status_display }}{% endif %}{% if emp.id in booking.conflicting_beautician_ids %} — ⚠ Time conflict{% endif %})
                         </option>
                       {% endfor %}
                     </select>
@@ -120,17 +121,23 @@
                     <input type="hidden" name="booking_id" value="{{ booking.id }}">
                     
                     <div class="admin-form-row">
-                      <select name="status" class="admin-select admin-select--sm admin-select--status-{{ booking.status }}">
-                        {% for code, label in status_choices %}
-                          <option value="{{ code }}" {% if booking.status == code %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                      </select>
+                      <div class="admin-status-field">
+                        <label class="admin-status-field__label" for="status-{{ booking.id }}">Order Status</label>
+                        <select id="status-{{ booking.id }}" name="status" class="admin-select admin-select--sm admin-select--status-{{ booking.status }}">
+                          {% for code, label in status_choices %}
+                            <option value="{{ code }}" {% if booking.status == code %}selected{% endif %}>{{ label }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
 
-                      <select name="payment_status" class="admin-select admin-select--sm">
-                        {% for code, label in payment_status_choices %}
-                          <option value="{{ code }}" {% if booking.payment_status == code %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                      </select>
+                      <div class="admin-status-field">
+                        <label class="admin-status-field__label" for="payment-{{ booking.id }}">Payment</label>
+                        <select id="payment-{{ booking.id }}" name="payment_status" class="admin-select admin-select--sm">
+                          {% for code, label in payment_status_choices %}
+                            <option value="{{ code }}" {% if booking.payment_status == code %}selected{% endif %}>{{ label }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
 
                       <button type="submit" class="admin-btn admin-btn--ghost admin-btn--xs">Save</button>
                     </div>
@@ -147,4 +154,69 @@
       </div>
     {% endif %}
   </div>
+
+  {% include "admin_dashboard/partials/pagination.html" %}
+{% endblock %}
+
+{% block extra_body %}
+  <script>
+    // AJAX-ify "Update Status" and "Assigned Staff" on this page only —
+    // both previously did a full form POST + redirect, which lost the
+    // active status-filter tab/search/date (the form's own `action`
+    // attribute has no query string, so the redirect landed back on the
+    // unfiltered "All Orders" view regardless of what the owner had
+    // filtered to). Posting to `window.location.href` instead (current
+    // URL, filters included) and swapping in just #adminContentRoot's
+    // fresh HTML keeps the owner exactly where they were.
+    document.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      if (form.method.toLowerCase() !== 'post') return;
+      if (!form.closest('#adminContentRoot')) return;
+
+      e.preventDefault();
+
+      // Snapshot the data BEFORE disabling anything — a disabled
+      // <select>/<input> is excluded from FormData entirely (per spec),
+      // so disabling first was silently dropping status/payment_status/
+      // beautician_id from the submitted data on every request.
+      var formData = new FormData(form);
+      var submitEls = form.querySelectorAll('button, select');
+      submitEls.forEach(function (el) { el.disabled = true; });
+
+      // The table's own horizontal scroll (.admin-table-wrapper has
+      // overflow-x: auto) resets to 0 on every swap below, since
+      // innerHTML replacement creates a brand new element — the page's
+      // own vertical scroll is untouched (no navigation happens), but
+      // this inner scroll position isn't, so it's restored manually.
+      var oldWrapper = document.querySelector('.admin-table-wrapper');
+      var scrollLeft = oldWrapper ? oldWrapper.scrollLeft : 0;
+
+      function getCsrfToken() {
+        var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+        return match ? match[1] : '';
+      }
+
+      fetch(window.location.href, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCsrfToken() },
+        body: formData,
+      })
+        .then(function (resp) { return resp.text(); })
+        .then(function (html) {
+          var freshRoot = new DOMParser().parseFromString(html, 'text/html').getElementById('adminContentRoot');
+          var root = document.getElementById('adminContentRoot');
+          if (freshRoot && root) {
+            root.innerHTML = freshRoot.innerHTML;
+            autoHideAdminMessages();
+            var newWrapper = document.querySelector('.admin-table-wrapper');
+            if (newWrapper) newWrapper.scrollLeft = scrollLeft;
+          }
+        })
+        .catch(function () {
+          submitEls.forEach(function (el) { el.disabled = false; });
+          adminAlert('Something went wrong — check your connection and try again.');
+        });
+    });
+  </script>
 {% endblock %}

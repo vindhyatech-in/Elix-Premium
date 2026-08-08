@@ -66,7 +66,10 @@
     document.body.addEventListener('click', async (e) => {
       const btn = e.target.closest('[data-delete-address]');
       if (!btn) return;
-      if (!window.confirm('Delete this address?')) return;
+      const confirmed = window.GlamourBooking
+        ? await window.GlamourBooking.confirmModal('Delete this address?')
+        : window.confirm('Delete this address?');
+      if (!confirmed) return;
 
       try {
         const response = await fetch(`/booking/addresses/${btn.dataset.addressId}/`, {
@@ -86,8 +89,29 @@
     });
   }
 
+  /* ---------------------------------------------------------
+   * Delete Account — a plain server-rendered <form method="post"> (see
+   * profile.html's "Delete Account" card) does the actual work; this
+   * only gates it behind a confirm since it's immediate and permanent
+   * (see accounts/views.py::delete_account).
+   * ------------------------------------------------------- */
+  function initDeleteAccount() {
+    const form = document.querySelector('[data-delete-account-form]');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = 'Permanently delete your account? This cannot be undone — your profile, addresses, and reviews will be removed immediately.';
+      const confirmed = window.GlamourBooking
+        ? await window.GlamourBooking.confirmModal(message)
+        : window.confirm(message);
+      if (confirmed) form.submit();
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     initAddressForm();
     initAddressDelete();
+    initDeleteAccount();
   });
 })();

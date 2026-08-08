@@ -1526,3 +1526,755 @@ there's no gallery-picker path to bypass live capture at all.
   reads "Retake"). Test browser profile, server process, and uploaded
   media were all cleaned up after.
 
+**Follow-up fix (same day): `[hidden]` was silently a no-op site-wide.**
+The first round of camera-modal testing above only asserted the DOM
+`.hidden` *property* after each click — which was always correct — so it
+missed that the modal never visually closed. Root cause: `base.css`'s
+`img, svg, video { display: block; ... }`, plus `.emp-btn { display:
+inline-flex; }` and the modal's own `.emp-camera-modal { display: flex;
+... }`, are **author-origin rules with an unconditional `display`** —
+and author rules always beat the browser's own `[hidden] { display:
+none }` default *regardless of selector specificity*, since origin (UA
+vs. author) is resolved before specificity in the cascade. Net effect:
+toggling `hidden` via JS on any element that also carries a class
+setting `display` did nothing visually — the modal, its video feed, and
+its buttons were always rendered, no matter what state the JS thought
+it was in. Fixed with one rule in `base.css` right after the img/svg/
+video reset: `[hidden] { display: none !important; }` — the standard,
+widely-used fix for exactly this conflict, and it now protects every
+future use of the `hidden` attribute anywhere on the site, not just this
+modal. Re-verified with a second CDP pass that checks actual
+`getComputedStyle`/`getBoundingClientRect` per element (not just the
+`.hidden` property) — this is the check that should have caught it the
+first time, and now does.
+
+## AJAX-ified employee & admin dashboard actions (2026-08-06)
+
+Every status/action form on the employee dashboard and the admin
+bookings page previously did a plain POST + `redirect()` — a real
+browser navigation. Two concrete complaints from this: on the employee
+dashboard, any action (mark paid, mark on-the-way, leave request, ...)
+reset the visible tab back to "Today" regardless of which tab the
+employee was actually on, since tab state (`switchEmpTab`) is pure
+client-side JS with no server-side memory. On the admin bookings page,
+updating a booking's status or reassigning its beautician POSTed to the
+form's own `action` attribute (`{% url 'admin_dashboard_bookings' %}`,
+no query string), so the subsequent redirect landed back on the
+*unfiltered* "All Orders" view — losing whatever status filter/search/
+date the owner had applied.
+
+**Employee dashboard** (`templates/employee_dashboard/emp_dashboard.html`):
+wrapped everything that can change after an action (header incl. duty
+toggle, tab nav incl. badge counts, messages, stats, all 4 tabs) in
+`<div id="empDashboardRoot">`, styled `display: contents` so it's
+invisible to `.emp-shell`'s flex layout. A single delegated `submit`
+listener on `document` catches every form inside that root, POSTs via
+`fetch` instead of letting the browser navigate, and replaces
+`#empDashboardRoot`'s innerHTML with the same element parsed out of the
+response (the view still returns the exact same rendered page after a
+redirect — `fetch` follows redirects transparently, so this is just "do
+what the browser would have done, minus the navigation"). A
+`currentEmpTab` JS variable tracks whichever tab is open and gets
+re-applied (`showEmpTab`) after every swap, which is what actually fixes
+the "resets to Today" complaint. `cancel_leave`'s inline
+`onsubmit="return confirm(...)"` became a `data-confirm` attribute read
+by the same delegated handler (an inline handler and a delegated
+`addEventListener` both firing on the same event is a real footgun —
+this keeps confirm-then-maybe-preventDefault in one place). Theme toggle
+and the camera-open buttons were also switched from
+`querySelectorAll(...).forEach(addEventListener)` at `DOMContentLoaded`
+to delegated listeners, since those buttons live inside the swapped
+root and a per-element binding would silently stop working on the next
+AJAX-rendered copy of the button. The camera modal's own save handler
+(arrival photo + face photos) was switched from
+`.then(() => window.location.reload())` to the same swap-in-place
+(`applyDashboardHtml`), closing the modal explicitly first since it
+lives outside `#empDashboardRoot` and wouldn't reset on its own.
+
+**Admin bookings page** (`templates/admin_dashboard/bookings_list.html`):
+same shape, scoped tighter since `bookings_list.html` shares
+`admin_base.html` with every other admin page. `admin_base.html` now
+wraps its messages block + `{% block content %}` in
+`<div id="adminContentRoot">` (also `display: contents`) — a harmless,
+inert change on pages that don't use it. The actual AJAX interception
+JS lives only in `bookings_list.html`'s `{% block extra_body %}`, so
+other admin pages (overview, services, employees) are completely
+unaffected. Two things this page's handler had to get right that the
+employee one didn't: (1) it must skip the toolbar's search/date `<form
+method="get">` — the delegated listener explicitly checks
+`form.method.toLowerCase() === 'post'` before intercepting, since that
+one *should* navigate (filters belong in a shareable/bookmarkable URL);
+(2) it POSTs to `window.location.href` (current URL, filters included),
+not the form's own `action`, specifically so the swapped-in response
+reflects the *same filtered view* the owner had open — this is the
+actual fix for "loses the filter." The beautician-assignment `<select>`'s
+`onchange="this.form.submit()"` was changed to
+`this.form.requestSubmit()` — `.submit()` does not fire a `submit`
+event at all (a real, easy-to-miss DOM quirk), so the delegated listener
+could never have intercepted it otherwise; `requestSubmit()` fires the
+same event a real Save-button click would.
+
+**Verified** over real CDP (no fake devices needed for the non-camera
+parts): planted a `window.__marker` before each action and confirmed it
+survives (proof no real navigation occurred) for mark-paid, arrival-photo
+upload, and both admin actions; confirmed the active employee tab stays
+put across an action taken from a *different* tab's booking; confirmed
+the admin's active status filter and URL are unchanged after updating a
+status or reassigning a beautician; confirmed the underlying data
+actually changed in each case (not just cosmetically) by reading the DB
+directly after each fetch. Test users/bookings and browser/server
+processes were all cleaned up after.
+
+**Follow-up fix (same day): disabled fields were silently dropped from
+the submitted data.** The admin bookings page's AJAX handler disabled
+`form.querySelectorAll('button, select')` — for UX (prevent double-
+submit) — *before* building `new FormData(form)`. A disabled `<select>`/
+`<input>` is excluded from `FormData` entirely, per spec — so `status`,
+`payment_status`, and `beautician_id` were all missing from every
+request. Effect: "Update Status" silently did nothing (no `status` in
+`request.POST` → nothing matched `dict(Booking.STATUS_CHOICES)`), and
+"Assigned Staff" always unassigned regardless of what was picked (no
+`beautician_id` → the view's `else` branch, which explicitly sets
+`assigned_beautician = None`, ran every time). Fixed by snapshotting
+`new FormData(form)` *before* disabling anything. The employee dashboard
+never had this bug — its handler only disables the submit `<button>`
+(which carries no `name` attribute, so it wasn't in the payload anyway),
+never the data-carrying fields. Re-verified via real CDP interaction
+(set a `<select>`'s value, dispatch `change`/click Save exactly as a user
+would) confirming both the DB and the re-rendered `<select>` reflect the
+chosen value, not "unassigned"/unchanged.
+
+**Follow-up fix (same day): `form.action` was silently the wrong thing on
+the employee dashboard.** Every form on that page has `<input
+type="hidden" name="action" value="mark_paid">` (etc.) — and a named
+form control shadows a same-named IDL property on its `<form>` element.
+So `form.action` in the AJAX handler wasn't the form's URL at all; it
+was the `<input name="action">` element itself. `fetch(form.action, ...)`
+then coerced that element to the string `"[object HTMLInputElement]"`,
+used it as a relative URL, and hit a 404 every single time — silently,
+since the `.then()` chain still ran on the 404's response body (Django's
+404 page has no `#empDashboardRoot`, so `applyDashboardHtml` found
+nothing to swap and returned early, leaving the old page exactly as it
+was with a **stale** message from whatever the previous real action had
+been — which is why "Collect & Mark Paid" *looked* like it did something
+but the payment status never actually changed). Confirmed directly via
+CDP: `typeof form.action` was `"object"`, `r.url` after fetch was
+`.../employee/[object%20HTMLInputElement]`, status 404. Fixed with
+`form.getAttribute('action')` instead — reads the literal HTML attribute,
+which named-control shadowing doesn't touch. Nothing else on the site
+had this exact pattern (the admin bookings page posts to
+`window.location.href`, and the camera modal posts to a hardcoded
+`{% url %}` string — neither ever reads `.action` off a form). Re-verified
+with a **real mouse click** dispatched via CDP's `Input.dispatchMouseEvent`
+(not a scripted `.requestSubmit()`, which is what all the *earlier*
+"this works" verifications in this file used, and which apparently never
+exercised this exact code path in a way that surfaced the bug) —
+payment status now correctly flips to Paid in both the DB and the
+re-rendered badge.
+
+## Cancellation window simplified: any time before "On The Way" (2026-08-06)
+
+The original cancel rule (see "Cancel booking" above, added 2026-08-01)
+was `status == 'upcoming'` AND more than `CANCELLATION_CUTOFF` (3h)
+before `scheduled_start`. Changed to just `status == 'upcoming'` — a
+customer can now cancel right up until the beautician marks the job "On
+The Way" (the point real effort starts being spent), with no separate
+time-based cutoff. Since `on_the_way` is a distinct status from
+`upcoming` (added for the job-status-workflow feature above), this one
+condition already fully captures "before the beautician heads out" —
+the 3h/`scheduled_start` math was solving a problem that status field
+now solves more precisely on its own.
+
+`Booking.scheduled_start`, `SLOT_START_TIMES`, and `CANCELLATION_CUTOFF`
+were deleted from `bookings/models.py` rather than left dead — nothing
+else in the codebase referenced them (confirmed via grep before
+removing). `templates/booking/pages/bookings_dashboard.html`'s cancel
+block had an inner `{% if booking.can_cancel %}` nested inside an outer
+`{% if booking.status == 'upcoming' %}` — now redundant since the two
+conditions are identical, so simplified to a single `{% if
+booking.can_cancel %}` and the now-unreachable "can't be cancelled —
+starts within 3 hours" note branch (plus its now-dead
+`.booking-card__cancel-note` CSS rule) were removed rather than kept
+as dead code.
+
+## Same-day slot availability: fixed a dead code path (2026-08-06)
+
+The "hide past morning/afternoon slots for a same-day regular booking"
+feature already existed (`updateRegularSlotsAvailability()` in
+`static/js/booking_drawer.js`, server-enforced too in
+`create_booking()`) — it just never ran on the most common path into the
+booking drawer: opening it fresh. `resetState()` defaults `state.date` to
+today and calls `renderCalendar()`, but never
+`updateRegularSlotsAvailability()` — that only ran from the calendar's
+own click handler and the booking-type toggle. A customer who never
+touched the calendar (today was already pre-selected) or the type toggle
+would see every slot enabled regardless of the actual time. Fixed by
+calling the right one (`updateRegularSlotsAvailability()` or
+`populateUrgentTimeDropdown()`, depending on `state.type`) every time
+step 3 ("Booking type & time") is entered, in `goToStep()` — covers the
+initial default-date case and guards against staleness if a customer
+sits on an earlier step for a while before reaching step 3.
+
+## Package customization now actually reaches the cart and the charge (2026-08-06)
+
+Packages (`Service.kind == 'package'`) let a customer pick a variant for
+each included service, and the catalog card / detail page already
+recalculated and *displayed* a new total price — but that was cosmetic
+only. The cart line stayed a flat `{id, variantId, qty}`, so whichever
+variants the customer picked were discarded the moment they clicked Add
+to Cart; `create_booking()` only ever resolved the package's own base
+`ServiceVariant`, and no template ever expanded a package's contents for
+display — so job cards/dashboards always showed exactly one line
+("Test Combo Package") no matter how many services were actually inside
+it, and a customized package always charged the same flat price
+regardless of what was picked.
+
+**Decision (confirmed with the user first, since it's a pricing
+question): a customized package's price follows the selection** — sum
+of the chosen included-service variants' prices, with the package's own
+discount percentage applied to that new total. Not "customization only
+picks which variant you get, price stays fixed."
+
+**Cart line shape extended**: `{id, variantId, qty, included}`, where
+`included` is `{includedServiceId: chosenVariantId}` — present only for
+packages, so every non-package cart line's shape is untouched.
+Dedup (`lineKey`/`lineMatches` in `booking.js`) now also matches on a
+stable serialization of `included`, since two different customizations
+of the same package are separate lines, not one line whose qty bumps.
+
+**Single source of pricing truth**: `computePackagePricing(item,
+included)` (module-level in `booking.js`, exposed via
+`window.GlamourBooking`) — sums the resolved variant per included
+service (falling back to that service's own default variant when
+unset/invalid), applies `item.discount_pct` if any, returns
+`{price, mrp, duration_mins, breakdown}`. Every place that needs to show
+or charge a package's price calls this same function: the catalog
+card's live preview (`onCustomerPackageVariantChange`, previously its
+own hand-rolled copy of this math), the service detail page's preview
+(`recalculateDetailPackageTotal`, ditto), the mini-cart panel's line
+price (`render()`), and `booking_drawer.js`'s `cartTotal()`/
+`renderSummary()` (via `linePrice()`) — so the number a customer sees in
+the drawer's final review step can never drift from what
+`create_booking()` actually charges. `gatherIncludedSelections(container)`
+reads whichever variant is currently selected for each included service
+out of the DOM (`[data-inc-id]` on both the `<select>` for
+multi-variant included services and the `<input type="hidden">` for
+single-variant ones — the hidden input previously carried no id/value at
+all, just display-only `data-price`/`data-duration`) — shared by the
+catalog card's Add-to-Cart handler and `service_detail.html`'s
+`addDetailItemToCart()`, both of which now call the also-newly-exposed
+`GB.addItem(id, variantId, included)` instead of hand-rolling their own
+cart push (the detail page's old version had its own latent dedup bug —
+`i.variantId === activeVariantId` compared a stored number against a
+string, so re-adding the same variant always created a duplicate line
+instead of bumping qty; using the shared `addItem()` fixes that for
+free).
+
+**Server-side (`bookings/views.py::create_booking`) never trusts the
+client's price** — it re-resolves `included` itself: for each of the
+package's `included_services`, looks up the client-sent variant id
+*scoped to that specific included service* (so a variant id belonging to
+a different service, or a nonexistent one, can't be smuggled in — it
+just silently falls back to that service's own default variant, no
+error), then **only overrides the package's price/duration when at
+least one resolved variant actually differs from that service's
+default** (`any_customized`). This matters: recomputing "sum of included
+defaults × package's own discount%" unconditionally would NOT
+necessarily reproduce the package's own stored price — verified this
+gap is real on the seeded "Test Combo Package" data (sum of its included
+services' current defaults is ₹3116; the package's own stored mrp is
+₹1917 — they'd drifted apart since seeding). Gating on `any_customized`
+means an un-customized package keeps charging exactly what it always
+charged, byte-for-byte, and only a genuinely customized one gets the new
+computed price — zero risk of silently repricing existing/default
+bookings.
+
+**New `BookingItem.included_snapshot`** (`JSONField`, default `[]`,
+migration `0005_bookingitem_included_snapshot`) — populated for every
+package `BookingItem` (customized or not) with each included service's
+name/variant label/price/duration at booking time. This is what fixes
+the "job card doesn't show all services in a package" complaint:
+`job_card.html` and `bookings_dashboard.html` now render this as a
+nested sub-list under the package's line. Deliberately a snapshot of
+what was actually resolved for *this* booking (customer's picks, or
+defaults) rather than re-deriving from `Service.included_services` at
+display time — a package's included-services list or their variants can
+change after the fact; a past booking's receipt shouldn't.
+
+**Verified**: server-side via direct requests exercising four cases
+(no `included` key at all → unchanged; `included` present but matching
+every default → unchanged; a garbage/nonexistent variant id → falls back
+silently, no 500; a variant id that's real but belongs to a *different*
+included service → rejected, falls back) — all confirmed against the
+real seeded package (5 included services, one with 3 variants, one with
+5), and one genuine customization (Half Arms → Rica Wax) confirmed to
+produce exactly the hand-computed price (₹849) and duration (205 min).
+Then re-verified the client side over real Chrome: changing the
+included-service dropdown updates the live preview to the same ₹849,
+clicking Add to Cart captures all 5 included selections (not just the
+one that changed) into the cart line, adding the identical customization
+twice bumps qty to 2 on one line, and adding a *different* customization
+of the same package creates a genuinely separate line — matching the
+dedup design exactly.
+
+## Follow-up fixes to the package customization feature (2026-08-06)
+
+Two real bugs surfaced immediately after shipping the above, both from
+testing pieces in isolation rather than the full integration.
+
+**"Proceed to Booking" silently stopped working — everywhere, not just
+for packages.** `window.GlamourBooking = {...}` referenced `addItem` —
+but `addItem` is a function declared *inside* `initFloatingCart()`'s own
+scope, while that object literal was being built in the outer
+`DOMContentLoaded` callback, outside it. Referencing an out-of-scope
+identifier throws `ReferenceError` while the object literal is still
+being constructed, which means the entire `window.GlamourBooking = ...`
+assignment never completes — `window.GlamourBooking` stayed `undefined`
+on every page load, breaking every single consumer: `service_detail.html`
+'s add-to-cart/preview (this is what made it look package-specific — the
+error surfaced there first), and — far more importantly —
+`booking_drawer.js`'s entire `GB.*` surface, i.e. the booking drawer
+itself. The catalog page's own Add-to-Cart button kept working purely by
+accident: its click handler is bound *inside* `initFloatingCart()` too,
+so it already has `addItem` in scope directly and never goes through
+`window.GlamourBooking` at all — the crash happens *after* that handler
+is already attached, so it looked unaffected in isolation. Fixed by
+moving the whole `window.GlamourBooking = {...}` assignment to be the
+last statement inside `initFloatingCart()`'s own body, where every name
+it references — locals like `addItem`, and module-level ones like
+`getCart`/`computePackagePricing` via closure — is actually in scope.
+Confirmed via a real page load: previously threw
+`ReferenceError: addItem is not defined` at that exact line on *every*
+page including the catalog listing (checked by capturing
+`Runtime.exceptionThrown` on load, not just by eyeballing the code);
+after the fix, `typeof window.GlamourBooking === 'object'` and the
+drawer opens and renders step 1 correctly.
+
+**Included-service name collapsed to invisible width on narrow
+screens.** Both `catalog_card.html`'s and `service_detail.html`'s
+"included services" rows used `justify-content: space-between` with no
+`flex-wrap`, a fixed-width `<select>` for multi-variant included
+services, and the name container's only shrink guard was `min-width: 0`
+(i.e., "shrink as much as needed, down to nothing"). On a ~390px mobile
+viewport, confirmed via actual `getBoundingClientRect()` measurements
+that the name span's rendered width was ~0–5px for any included service
+with a variant picker (the select's ~170px ate almost the entire ~266px
+row), while a plain-price included service (no select) rendered fine —
+matching the report exactly ("Half Arms"/"Full Body" showing no name,
+just an image and a dropdown). Fixed by adding `flex-wrap: wrap` to the
+row and giving the name container a real `flex-basis`/`min-width`
+(140px on the detail page, 100px on the catalog card) so it can't be
+squeezed below a readable width — once both can't fit on one line, the
+select/price control wraps to its own line under the name instead of
+crushing it. Re-verified at the same 390px viewport: name width went
+from ~0-5px to ~60-66px for both previously-broken rows.
+
+## Review UI redesign: inline stars per service, one shared comment per order (2026-08-06)
+
+The old "Rate & Review" flow was a `<details>` accordion per `BookingItem`
+— rating dropdown + its own comment textarea + its own Submit button,
+repeated once per item, which read as a wall of near-identical forms on
+any multi-item order (see the original screenshot: three near-identical
+"Rate & Review" buttons stacked for a 3-item booking). Discussed the
+redesign with the user first since it implied a real data-model
+question — where does free-text feedback live if it's no longer
+one-comment-per-item.
+
+**Decision**: keep star ratings per service (unchanged meaning — still
+feeds each `Service.rating`/`reviews_count`), but collect only *one*
+free-text comment for the whole order. `Booking` gained two fields:
+`feedback_comment` (`TextField`) and `feedback_submitted_at`
+(migration `0006_booking_feedback_comment_and_more`) — a new
+`submit_booking_feedback` view (`POST
+/booking/my-bookings/<booking_number>/feedback/`) owns writing to them,
+independent of `Review.comment` (which still exists on the model for
+old rows but the current UI never writes to it — see that field's
+updated docstring).
+
+**Stars are inline and submit instantly, no button** — a row of 5
+`<button>` elements per completed item
+(`templates/booking/pages/bookings_dashboard.html`), painted via a
+`data-star-picker[data-rating]` attribute reflecting the existing
+`Review.rating` if any. Clicking one fills stars optimistically and
+fires a `fetch` POST to `submit_review` immediately
+(`static/js/bookings_dashboard.js::initStarRatings`) — no separate
+Submit step. `submit_review` (`bookings/views.py`) changed from
+"error if `hasattr(item, 'review')`" (one-shot, `Review.objects.create`)
+to `Review.objects.update_or_create(booking_item=item, defaults={...})`
+— clicking a *different* star later now re-rates in place instead of
+being rejected, matching how every other star-rating widget behaves,
+and matching the return type change: JSON (`{ok, rating}` /
+`{ok: false, error}`) instead of a redirect + Django message, since
+there's no page reload to carry a message through anymore. On a failed
+request, the JS rolls the stars back to whatever rating was in place
+before the click rather than leaving a rating painted that never
+actually saved.
+
+**One feedback box, one button, per booking** — a single `<textarea>` +
+button living once per completed booking card (not per item), pre-filled
+with any existing `feedback_comment`; the button reads "Submit Feedback"
+or "Update Feedback" depending on `feedback_submitted_at`. Submits via
+`fetch` to the new endpoint and flips its own label + reveals a "✓ Saved"
+status inline, again no page reload.
+
+**URLs resolved server-side into `data-*` attributes**
+(`data-review-url`/`data-feedback-url`), not reconstructed in JS from a
+hand-typed path pattern — `bookings_dashboard.js` is a plain static file
+with no access to `{% url %}`, and hand-typing
+`/booking/my-bookings/reviews/${id}/` there would silently drift the day
+that URL pattern changes.
+
+**Verified**: server-side directly (initial rating → DB check → update
+to a different rating → confirmed still exactly one `Review` row, not
+two → invalid rating rejected with 400 → feedback saved → a second user
+attempting to rate someone else's item gets 404, not 403, same
+ownership pattern as `cancel_booking`), then the actual click
+interaction over a real browser — clicking star 4 on one item visibly
+fills stars 1-4 only and leaves 5 unfilled, a second independent picker
+on the same page correctly fills all 5 on a 5-star click (proving each
+item's picker is scoped independently, not a shared/leaked state), and
+the feedback textarea + button round-trip correctly updates its own
+label and reveals the saved indicator — all confirmed against the
+database afterward, not just the DOM.
+
+## Three-tier authentication: Google/Apple → Phone OTP → password (added 2026-08-07)
+
+Login and signup restructured around three priority tiers per the owner's
+request: **Google/Apple sign-in first**, **phone-number OTP second**,
+**username-or-email + password third** (now collapsed behind a `<details>`
+on the login page — still fully functional, just visually de-emphasized).
+Signup collects first name, last name, email, phone (mandatory), and age,
+and auto-generates the username rather than asking the customer to pick
+one.
+
+**Don't build custom OTP — the installed library already has it.** Before
+writing a `PhoneOTP` model, checked the actual installed
+`django-allauth==65.18.0` source (not docs) and found it ships a complete
+phone-login-by-code system: `RequestLoginCodeView`/`ConfirmLoginCodeView`
+(`account_request_login_code`/`account_confirm_login_code`, gated behind
+`ACCOUNT_LOGIN_BY_CODE_ENABLED = True`), rate limiting, code expiry/resend,
+and a `PhoneField` with E.164 validation — all already installed. The only
+genuinely new code needed was one adapter with five short methods
+(`accounts/adapter.py::AccountAdapter`), since `DefaultAccountAdapter`'s
+phone hooks all `raise NotImplementedError` by default:
+`send_verification_code_sms` (does the real MSG91 call), `set_phone`/
+`get_phone`/`set_phone_verified` (read/write `Profile.phone`/
+`Profile.phone_verified`, both new fields), and `get_user_by_phone`
+(`User.objects.filter(profile__phone=phone).first()`). Registered via
+`ACCOUNT_ADAPTER` in settings.
+
+**Username auto-generation shared with the employee scheme, not allauth's
+own.** allauth's default `populate_username`/`generate_unique_username`
+uses a random suffix, not the sequential-number scheme employee logins use
+(`core/admin_dashboard_views.py::_create_employee_login`). Extracted that
+scheme into `accounts/utils.py::generate_username_from_name` (lowercased
+firstname+lastname, collision-suffixed `2`, `3`, ...), called from both
+`_create_employee_login` (refactored, behavior unchanged) and
+`AccountAdapter.populate_username` (new) — one rule, one place, instead of
+two copies drifting apart later.
+
+**`first_name`/`last_name`/`age` aren't allauth signup fields.** Unlike
+`email`/`phone`/`username` (added dynamically via `ACCOUNT_SIGNUP_FIELDS`),
+allauth's `BaseSignupForm` has no concept of name or age fields at all.
+Added them via a shared mixin (`accounts/forms.py::ExtraSignupFieldsMixin`)
+whose `custom_signup()` saves `age` to `Profile` — mixed into two separate
+subclasses, `CustomSignupForm` (extends `allauth.account.forms.SignupForm`,
+registered via `ACCOUNT_FORMS`) and `CustomSocialSignupForm` (extends
+`allauth.socialaccount.forms.SignupForm`, registered via
+`SOCIALACCOUNT_FORMS`) — genuinely two separate settings keys read by two
+separate allauth views, easy to miss one.
+
+**MSG91 wired for real, not a placeholder.** Per explicit direction,
+`send_verification_code_sms` makes a real HTTP call to MSG91's send-OTP
+API (`MSG91_AUTH_KEY`/`MSG91_SENDER_ID`/`MSG91_TEMPLATE_ID`, new `.env`
+keys, all empty today). With no real key yet, the call fails and is caught
+(logged, not raised) — same "reserved slot, wire up later" pattern already
+used for Google/Apple OAuth and Google Maps in this codebase. Once real
+credentials land in `.env`, delivery starts working with zero code changes.
+Apple Sign In (already partially wired from an earlier phase) follows the
+same pattern — renders now, completes a real login only once credentials
+are added.
+
+**Templates**: `templates/account/login.html` reordered into the three
+tiers (Google/Apple buttons on top, a "Continue with Phone Number" link
+second, the existing username/password form third inside a collapsed
+`<details>`). New `templates/account/signup.html` (none existed before —
+signup previously fell through to allauth's unstyled default), new
+`templates/account/request_login_code.html`/`confirm_login_code.html`
+overrides for the phone-OTP flow, and a new `templates/socialaccount/
+signup.html` override for the "complete your signup" step after a Google/
+Apple login (asks only for what the provider didn't supply: phone, age).
+All reuse the existing `auth-card`/`auth-group`/`auth-input`/
+`auth-submit-btn`/`auth-social-btn` classes already in `auth.css`, plus a
+handful of new ones for the two-column name row and the collapsed tier-3
+section.
+
+**Verified server-side** (Django test client, not a browser — signup with
+phone+age → username matched the employee-style rule exactly →
+`Profile.phone`/`age` saved; a second same-named signup collided correctly
+to `name2`; confirmed `_create_employee_login` still behaves identically
+after the refactor; called `send_verification_code_sms` directly and
+confirmed the expected MSG91 failure — no real key yet — is caught rather
+than raised; ran the full phone-login-by-code loop end-to-end — requested
+a code, read it out of the session-stored login stage, submitted it back,
+and confirmed the test client actually became authenticated as the right
+user and `Profile.phone_verified` flipped to `True`).
+
+**Follow-ups**: `send_verification_code_sms` now also `print()`s the code
+to the console unconditionally (not just on MSG91 failure) — needed to
+actually exercise the flow end-to-end without real MSG91 delivery.
+
+**Resend was silently disabled by allauth's own default.** Both the
+phone-login confirm page and the post-signup phone-verification page
+already had a "resend" button wired in their templates, but it never
+rendered — `can_resend` was always `False`, because allauth's
+`ACCOUNT_LOGIN_BY_CODE_SUPPORTS_RESEND`/`ACCOUNT_PHONE_VERIFICATION_SUPPORTS_RESEND`
+both default to `False` (which caps the resend quota at 0), a detail easy
+to miss since nothing errors — the button just never appears. Added both
+to settings.py (quota becomes 2 resends each once enabled). Also added a
+`templates/account/confirm_phone_verification_code.html` override (the
+actual post-signup "enter the code we texted you" page, previously left
+on allauth's unstyled default) with the same styling and resend pattern as
+`confirm_login_code.html`.
+
+Verified via the Django test client: signed up → confirmed the code was
+printed to console → requested a resend → confirmed a *different* code was
+generated and printed → submitted the new code → `phone_verified` became
+`True`. Also confirmed the login-by-code confirm page's resend button now
+renders too.
+
+## Security audit + penetration test (added 2026-08-07)
+
+Ran a full read-only audit across `core`/`accounts`/`bookings`/`catalog`,
+then personally exploited and fixed every real finding rather than just
+listing them.
+
+**Critical — employee-identity IDOR.** `employee_dashboard_views.py`
+resolved "which employee is this?" partly via
+`Employee.objects.filter(email__iexact=user.email)` — a fallback for
+accounts without a direct `employee_profile` link. Proved exploitable:
+created a real employee, then an unrelated attacker account with the
+same email (`Employee.email` is just admin-entered contact info, not a
+verified identity key) — the attacker got full access to that employee's
+bookings, customer PII, `mark_paid`, and arrival-OTP verification.
+Removed the fallback entirely; identity now resolves only through the
+real link an admin establishes.
+
+**Critical — stored-XSS via spoofed upload Content-Type.**
+`core/utils.py::validate_image_upload` only checked the attacker-supplied
+multipart `Content-Type` header. Proved exploitable: an HTML file with a
+faked `image/jpeg` header was accepted. Fixed with a real extension
+allow-list *and* Pillow (`Image.open(...).verify()`) decoding the actual
+bytes — a script file can no longer pass as an "image" no matter what
+headers/extension it claims.
+
+**High — arrival-OTP-verification bypass.** `update_booking_status`
+accepted any status transition directly, so an assigned employee could
+jump straight from "upcoming" to "in_progress"/"completed", completely
+skipping the On-The-Way → photo → OTP sequence built specifically to
+prove physical arrival. Restricted that action to its one legitimate
+transition (in_progress → completed, still payment-gated).
+
+**Medium fixes**: re-enabled `ACCOUNT_RATE_LIMITS` (was `False` —
+unthrottled login/OTP/reset is what makes credential-stuffing practical
+at scale); replaced the predictable `Firstname2026` employee password
+scheme with `Firstname` + 4 random digits (the old one was computable by
+anyone who knows an employee's first name, which customers see); added a
+5-attempt lockout to the arrival OTP (`Booking.otp_failed_attempts`) — a
+6-digit code had no brute-force limit within its 20-minute window.
+
+**Hardening** (`settings.py`, zero behavior change confirmed for local
+dev): `SECRET_KEY` was hardcoded and committed to git — moved to `.env`
+with the same value as a dev-only fallback; `DEBUG`/`ALLOWED_HOSTS` made
+env-configurable; `SESSION_COOKIE_SECURE`/`CSRF_COOKIE_SECURE`/
+`SECURE_SSL_REDIRECT` added, gated on `not DEBUG` so they activate
+automatically the moment a real deploy flips that flag; the devtunnels
+CSRF wildcard scoped to `DEBUG` only.
+
+**A self-inflicted near-miss worth remembering**: the `ACCOUNT_RATE_LIMITS
+= True` fix above was initially landed as a literal `True` — allauth's
+`app_settings.RATE_LIMITS` property does `ret.update(rls)` on whatever
+this setting is, and `dict.update(True)` raises `TypeError`, which would
+have taken down *every* allauth view that checks a rate limit (login,
+signup, password reset...) the moment it shipped. Caught immediately by
+actually testing the fix with the Django test client rather than trusting
+that "enabling" a boolean-sounding setting was safe — fixed to `{}` (the
+real "use allauth's own defaults" value). Reinforces the standing rule in
+this project: every fix gets exercised with a real request before being
+called done, not just reasoned about.
+
+## Real MessageCentral "Verify Now" phone-OTP + real Razorpay checkout (added 2026-08-07)
+
+Two real payment-adjacent third-party credentials landed in `.env`
+(`SMS_KEY`, `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`) — wired both up for
+real, replacing what had been reserved-slot/dev-only paths.
+
+**MessageCentral replaces allauth's login-by-code entirely, not MSG91's
+role.** MSG91 (the earlier phone-OTP vendor, never given real credentials)
+worked like a dumb relay: allauth generates its own 6-digit code, the
+adapter's job is just to text it. MessageCentral's "Verify Now" product
+is fundamentally different — *they* generate and validate the OTP
+(`POST .../verification/v3/send` returns a `verificationId`; you never
+see the code at all, only whether `GET .../validateOtp` later reports
+`VERIFICATION_COMPLETED`). There's no way to hand it an allauth-generated
+code to relay, so keeping allauth's own `send_verification_code_sms` hook
+was a non-starter for this vendor — confirmed by directly researching
+their current v3 API reference before writing any code, rather than
+guessing at the shape from an older tutorial that turned out to describe
+a different endpoint style (v2 vs v3 auth flow disagreed across sources).
+
+Given that, tier-2 login ("Continue with Phone Number") is now a small
+hand-built flow instead of allauth's own login-by-code
+(`ACCOUNT_LOGIN_BY_CODE_ENABLED` switched off to avoid two competing
+phone-OTP paths): `accounts/messagecentral.py` (thin REST client —
+`send_otp`/`validate_otp`; the customerId is decoded straight out of the
+API key's own JWT payload, since it already carries it as
+`client_company_name`, avoiding a second manually-copied .env value) +
+`accounts/phone_login_views.py` (`request_phone_login`/
+`confirm_phone_login`, using Django's own session dict for the two-step
+state — no allauth internals touched) + two new templates matching the
+existing auth-card styling. Reuses the existing `IndianPhoneField`
+(+91 auto-prepend) and `AccountAdapter.get_user_by_phone`/
+`set_phone_verified` hooks, so signup's mandatory phone field and this
+login path stay consistent. Added a 5-attempt lockout (mirroring the
+arrival-OTP one above) and real rate limiting on the two custom actions
+by adding them to the same `ACCOUNT_RATE_LIMITS` dict allauth's own
+`ratelimit.consume()` reads — it works for any action name, not just
+allauth's built-in ones. Removed the now-fully-dead MSG91 code and the
+three allauth phone-OTP templates it no longer reaches
+(`request_login_code.html`, `confirm_login_code.html`,
+`confirm_phone_verification_code.html`).
+
+**Razorpay**: replaced the fake "processing → success" `setTimeout` in
+`booking_drawer.js` with a real Checkout.js integration.
+`bookings/razorpay_client.py` (`create_order`/`fetch_order`/
+`verify_payment_signature` — plain `requests` + HMAC-SHA256, no SDK
+dependency, matching this project's pattern for every other third-party
+integration). The cart→price resolution logic in
+`bookings/views.py::create_booking` (variant lookup, package
+customization, coupon math) was extracted into a shared
+`_resolve_cart_pricing()` so a new `create_razorpay_order` endpoint and
+`create_booking` itself compute the exact same total two different times
+without any chance of drift. `create_booking` now requires and verifies
+a real signature for `payment_method='pay_now'` — HMAC first, then a
+second server-to-server call to re-fetch the order's amount from
+Razorpay directly (never trusting anything client-supplied about what
+was actually paid) — before marking a booking paid; `pay_at_home` is
+untouched. New `Booking.razorpay_order_id`/`razorpay_payment_id` fields
+for support/refund lookups.
+
+**Verified** (mocked HTTP throughout — real API calls would spend the
+client's actual credits/quota for no benefit over a mock proving the same
+code paths): full phone-login flow (send → confirm → login →
+`phone_verified=True`), wrong-code lockout after 5 attempts, resend
+resetting the lockout counter, unknown-phone redirecting to signup
+without logging anyone in; Razorpay order creation, a valid
+signature+matching-amount payment correctly marking a booking paid, and —
+critically — a forged signature, a tampered/mismatched amount, and
+missing payment fields entirely all correctly rejected with **no booking
+created** in any of the three cases; `pay_at_home` confirmed unaffected
+throughout.
+
+## MessageCentral: fixing the real auth flow against the live API (added 2026-08-07)
+
+The mocked-HTTP verification above proved the *view/session* logic was
+right, but the real API rejected every call with a bare `401` (no body
+at all) once actually tried. Chased this down against the live API
+rather than guessing further from docs, since the docs themselves turned
+out to be self-contradictory:
+
+- The dashboard's "Auth Token" (`SMS_KEY`) is **not** usable directly as
+  the `authToken` header on send/validate, despite matching every
+  documented shape — MessageCentral's own onboarding PDF confirms
+  send/validate need a short-lived **session token** from
+  `/auth/v1/authentication/token` first; the dashboard token is a
+  different, longer-lived credential. That endpoint needs the actual
+  dashboard *login password* (base64-encoded) as its `key` param — a
+  second secret, added as `MESSAGECENTRAL_PASSWORD`.
+- `validateOtp` specifically needs **GET**, not the POST its own docs'
+  prose claims (their own example cURL for that one endpoint quietly
+  uses GET) — and **no trailing slash** on the path. Either mismatch
+  gets the same bare-401 gateway rejection as the wrong auth entirely,
+  which is what made this so slow to isolate: several genuinely
+  different root causes all produced an identical, contentless symptom.
+
+`accounts/messagecentral.py::_generate_session_token` now performs that
+exchange (cached via Django's cache for 6 hours, force-refreshed once on
+a 401 to cover a token expiring server-side before the local guess
+does). `send_otp`/`validate_otp` both route through
+`_request_with_token_retry` for that retry-once behavior.
+
+**Verified against the real live API** (not mocked — deliberately, since
+this exact gap only showed up against the real service): generated a
+real session token, sent a real OTP to a real phone, and validated the
+real code the phone actually received — confirmed `VERIFICATION_COMPLETED`.
+A second validation attempt against the same (by-then-expired, ~60s
+window) code correctly came back `VERIFICATION_EXPIRED` rather than
+silently "working" — confirming expiry is enforced by MessageCentral
+itself, not just assumed.
+
+## Fixed: password login silently failing for any phoneless account (added 2026-08-07)
+
+Surfaced right after wiping all data (see below) — every remaining login
+(a freshly `createsuperuser`'d account, an employee login from the admin
+dashboard) has no `Profile.phone` at all, and every single one bounced
+back to the login page with no error, just a server-side
+`"Login stage aborted, redirecting to login"` log line.
+
+Root cause: allauth's `PhoneVerificationStage` runs on **every** login
+regardless of `ACCOUNT_PHONE_VERIFICATION_ENABLED` — that flag is only
+consulted once a phone already exists on the account. For an account
+with no phone at all, `AccountAdapter.get_phone()` returns `None`, and
+since `ACCOUNT_SIGNUP_FIELDS` marks phone as required, the stage
+interprets "required field, but nothing on file" as an unrecoverable
+state and aborts the whole login pipeline rather than continuing —
+`ACCOUNT_PHONE_VERIFICATION_ENABLED = False` (set earlier this session)
+never actually covered this path. Fixed by overriding
+`AccountAdapter.get_login_stages()` to drop `PhoneVerificationStage`
+from the pipeline outright — phone verification only ever happens
+through the optional MessageCentral-backed tier
+(`accounts/phone_login_views.py`), never as a forced stage on password/
+Google login. Verified: a phoneless account now logs in and reaches
+`/booking/`; an account with an on-file-but-unverified phone still logs
+in fine too (no regression).
+
+## Full data reset: users, bookings, and packages wiped (added 2026-08-07)
+
+At the user's explicit request (confirmed scope twice, given the
+irreversibility): deleted every `User` (11, including staff/admin/
+employee logins — cascading `Profile`/`Address`/allauth rows), every
+`Booking` (3, cascading items/reviews), and every package-type `Service`
+(2, cascading their variants) — leaving all 39 `kind='service'` Services
+and their variants/categories untouched. `Employee` rows (5) were kept
+as data since they weren't explicitly listed as a delete target — only
+their `user` login link was nulled via its existing `on_delete=SET_NULL`.
+A `db.sqlite3.backup-<timestamp>` copy was taken first as a cheap safety
+net before running it. A fresh `createsuperuser` is needed to regain any
+access to the site at all after this.
+
+## Email/phone uniqueness enforced at the DB level (added 2026-08-07)
+
+`auth.User` has no email-uniqueness constraint at all by default (a
+well-known Django gotcha, and not fixable by adding `unique=True` in a
+migration since it's Django's own built-in model, not ours to alter).
+Added partial/conditional unique indexes instead — `CREATE UNIQUE INDEX
+... WHERE column != ''` — on `accounts_profile.phone` and
+`auth_user.email`, via raw `RunSQL` rather than `AlterField`. The
+`WHERE` clause matters: plenty of legitimate rows have a blank phone or
+email (pre-phone-mandatory accounts, admin/employee accounts), and a
+plain `unique=True` would treat every blank as a value that itself must
+be unique — the second blank row would violate it.
+
+Traced through allauth's actual signup validation (`assess_unique_email`/
+`_clean_phone`) and confirmed it already silently prevents duplicate
+signups given this project's settings (`ACCOUNT_EMAIL_VERIFICATION=
+'optional'` + default `PREVENT_ENUMERATION=True` lands in the "uniqueness
+takes precedence" branch). The real gaps were two admin-side paths that
+bypass that form entirely — `dashboard_employees`'s `add_employee`/
+`generate_login`, which set a linked User's email with no check at all —
+now given a friendly pre-check instead of a raw `IntegrityError`. Same
+for `accounts/views.py::profile_view`'s phone field. Verified: blank
+phones/emails never collide with each other, real duplicates are
+blocked with a clean message (not a 500) at every write path checked,
+and normal signup/profile-edit/employee-creation are all unaffected.
+

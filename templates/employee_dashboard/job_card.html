@@ -11,11 +11,8 @@
 
   <div class="emp-job-card__customer">
     <div class="emp-customer-main">
-      <strong>👤 {{ booking.user.first_name|default:booking.user.username }} {{ booking.user.last_name }}</strong>
+      <strong>👤 {{ booking.customer_display_name }} {{ booking.user.last_name }}</strong>
       <span class="emp-customer-email">✉ {{ booking.user.email }}</span>
-      {% if booking.user.profile.phone %}
-        <a href="tel:{{ booking.user.profile.phone|cut:' ' }}" class="emp-customer-phone">📞 {{ booking.user.profile.phone }}</a>
-      {% endif %}
     </div>
 
     <!-- Location & Directions -->
@@ -40,7 +37,16 @@
     <span class="emp-items-title">Services to perform:</span>
     <ul class="emp-items-list">
       {% for item in booking.items.all %}
-        <li><strong>{{ item.name_snapshot }}</strong> (x{{ item.quantity }}) — ₹{{ item.price_snapshot }}</li>
+        <li>
+          <strong>{{ item.name_snapshot }}</strong> (x{{ item.quantity }}) — ₹{{ item.price_snapshot }}
+          {% if item.included_snapshot %}
+            <ul class="emp-items-list__included">
+              {% for inc in item.included_snapshot %}
+                <li>{{ inc.name }}{% if inc.variant_label %} ({{ inc.variant_label }}){% endif %}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </li>
       {% endfor %}
     </ul>
     <div class="emp-job-total">
@@ -51,6 +57,21 @@
 
   <!-- Quick Action Controls -->
   <div class="emp-job-card__actions">
+    {% if booking.user.profile.phone %}
+      {% if booking.status == 'upcoming' or booking.status == 'on_the_way' %}
+        <a href="tel:{{ booking.user.profile.phone|cut:' ' }}" class="emp-btn emp-btn--ghost emp-btn--sm">📞 Call Customer</a>
+      {% endif %}
+    {% endif %}
+
+    {% if booking.payment_status != 'paid' and booking.status != 'cancelled' %}
+      <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="mark_paid">
+        <input type="hidden" name="booking_id" value="{{ booking.id }}">
+        <button type="submit" class="emp-btn emp-btn--ghost emp-btn--sm">💵 Collect & Mark Paid</button>
+      </form>
+    {% endif %}
+
     {% if booking.status == 'upcoming' %}
       <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form">
         {% csrf_token %}
@@ -79,7 +100,7 @@
             <input type="text" name="otp" inputmode="numeric" maxlength="6" placeholder="6-digit code" required class="emp-otp-input">
             <button type="submit" class="emp-btn emp-btn--complete">✅ Start Job</button>
           </form>
-          <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form">
+          <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form emp-otp-regenerate">
             {% csrf_token %}
             <input type="hidden" name="action" value="regenerate_otp">
             <input type="hidden" name="booking_id" value="{{ booking.id }}">
@@ -89,22 +110,17 @@
       {% endif %}
 
     {% elif booking.status == 'in_progress' %}
-      <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="update_booking_status">
-        <input type="hidden" name="booking_id" value="{{ booking.id }}">
-        <input type="hidden" name="status" value="completed">
-        <button type="submit" class="emp-btn emp-btn--complete">✔ Complete Job</button>
-      </form>
-    {% endif %}
-
-    {% if booking.payment_status != 'paid' and booking.status != 'cancelled' %}
-      <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="mark_paid">
-        <input type="hidden" name="booking_id" value="{{ booking.id }}">
-        <button type="submit" class="emp-btn emp-btn--ghost emp-btn--sm">💵 Collect & Mark Paid</button>
-      </form>
+      {% if booking.payment_status == 'paid' %}
+        <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_booking_status">
+          <input type="hidden" name="booking_id" value="{{ booking.id }}">
+          <input type="hidden" name="status" value="completed">
+          <button type="submit" class="emp-btn emp-btn--complete">✔ Complete Job</button>
+        </form>
+      {% else %}
+        <p class="emp-payment-note">💵 Collect payment below to complete this job.</p>
+      {% endif %}
     {% endif %}
   </div>
 </div>

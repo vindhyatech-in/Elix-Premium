@@ -272,6 +272,15 @@ body.booking-app {
   margin-bottom: 0.4rem;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+}
+
+/* A long, unbroken email address (no spaces) has nowhere to wrap by
+   default and overflows past the dropdown panel's edge — break it like a
+   URL instead of letting it spill out. */
+.dropdown-panel__header strong {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .dropdown-panel__header span { font-size: var(--fs-xs); color: var(--ink-muted); }
@@ -1041,6 +1050,44 @@ body.booking-app {
 }
 .modal-backdrop.is-open { opacity: 1; pointer-events: auto; }
 
+/* Generic confirm/alert modal — replaces native window.confirm()/alert()
+   across the customer-facing pages (see GB.confirmModal/alertModal in
+   booking.js, which injects the matching markup once, on first use, so
+   no template needs its own copy of this). Reuses .modal-backdrop above
+   for the dimmed background. */
+.confirm-modal {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 380px);
+  z-index: calc(var(--z-app-modal) + 1);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-md) var(--ease-soft), transform var(--dur-md) var(--ease-soft), visibility var(--dur-md);
+}
+.confirm-modal.is-open { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(-50%, -50%); }
+
+.confirm-modal__message {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-body);
+  line-height: 1.5;
+}
+
+.confirm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
 .quick-view-modal {
   position: fixed;
   top: 50%; left: 50%;
@@ -1739,6 +1786,35 @@ body.booking-app {
 .bookings-dashboard__message--success { background: rgba(169, 127, 55, 0.12); color: var(--gold-deep); border: 1px solid rgba(169, 127, 55, 0.3); }
 .bookings-dashboard__message--error { background: rgba(199, 141, 134, 0.12); color: var(--rose); border: 1px solid rgba(199, 141, 134, 0.3); }
 
+.bookings-dashboard__filters { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: var(--space-md); }
+
+.bookings-dashboard__search {
+  flex: 1 1 220px;
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-hairline);
+  background: var(--surface-2);
+  color: var(--text-body);
+  font-size: var(--fs-sm);
+  font-family: var(--font-body);
+}
+
+.bookings-dashboard__date {
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-hairline);
+  background: var(--surface-2);
+  color: var(--text-body);
+  font-size: var(--fs-sm);
+  font-family: var(--font-body);
+}
+
+.bookings-dashboard__search:focus,
+.bookings-dashboard__date:focus {
+  outline: none;
+  border-color: var(--gold-deep);
+}
+
 .bookings-dashboard__tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: var(--space-lg); }
 
 .bookings-dashboard__list { display: flex; flex-direction: column; gap: var(--space-md); }
@@ -1766,6 +1842,26 @@ body.booking-app {
 .booking-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-sm); padding-bottom: var(--space-sm); border-bottom: 1px solid var(--border-hairline); }
 .booking-card__number { font-weight: 700; color: var(--text-body); letter-spacing: 0.02em; }
 .booking-card__date { font-size: var(--fs-sm); color: var(--ink-muted); margin-top: 0.15rem; }
+
+.booking-card__beautician { display: flex; align-items: center; gap: 0.6rem; }
+.booking-card__beautician-photo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border-hairline);
+}
+.booking-card__beautician-photo--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-1);
+  font-size: 1.1rem;
+}
+.booking-card__beautician-info { display: flex; flex-direction: column; gap: 0.1rem; }
+.booking-card__beautician-label { font-size: var(--fs-xs); color: var(--ink-muted); }
+.booking-card__beautician-info strong { font-size: var(--fs-sm); color: var(--text-body); }
 
 .booking-card__status {
   flex-shrink: 0;
@@ -1803,6 +1899,7 @@ body.booking-app {
 
 .booking-card__items { padding-block: var(--space-sm); display: flex; flex-direction: column; gap: 0.4rem; border-bottom: 1px solid var(--border-hairline); }
 .booking-card__item { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-sm); color: var(--text-body); }
+.booking-card__item-included { margin: -0.15rem 0 0; padding-left: 1.1rem; list-style: disc; font-size: var(--fs-xs); color: var(--ink-muted); }
 
 .booking-card__footer { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-sm); padding-top: var(--space-sm); }
 .booking-card__address { display: flex; align-items: flex-start; gap: 0.4rem; font-size: var(--fs-xs); color: var(--ink-muted); max-width: 60%; }
@@ -1810,40 +1907,53 @@ body.booking-app {
 .booking-card__total { text-align: right; font-size: var(--fs-xs); color: var(--ink-muted); }
 .booking-card__total strong { display: block; font-size: 1.05rem; color: var(--text-body); }
 
-.booking-card__rebook { margin-top: var(--space-sm); width: 100%; }
+.booking-card__quick-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: var(--space-sm); }
+.booking-card__quick-actions .btn { flex: 1 1 140px; margin-top: 0; width: auto; }
 
-.booking-card__cancel { margin-top: var(--space-sm); width: 100%; color: var(--rose); border-color: rgba(199, 141, 134, 0.4); }
+.booking-card__cancel { color: var(--rose); border-color: rgba(199, 141, 134, 0.4); }
 .booking-card__cancel:hover { background: var(--rose); color: var(--cream); border-color: var(--rose); }
-.booking-card__cancel-note { margin-top: var(--space-sm); text-align: center; font-size: var(--fs-xs); color: var(--ink-muted); }
 
 .booking-card__reviews {
   margin-top: var(--space-sm);
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   border-top: 1px dashed var(--border-hairline);
   padding-top: var(--space-sm);
 }
 
-.booking-card__review-row { display: flex; flex-direction: column; gap: var(--space-3xs); }
+.booking-card__reviews-heading { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); }
 
-.booking-card__review-service { font-size: var(--fs-xs); font-weight: 600; color: var(--ink-muted); }
+.booking-card__review-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
 
-.booking-card__review-given { display: flex; flex-direction: column; gap: var(--space-3xs); }
-.booking-card__review-stars { color: var(--gold-deep); letter-spacing: 0.1em; }
-.booking-card__review-comment { margin: 0; font-size: var(--fs-sm); color: var(--text-body); font-style: italic; }
+.booking-card__review-service { font-size: var(--fs-sm); font-weight: 600; color: var(--text-body); }
+
 .booking-card__review-unavailable { margin: 0; font-size: var(--fs-xs); color: var(--ink-muted); }
 
-.booking-card__review-toggle summary { cursor: pointer; list-style: none; width: fit-content; }
-.booking-card__review-toggle summary::-webkit-details-marker { display: none; }
+.booking-card__star-picker { display: flex; gap: 0.15rem; }
+.booking-card__star {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--border-hairline);
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+.booking-card__star:hover { transform: scale(1.15); }
+.booking-card__star.is-filled { color: var(--gold-deep); }
 
-.booking-card__review-form {
-  margin-top: var(--space-sm);
+.booking-card__feedback {
   display: flex;
   flex-direction: column;
   gap: var(--space-2xs);
+  padding-top: var(--space-sm);
+  border-top: 1px dashed var(--border-hairline);
 }
-.booking-card__review-form .field { margin-bottom: 0; }
+.booking-card__feedback label { font-size: var(--fs-xs); font-weight: 600; color: var(--ink-muted); }
+.booking-card__feedback-actions { display: flex; align-items: center; gap: var(--space-sm); }
+.booking-card__feedback-status { font-size: var(--fs-xs); color: var(--green); font-weight: 600; }
 
 @media (max-width: 640px) {
   .booking-card__footer { flex-direction: column; align-items: stretch; gap: 0.5rem; }
@@ -1877,6 +1987,16 @@ body.booking-app {
 
 .profile-page__card .address-list { margin-bottom: var(--space-md); }
 .address-card--static { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-sm); }
+
+.profile-page__card--danger {
+  border-color: rgba(199, 141, 134, 0.4);
+}
+.profile-page__card--danger h2 { color: var(--rose); }
+.profile-page__danger-text {
+  color: var(--ink-muted);
+  font-size: var(--fs-sm);
+  margin-bottom: var(--space-md);
+}
 
 @media (max-width: 640px) {
   .profile-page__form-row { grid-template-columns: 1fr; }
