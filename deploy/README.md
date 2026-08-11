@@ -32,9 +32,7 @@ process supervision, certbot for HTTPS.
 ## Deploy
 
 ```bash
-scp -r deploy/ ubuntu@140.245.207.15:~/elix-deploy   # or git clone the whole repo directly on the VM
-ssh ubuntu@140.245.207.15
-cd ~/elix-deploy   # or wherever deploy.sh ended up
+cd ~/Elix-Premium
 sudo CERTBOT_EMAIL=you@example.com ./deploy.sh
 ```
 

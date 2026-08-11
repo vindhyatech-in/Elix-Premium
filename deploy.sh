@@ -6,10 +6,8 @@
 # unrelated projects — every path/service/socket name here is scoped to
 # "elix" specifically so this script never touches them.
 #
-# Usage (on the Oracle VM, as a user with sudo):
-#   sudo REPO_URL=git@github.com:vindhyatech-in/Elix-Premium.git \
-#        CERTBOT_EMAIL=you@example.com \
-#        ./deploy.sh
+# Usage (on the Oracle VM, as a user with sudo from repository root):
+#   sudo CERTBOT_EMAIL=you@example.com ./deploy.sh
 #
 # First run: clones the repo, sets up the venv, installs nginx/certbot,
 # and asks you to fill in /var/www/elix/.env before it can finish
