@@ -43,7 +43,8 @@ else
 fi
 
 echo "==> Python virtualenv + dependencies"
-if [ ! -d "$PROJECT_DIR/venv" ]; then
+if [ ! -f "$PROJECT_DIR/venv/bin/pip" ]; then
+  rm -rf "$PROJECT_DIR/venv"
   python3 -m venv "$PROJECT_DIR/venv"
 fi
 "$PROJECT_DIR/venv/bin/pip" install -q --upgrade pip
