@@ -18,4 +18,5 @@ urlpatterns = [
     path('dashboard/offers/', admin_dashboard_views.dashboard_offers, name='admin_dashboard_offers'),
     # Employee / Beautician Dashboard
     path('employee/', employee_dashboard_views.employee_dashboard, name='employee_dashboard'),
+    path('employee/profile/', employee_dashboard_views.employee_profile_view, name='employee_profile'),
 ]

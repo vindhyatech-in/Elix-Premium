@@ -91,23 +91,22 @@ def _build_month_calendar(employee, year, month, today_date):
 
 
 @owner_or_emp_required
-def employee_dashboard(request):
+def _resolve_employee(request):
     """
-    Employee / Beautician Dashboard: Mobile-first control panel for assigned jobs,
-    schedule navigation, order status updates, payment collection, and duty status toggle.
+    Identify employee profile — ONLY via the real user<->Employee link
+    established by an admin (_create_employee_login/generate_login). A
+    previous fallback matched by `user.email == Employee.email` instead —
+    Employee.email is just admin-entered contact info, and a user's own
+    account email is self-service editable, so anyone who set their
+    account email to a real employee's contact email got treated as that
+    employee (full access to their bookings/customer PII, mark_paid,
+    arrival-photo/OTP verification). Removed — no legitimate employee
+    needs this, since every employee with a login already has
+    `employee_profile` set directly. Shared by employee_dashboard and
+    employee_profile_view so both resolve the same way, including the
+    owner-preview-any-employee fallback.
     """
     user = request.user
-
-    # Identify employee profile — ONLY via the real user<->Employee link
-    # established by an admin (_create_employee_login/generate_login).
-    # A previous fallback matched by `user.email == Employee.email`
-    # instead — Employee.email is just admin-entered contact info, and
-    # a user's own account email is self-service editable, so anyone who
-    # set their account email to a real employee's contact email got
-    # treated as that employee (full access to their bookings/customer
-    # PII, mark_paid, arrival-photo/OTP verification). Removed — no
-    # legitimate employee needs this, since every employee with a login
-    # already has `employee_profile` set directly.
     employee = user.employee_profile if hasattr(user, 'employee_profile') else None
 
     if not employee and is_owner(user):
@@ -117,6 +116,19 @@ def employee_dashboard(request):
             employee = Employee.objects.filter(id=emp_id).first()
         if not employee:
             employee = Employee.objects.first()
+
+    return employee
+
+
+def employee_dashboard(request):
+    """
+    Employee / Beautician Dashboard: Mobile-first control panel for assigned jobs,
+    schedule navigation, order status updates, payment collection, and duty status toggle.
+    Profile/face-verification/leave management live on their own page — see
+    employee_profile_view below.
+    """
+    user = request.user
+    employee = _resolve_employee(request)
 
     if not employee:
         # Reachable if an 'emp' group member somehow has no linked
@@ -246,7 +258,103 @@ def employee_dashboard(request):
                 booking.save()
                 messages.success(request, f'Verified — #{booking.booking_number} is now Job Started.')
 
-        elif action == 'upload_face_photos' and employee:
+        return redirect(request.get_full_path())
+
+    # Get Assigned Bookings
+    assigned_bookings = (
+        Booking.objects.filter(assigned_beautician=employee)
+        .select_related('user')
+        .prefetch_related('items')
+        if employee
+        else Booking.objects.none()
+    )
+
+    today_bookings = assigned_bookings.filter(scheduled_date=today_date).exclude(status='cancelled')
+    upcoming_bookings = assigned_bookings.filter(status__in=['upcoming', 'on_the_way', 'in_progress']).exclude(
+        id__in=today_bookings.values_list('id', flat=True)
+    )
+    completed_bookings = assigned_bookings.filter(status='completed')
+
+    # Metrics
+    completed_count = completed_bookings.count()
+    total_earnings = completed_bookings.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+
+    # Calendar month navigation (?cal_year=&cal_month=) — defaults to the
+    # current month. Clamped to valid values instead of 500ing on a
+    # hand-edited/garbage query string.
+    try:
+        cal_year = int(request.GET.get('cal_year', today_date.year))
+        cal_month = int(request.GET.get('cal_month', today_date.month))
+        if not 1 <= cal_month <= 12:
+            raise ValueError
+    except ValueError:
+        cal_year, cal_month = today_date.year, today_date.month
+
+    prev_month, prev_year = (12, cal_year - 1) if cal_month == 1 else (cal_month - 1, cal_year)
+    next_month, next_year = (1, cal_year + 1) if cal_month == 12 else (cal_month + 1, cal_year)
+
+    context = {
+        'page_title': 'Beautician Dashboard',
+        'employee': employee,
+        'today_bookings': today_bookings,
+        'upcoming_bookings': upcoming_bookings,
+        'completed_bookings': completed_bookings,
+        'completed_count': completed_count,
+        'total_earnings': total_earnings,
+        'today_date': today_date,
+        'all_employees': Employee.objects.all() if is_owner(user) else None,
+        'calendar_weeks': _build_month_calendar(employee, cal_year, cal_month, today_date),
+        'calendar_label': f'{MONTH_NAMES[cal_month - 1]} {cal_year}',
+        'calendar_prev': {'month': prev_month, 'year': prev_year},
+        'calendar_next': {'month': next_month, 'year': next_year},
+    }
+    return render(request, 'employee_dashboard/emp_dashboard.html', context)
+
+
+@owner_or_emp_required
+def employee_profile_view(request):
+    """
+    An employee's own profile: editable phone/specialties, the 5 face-
+    verification reference photos, and leave requests — split out from
+    employee_dashboard() into its own page (2026-08-11) rather than a
+    client-side tab on the job-management dashboard, since none of this
+    is job-management and it doesn't need that page's AJAX-refresh
+    behavior. See _resolve_employee for the owner-preview-any-employee
+    fallback, shared with employee_dashboard.
+    """
+    employee = _resolve_employee(request)
+
+    if not employee:
+        messages.error(request, 'You do not have an assigned Beautician profile.')
+        return redirect('services_booking')
+
+    today_date = timezone.now().date()
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'update_profile_photo':
+            # The public-facing "meet the team" photo (see
+            # accounts.Employee.display_photo_url, used by
+            # templates/components/beauticians.html) — deliberately
+            # separate from the 5 face_photo_* fields below, which are
+            # arrival-verification reference shots never shown to
+            # customers. A normal file upload is fine here (unlike face
+            # verification, this isn't evidence of anything — just a
+            # display photo, so there's no need to force a live camera
+            # capture).
+            photo = request.FILES.get('photo_image')
+            upload_error = validate_image_upload(photo) if photo else None
+            if not photo:
+                messages.error(request, 'Please choose a photo first.')
+            elif upload_error:
+                messages.error(request, upload_error)
+            else:
+                employee.photo_image = photo
+                employee.save(update_fields=['photo_image'])
+                messages.success(request, 'Profile photo updated.')
+
+        elif action == 'upload_face_photos':
             slots = ['face_photo_front', 'face_photo_left', 'face_photo_right', 'face_photo_top', 'face_photo_bottom']
             uploaded = [name for name in slots if request.FILES.get(name)]
             upload_error = next(
@@ -263,7 +371,7 @@ def employee_dashboard(request):
                 employee.save()
                 messages.success(request, 'Face photo saved.')
 
-        elif action == 'update_profile' and employee:
+        elif action == 'update_profile':
             phone = request.POST.get('phone', '').strip()[:20]
             specialties = request.POST.get('specialties', '').strip()
             if phone and not looks_like_phone(phone):
@@ -276,7 +384,7 @@ def employee_dashboard(request):
                 employee.save()
                 messages.success(request, 'Profile updated.')
 
-        elif action == 'request_leave' and employee:
+        elif action == 'request_leave':
             start_date = parse_date(request.POST.get('start_date') or '')
             end_date = parse_date(request.POST.get('end_date') or '')
             reason = request.POST.get('reason', '').strip()
@@ -305,7 +413,7 @@ def employee_dashboard(request):
                 else:
                     messages.success(request, 'Leave request added.')
 
-        elif action == 'cancel_leave' and employee:
+        elif action == 'cancel_leave':
             leave_id = request.POST.get('leave_id', '')
             if leave_id.isdigit():
                 EmployeeLeave.objects.filter(id=leave_id, employee=employee).delete()
@@ -313,59 +421,14 @@ def employee_dashboard(request):
             else:
                 messages.error(request, 'Invalid leave id.')
 
-        return redirect(request.get_full_path())
+        return redirect('employee_profile')
 
-    # Get Assigned Bookings
-    assigned_bookings = (
-        Booking.objects.filter(assigned_beautician=employee)
-        .select_related('user')
-        .prefetch_related('items')
-        if employee
-        else Booking.objects.none()
-    )
-
-    today_bookings = assigned_bookings.filter(scheduled_date=today_date).exclude(status='cancelled')
-    upcoming_bookings = assigned_bookings.filter(status__in=['upcoming', 'on_the_way', 'in_progress']).exclude(
-        id__in=today_bookings.values_list('id', flat=True)
-    )
-    completed_bookings = assigned_bookings.filter(status='completed')
-
-    # Metrics
-    completed_count = completed_bookings.count()
-    total_earnings = completed_bookings.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
-
-    upcoming_leaves = (
-        employee.leaves.filter(end_date__gte=today_date) if employee else EmployeeLeave.objects.none()
-    )
-
-    # Calendar month navigation (?cal_year=&cal_month=) — defaults to the
-    # current month. Clamped to valid values instead of 500ing on a
-    # hand-edited/garbage query string.
-    try:
-        cal_year = int(request.GET.get('cal_year', today_date.year))
-        cal_month = int(request.GET.get('cal_month', today_date.month))
-        if not 1 <= cal_month <= 12:
-            raise ValueError
-    except ValueError:
-        cal_year, cal_month = today_date.year, today_date.month
-
-    prev_month, prev_year = (12, cal_year - 1) if cal_month == 1 else (cal_month - 1, cal_year)
-    next_month, next_year = (1, cal_year + 1) if cal_month == 12 else (cal_month + 1, cal_year)
+    upcoming_leaves = employee.leaves.filter(end_date__gte=today_date)
 
     context = {
-        'page_title': 'Beautician Dashboard',
+        'page_title': 'My Profile',
         'employee': employee,
-        'today_bookings': today_bookings,
-        'upcoming_bookings': upcoming_bookings,
-        'completed_bookings': completed_bookings,
-        'completed_count': completed_count,
-        'total_earnings': total_earnings,
         'today_date': today_date,
         'upcoming_leaves': upcoming_leaves,
-        'all_employees': Employee.objects.all() if is_owner(user) else None,
-        'calendar_weeks': _build_month_calendar(employee, cal_year, cal_month, today_date),
-        'calendar_label': f'{MONTH_NAMES[cal_month - 1]} {cal_year}',
-        'calendar_prev': {'month': prev_month, 'year': prev_year},
-        'calendar_next': {'month': next_month, 'year': next_year},
     }
-    return render(request, 'employee_dashboard/emp_dashboard.html', context)
+    return render(request, 'employee_dashboard/emp_profile.html', context)

@@ -748,6 +748,22 @@ body.emp-body {
 
 .emp-profile-card + .emp-profile-card { margin-top: 1rem; }
 
+.emp-profile-photo-row {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.emp-profile-photo-preview {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border-hairline);
+  flex-shrink: 0;
+}
+
 .emp-section-title {
   font-family: var(--font-display);
   font-size: 1.05rem;

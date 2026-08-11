@@ -1,0 +1,513 @@
+{% load static %}<!doctype html>
+<html lang="en-IN">
+<head>
+  <script>
+    (function () {
+      var stored = localStorage.getItem('theme');
+      var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile — {{ employee.name }} | {{ SITE.name }}</title>
+
+  <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/employee_dashboard.css' %}">
+</head>
+<body class="emp-body">
+
+  <div class="emp-shell">
+    <header class="emp-header">
+      <div class="emp-header__user">
+        <span class="emp-avatar">👩‍🎨</span>
+        <div>
+          <h1 class="emp-user-name">My Profile</h1>
+          <div class="emp-user-meta">
+            <span>{{ employee.name }}</span> ·
+            <a href="{% url 'employee_dashboard' %}">← Back to Dashboard</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="emp-header__actions">
+        <button type="button" class="emp-theme-toggle" data-theme-toggle aria-label="Toggle theme">
+          <svg class="emp-theme-icon emp-theme-icon--moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg class="emp-theme-icon emp-theme-icon--sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        </button>
+        <a href="{% url 'account_logout' %}" class="emp-btn emp-btn--ghost emp-btn--xs">Logout</a>
+      </div>
+    </header>
+
+    {% if messages %}
+      <div class="emp-messages">
+        {% for message in messages %}
+          <div class="emp-alert emp-alert--{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="emp-profile-card">
+      <h3 class="emp-section-title">Profile Photo</h3>
+      <p class="emp-section-hint">Shown to customers on the public "meet the team" section — separate from the face verification photos below, which are never shown publicly.</p>
+      <div class="emp-profile-photo-row">
+        <img src="{{ employee.display_photo_url }}" alt="{{ employee.name }}" class="emp-profile-photo-preview">
+        <form method="post" action="{% url 'employee_profile' %}" enctype="multipart/form-data" class="emp-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_profile_photo">
+          <div class="emp-field">
+            <label for="emp-photo-image">Replace photo</label>
+            <input type="file" id="emp-photo-image" name="photo_image" accept="image/*" required>
+          </div>
+          <button type="submit" class="emp-btn emp-btn--complete emp-btn--sm">Save Photo</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="emp-profile-card">
+      <h3 class="emp-section-title">Your Details</h3>
+      <div class="emp-profile-readonly">
+        <div><small>Name</small><span>{{ employee.name }}</span></div>
+        <div><small>Email</small><span>{{ employee.email|default:"—" }}</span></div>
+        <div><small>Experience</small><span>{{ employee.experience_years }} yr{{ employee.experience_years|pluralize }}</span></div>
+        <div><small>Rating</small><span>⭐ {{ employee.rating }}</span></div>
+      </div>
+
+      <form method="post" action="{% url 'employee_profile' %}" class="emp-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_profile">
+        <div class="emp-form-grid">
+          <div class="emp-field">
+            <label for="emp-phone">Phone</label>
+            <input type="tel" id="emp-phone" name="phone" value="{{ employee.phone }}" required>
+          </div>
+          <div class="emp-field">
+            <label for="emp-specialties">Specialties</label>
+            <input type="text" id="emp-specialties" name="specialties" value="{{ employee.specialties }}" placeholder="e.g. Hair Spa, Facials, Makeup" required>
+          </div>
+        </div>
+        <button type="submit" class="emp-btn emp-btn--complete emp-btn--sm">Save Changes</button>
+      </form>
+    </div>
+
+    <div class="emp-profile-card">
+      <h3 class="emp-section-title">Login &amp; Security</h3>
+      <p class="emp-section-hint">Change the password used to sign in to this dashboard.</p>
+      <a href="{% url 'account_change_password' %}?next={% url 'employee_profile' %}" class="emp-btn emp-btn--progress emp-btn--sm">Change Password</a>
+    </div>
+
+    <div class="emp-profile-card">
+      <h3 class="emp-section-title">Face Verification Photos</h3>
+      <p class="emp-section-hint">
+        Take 5 reference photos of your face — front, left, right, top and bottom view. These are shown
+        to the owner and kept as a record for job-site arrival checks, never shown to customers.
+        {% if employee.face_photos_complete %}
+          <span class="emp-face-complete">✔ All 5 uploaded</span>
+        {% endif %}
+      </p>
+
+      <div class="emp-face-grid">
+        <div class="emp-face-slot">
+          <div class="emp-face-diagram">
+            <svg viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="32" cy="34" r="20"/>
+              <circle cx="25" cy="30" r="2" fill="currentColor" stroke="none"/>
+              <circle cx="39" cy="30" r="2" fill="currentColor" stroke="none"/>
+              <path d="M25 42 Q32 47 39 42" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <strong class="emp-face-slot__title">Front</strong>
+          <p class="emp-face-slot__hint">Straight-on, looking directly at the camera</p>
+          {% if employee.face_photo_front %}<img src="{{ employee.face_photo_front.url }}" alt="Front face photo" class="emp-face-slot__preview">{% endif %}
+          <button
+            type="button"
+            class="emp-btn emp-btn--ghost emp-btn--xs"
+            data-open-camera
+            data-face-field="face_photo_front"
+            data-face-label="Front"
+          >{% if employee.face_photo_front %}Retake{% else %}Take Photo{% endif %}</button>
+        </div>
+
+        <div class="emp-face-slot">
+          <div class="emp-face-diagram">
+            <svg viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 20 L10 26 16 32" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="34" cy="34" r="20"/>
+              <circle cx="42" cy="30" r="2" fill="currentColor" stroke="none"/>
+              <path d="M26 30 Q22 34 26 38" stroke-linecap="round"/>
+              <path d="M30 42 Q34 47 42 42" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <strong class="emp-face-slot__title">Left</strong>
+          <p class="emp-face-slot__hint">Head turned to show your left profile</p>
+          {% if employee.face_photo_left %}<img src="{{ employee.face_photo_left.url }}" alt="Left face photo" class="emp-face-slot__preview">{% endif %}
+          <button
+            type="button"
+            class="emp-btn emp-btn--ghost emp-btn--xs"
+            data-open-camera
+            data-face-field="face_photo_left"
+            data-face-label="Left"
+          >{% if employee.face_photo_left %}Retake{% else %}Take Photo{% endif %}</button>
+        </div>
+
+        <div class="emp-face-slot">
+          <div class="emp-face-diagram">
+            <svg viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M48 20 L54 26 48 32" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="30" cy="34" r="20"/>
+              <circle cx="22" cy="30" r="2" fill="currentColor" stroke="none"/>
+              <path d="M38 30 Q42 34 38 38" stroke-linecap="round"/>
+              <path d="M22 42 Q30 47 34 42" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <strong class="emp-face-slot__title">Right</strong>
+          <p class="emp-face-slot__hint">Head turned to show your right profile</p>
+          {% if employee.face_photo_right %}<img src="{{ employee.face_photo_right.url }}" alt="Right face photo" class="emp-face-slot__preview">{% endif %}
+          <button
+            type="button"
+            class="emp-btn emp-btn--ghost emp-btn--xs"
+            data-open-camera
+            data-face-field="face_photo_right"
+            data-face-label="Right"
+          >{% if employee.face_photo_right %}Retake{% else %}Take Photo{% endif %}</button>
+        </div>
+
+        <div class="emp-face-slot">
+          <div class="emp-face-diagram">
+            <svg viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M26 8 L32 15 38 8" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="32" cy="36" r="20"/>
+              <circle cx="25" cy="30" r="2" fill="currentColor" stroke="none"/>
+              <circle cx="39" cy="30" r="2" fill="currentColor" stroke="none"/>
+              <path d="M25 46 Q32 49 39 46" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <strong class="emp-face-slot__title">Top</strong>
+          <p class="emp-face-slot__hint">Chin down, eyes looking up toward the camera</p>
+          {% if employee.face_photo_top %}<img src="{{ employee.face_photo_top.url }}" alt="Top face photo" class="emp-face-slot__preview">{% endif %}
+          <button
+            type="button"
+            class="emp-btn emp-btn--ghost emp-btn--xs"
+            data-open-camera
+            data-face-field="face_photo_top"
+            data-face-label="Top"
+          >{% if employee.face_photo_top %}Retake{% else %}Take Photo{% endif %}</button>
+        </div>
+
+        <div class="emp-face-slot">
+          <div class="emp-face-diagram">
+            <svg viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M26 56 L32 49 38 56" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="32" cy="28" r="20"/>
+              <circle cx="25" cy="34" r="2" fill="currentColor" stroke="none"/>
+              <circle cx="39" cy="34" r="2" fill="currentColor" stroke="none"/>
+              <path d="M25 22 Q32 19 39 22" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <strong class="emp-face-slot__title">Bottom</strong>
+          <p class="emp-face-slot__hint">Chin up, eyes looking down toward the camera</p>
+          {% if employee.face_photo_bottom %}<img src="{{ employee.face_photo_bottom.url }}" alt="Bottom face photo" class="emp-face-slot__preview">{% endif %}
+          <button
+            type="button"
+            class="emp-btn emp-btn--ghost emp-btn--xs"
+            data-open-camera
+            data-face-field="face_photo_bottom"
+            data-face-label="Bottom"
+          >{% if employee.face_photo_bottom %}Retake{% else %}Take Photo{% endif %}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="emp-profile-card">
+      <h3 class="emp-section-title">Mark Yourself On Leave</h3>
+      <p class="emp-section-hint">Block out future dates you won't be available for — this lets the owner know when assigning new jobs.</p>
+
+      <form method="post" action="{% url 'employee_profile' %}" class="emp-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="request_leave">
+        <div class="emp-form-grid">
+          <div class="emp-field">
+            <label for="emp-leave-start">From</label>
+            <input type="date" id="emp-leave-start" name="start_date" min="{{ today_date|date:'Y-m-d' }}" required>
+          </div>
+          <div class="emp-field">
+            <label for="emp-leave-end">To</label>
+            <input type="date" id="emp-leave-end" name="end_date" min="{{ today_date|date:'Y-m-d' }}" required>
+          </div>
+        </div>
+        <p class="emp-leave-duration-preview" data-leave-duration-preview hidden></p>
+        <div class="emp-field">
+          <label for="emp-leave-reason">Reason (optional)</label>
+          <input type="text" id="emp-leave-reason" name="reason" placeholder="e.g. Family function">
+        </div>
+        <button type="submit" class="emp-btn emp-btn--progress emp-btn--sm">Request Leave</button>
+      </form>
+
+      {% if upcoming_leaves %}
+        <div class="emp-leave-list">
+          {% for leave in upcoming_leaves %}
+            <div class="emp-leave-item">
+              <div>
+                <div class="emp-leave-dates">
+                  {{ leave.start_date|date:"M j" }} – {{ leave.end_date|date:"M j, Y" }}
+                  <span class="emp-leave-duration">· {{ leave.duration_days }} day{{ leave.duration_days|pluralize }}</span>
+                </div>
+                {% if leave.reason %}<div class="emp-leave-reason">{{ leave.reason }}</div>{% endif %}
+              </div>
+              <form method="post" action="{% url 'employee_profile' %}" class="emp-inline-form" data-confirm="Cancel this leave request?">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="cancel_leave">
+                <input type="hidden" name="leave_id" value="{{ leave.id }}">
+                <button type="submit" class="emp-btn emp-btn--ghost emp-btn--xs">Cancel</button>
+              </form>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="emp-section-hint">No upcoming leave scheduled.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Confirm modal (leave cancellation) -->
+  <div id="empConfirmBackdrop" class="emp-confirm-modal" hidden>
+    <div class="emp-confirm-modal__panel">
+      <p class="emp-confirm-modal__message" id="empConfirmMessage"></p>
+      <div class="emp-confirm-modal__actions">
+        <button type="button" class="emp-btn emp-btn--ghost emp-btn--sm" id="empConfirmCancel">Cancel</button>
+        <button type="button" class="emp-btn emp-btn--complete" id="empConfirmOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Face-photo camera modal — live capture only, no file/gallery input
+       exists here on purpose: a face verification photo must be taken in
+       the moment, not picked from an old photo. -->
+  <div id="empCameraModal" class="emp-camera-modal" hidden>
+    <div class="emp-camera-modal__panel">
+      <h3 class="emp-camera-modal__title" data-camera-title>Photo</h3>
+      <p class="emp-camera-modal__hint">Live camera only — this can't be replaced with a photo from your gallery.</p>
+
+      <video id="empCameraVideo" class="emp-camera-modal__video" autoplay playsinline muted></video>
+      <canvas id="empCameraCanvas" class="emp-camera-modal__canvas" hidden></canvas>
+      <img id="empCameraPreview" class="emp-camera-modal__preview" hidden alt="Captured face photo">
+
+      <p class="emp-camera-modal__error" data-camera-error hidden></p>
+
+      <div class="emp-camera-modal__actions">
+        <button type="button" class="emp-btn emp-btn--ghost emp-btn--sm" data-camera-cancel>Cancel</button>
+        <button type="button" class="emp-btn emp-btn--progress" data-camera-capture>📸 Capture</button>
+        <button type="button" class="emp-btn emp-btn--ghost emp-btn--sm" data-camera-retake hidden>↺ Retake</button>
+        <button type="button" class="emp-btn emp-btn--complete" data-camera-save hidden>✔ Use This Photo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-stack" data-toast-stack aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+    function getCsrfToken() {
+      var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+      return match ? match[1] : '';
+    }
+
+    function _empModalPrompt(message, showCancel) {
+      return new Promise(function (resolve) {
+        var backdrop = document.getElementById('empConfirmBackdrop');
+        var msgEl = document.getElementById('empConfirmMessage');
+        var okBtn = document.getElementById('empConfirmOk');
+        var cancelBtn = document.getElementById('empConfirmCancel');
+
+        msgEl.textContent = message;
+        cancelBtn.hidden = !showCancel;
+        backdrop.hidden = false;
+
+        function cleanup(result) {
+          backdrop.hidden = true;
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          resolve(result);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+      });
+    }
+    function empConfirm(message) { return _empModalPrompt(message, true); }
+
+    document.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      if (!form.dataset.confirm) return;
+      e.preventDefault();
+      empConfirm(form.dataset.confirm).then(function (ok) {
+        if (ok) form.submit();
+      });
+    });
+
+    // Leave form: keep "To" from ever being before "From", live day-count.
+    document.addEventListener('change', function (e) {
+      if (e.target.id !== 'emp-leave-start' && e.target.id !== 'emp-leave-end') return;
+      var startInput = document.getElementById('emp-leave-start');
+      var endInput = document.getElementById('emp-leave-end');
+      var preview = document.querySelector('[data-leave-duration-preview]');
+      if (!startInput || !endInput || !preview) return;
+
+      if (startInput.value) endInput.min = startInput.value;
+      if (!startInput.value || !endInput.value) { preview.hidden = true; return; }
+      var start = new Date(startInput.value);
+      var end = new Date(endInput.value);
+      var days = Math.round((end - start) / 86400000) + 1;
+      if (days < 1) { preview.hidden = true; return; }
+      preview.textContent = days + ' day' + (days === 1 ? '' : 's');
+      preview.hidden = false;
+    });
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-theme-toggle]');
+      if (!btn) return;
+      var root = document.documentElement;
+      var current = root.getAttribute('data-theme') || 'dark';
+      var next = current === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+    });
+
+    // Face-photo camera capture — same live-capture-only flow as the
+    // dashboard's arrival-photo modal, trimmed to face-mode only since
+    // this page never handles arrival/verification photos.
+    document.addEventListener('DOMContentLoaded', function () {
+      var modal = document.getElementById('empCameraModal');
+      if (!modal) return;
+
+      var video = document.getElementById('empCameraVideo');
+      var canvas = document.getElementById('empCameraCanvas');
+      var preview = document.getElementById('empCameraPreview');
+      var errorEl = modal.querySelector('[data-camera-error]');
+      var titleEl = modal.querySelector('[data-camera-title]');
+      var captureBtn = modal.querySelector('[data-camera-capture]');
+      var retakeBtn = modal.querySelector('[data-camera-retake]');
+      var saveBtn = modal.querySelector('[data-camera-save]');
+      var cancelBtn = modal.querySelector('[data-camera-cancel]');
+
+      var stream = null;
+      var capturedBlob = null;
+      var activeFaceField = null;
+
+      function showError(message) {
+        errorEl.textContent = message;
+        errorEl.hidden = false;
+      }
+
+      function resetToLiveView() {
+        capturedBlob = null;
+        video.hidden = false;
+        preview.hidden = true;
+        captureBtn.hidden = false;
+        retakeBtn.hidden = true;
+        saveBtn.hidden = true;
+        errorEl.hidden = true;
+      }
+
+      function stopStream() {
+        if (stream) {
+          stream.getTracks().forEach(function (track) { track.stop(); });
+          stream = null;
+        }
+        video.srcObject = null;
+      }
+
+      function startStream() {
+        return navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+          .then(function (s) {
+            stream = s;
+            video.srcObject = s;
+          });
+      }
+
+      function closeModal() {
+        stopStream();
+        modal.hidden = true;
+        activeFaceField = null;
+      }
+
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-open-camera]');
+        if (!btn) return;
+
+        activeFaceField = btn.dataset.faceField;
+        titleEl.textContent = 'Face Photo — ' + btn.dataset.faceLabel;
+        resetToLiveView();
+        modal.hidden = false;
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showError('Camera access isn\'t available in this browser.');
+          captureBtn.hidden = true;
+          return;
+        }
+        startStream().catch(function () {
+          showError('Couldn\'t access the camera — check camera permission for this site and try again.');
+          captureBtn.hidden = true;
+        });
+      });
+
+      captureBtn.addEventListener('click', function () {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(function (blob) {
+          capturedBlob = blob;
+          preview.src = URL.createObjectURL(blob);
+          video.hidden = true;
+          preview.hidden = false;
+          captureBtn.hidden = true;
+          retakeBtn.hidden = false;
+          saveBtn.hidden = false;
+          stopStream();
+        }, 'image/jpeg', 0.9);
+      });
+
+      retakeBtn.addEventListener('click', function () {
+        resetToLiveView();
+        startStream().catch(function () {
+          showError('Couldn\'t access the camera — check camera permission for this site and try again.');
+          captureBtn.hidden = true;
+        });
+      });
+
+      saveBtn.addEventListener('click', function () {
+        if (!capturedBlob || !activeFaceField) return;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+
+        var formData = new FormData();
+        formData.append('action', 'upload_face_photos');
+        formData.append(activeFaceField, capturedBlob, activeFaceField + '.jpg');
+
+        fetch('{% url "employee_profile" %}', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': getCsrfToken() },
+          body: formData,
+        })
+          .then(function () {
+            closeModal();
+            window.location.reload();
+          })
+          .catch(function () {
+            showError('Upload failed — check your connection and try again.');
+            saveBtn.disabled = false;
+            saveBtn.textContent = '✔ Use This Photo';
+          });
+      });
+
+      cancelBtn.addEventListener('click', closeModal);
+    });
+  </script>
+</body>
+</html>

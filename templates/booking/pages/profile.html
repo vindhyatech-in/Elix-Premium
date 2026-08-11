@@ -47,6 +47,14 @@
         </form>
       </div>
 
+      <div class="profile-page__card">
+        <h2>Login & Security</h2>
+        <p>Change the password used to sign in to your account.</p>
+        <a href="{% url 'account_change_password' %}?next={% url 'profile' %}" class="btn btn--ghost">
+          {% if user.has_usable_password %}Change Password{% else %}Set Password{% endif %}
+        </a>
+      </div>
+
       <div class="profile-page__card" id="addresses">
         <h2>Saved Addresses</h2>
 

@@ -64,6 +64,13 @@ if DEBUG:
     # satisfy this Origin check), so it's gated on DEBUG rather than
     # listed unconditionally above with the fixed local ports.
     CSRF_TRUSTED_ORIGINS.append('https://*.devtunnels.ms')
+
+# The real deployed domain(s) — e.g. https://elix.vindhyatech.in — go in
+# .env, not here: this file is shared across every environment (local dev,
+# demo VM, anyone else's checkout), and the dev-only origins above must
+# stay in place regardless of what a given deploy's domain is. Comma-
+# separated, full scheme+host (CSRF_TRUSTED_ORIGINS requires a scheme).
+CSRF_TRUSTED_ORIGINS += config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Cookie/transport hardening — gated on `not DEBUG` so local dev (plain
@@ -84,12 +91,15 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    # Must come before django.contrib.staticfiles per django-cloudinary-
-    # storage's own docs. Only MEDIA (user uploads) is routed to
-    # Cloudinary below — static assets (CSS/JS/site-shipped images)
-    # stay served locally, unaffected.
-    'cloudinary_storage',
     'django.contrib.staticfiles',
+    # Deliberately NOT 'cloudinary_storage' — that app's only effect on
+    # INSTALLED_APPS is registering a `collectstatic` command override
+    # (checking the pre-Django-4.2 `STATICFILES_STORAGE` setting, which
+    # no longer exists once STORAGES below is used — crashes collectstatic
+    # outright otherwise: AttributeError, found running `deploy.sh` for
+    # real). `MediaCloudinaryStorage` (used below) is a plain importable
+    # class — it needs no AppConfig/app registration to work as a STORAGES
+    # backend, since static files were never routed to Cloudinary anyway.
     'cloudinary',
     'anymail',
 
@@ -261,7 +271,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ---------------------------------------------------------------------------
 SITE_NAME = 'Elix'
 SITE_TAGLINE = 'Premium Salon at Home'
-SITE_DOMAIN = 'elix.com'  # update for the real production domain
+SITE_DOMAIN = config('SITE_DOMAIN', default='elix.com')
 SITE_DESCRIPTION = (
     'Elix brings verified, professional beauticians and premium products '
     'to your doorstep — salon-grade hair, skin, makeup and spa services on '

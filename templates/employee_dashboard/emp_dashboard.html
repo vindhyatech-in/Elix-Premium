@@ -87,10 +87,10 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         <span>Completed</span>
       </button>
-      <button type="button" class="emp-tab emp-bottom-nav__item" onclick="switchEmpTab(this, 'tabProfile')">
+      <a href="{% url 'employee_profile' %}" class="emp-tab emp-bottom-nav__item">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span>Profile</span>
-      </button>
+      </a>
     </nav>
 
     <!-- Staff Switcher (If Staff/Owner) -->
@@ -223,212 +223,6 @@
           <p>No completed jobs recorded yet.</p>
         </div>
       {% endif %}
-    </div>
-
-    <!-- Tab 4: Profile & Leave -->
-    <div id="tabProfile" class="emp-tab-content" style="display: none;">
-      <div class="emp-profile-card">
-        <h3 class="emp-section-title">Your Details</h3>
-        <div class="emp-profile-readonly">
-          <div><small>Name</small><span>{{ employee.name }}</span></div>
-          <div><small>Email</small><span>{{ employee.email|default:"—" }}</span></div>
-          <div><small>Experience</small><span>{{ employee.experience_years }} yr{{ employee.experience_years|pluralize }}</span></div>
-          <div><small>Rating</small><span>⭐ {{ employee.rating }}</span></div>
-        </div>
-
-        <form method="post" action="{% url 'employee_dashboard' %}" class="emp-form">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="update_profile">
-          <div class="emp-form-grid">
-            <div class="emp-field">
-              <label for="emp-phone">Phone</label>
-              <input type="tel" id="emp-phone" name="phone" value="{{ employee.phone }}" required>
-            </div>
-            <div class="emp-field">
-              <label for="emp-specialties">Specialties</label>
-              <input type="text" id="emp-specialties" name="specialties" value="{{ employee.specialties }}" placeholder="e.g. Hair Spa, Facials, Makeup" required>
-            </div>
-          </div>
-          <button type="submit" class="emp-btn emp-btn--complete emp-btn--sm">Save Changes</button>
-        </form>
-      </div>
-
-      <div class="emp-profile-card">
-        <h3 class="emp-section-title">Face Verification Photos</h3>
-        <p class="emp-section-hint">
-          Take 5 reference photos of your face — front, left, right, top and bottom view. These are shown
-          to the owner and kept as a record for job-site arrival checks.
-          {% if employee.face_photos_complete %}
-            <span class="emp-face-complete">✔ All 5 uploaded</span>
-          {% endif %}
-        </p>
-
-        <div class="emp-face-grid">
-          <div class="emp-face-slot">
-            <div class="emp-face-diagram">
-              <svg viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="32" cy="34" r="20"/>
-                <circle cx="25" cy="30" r="2" fill="currentColor" stroke="none"/>
-                <circle cx="39" cy="30" r="2" fill="currentColor" stroke="none"/>
-                <path d="M25 42 Q32 47 39 42" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <strong class="emp-face-slot__title">Front</strong>
-            <p class="emp-face-slot__hint">Straight-on, looking directly at the camera</p>
-            {% if employee.face_photo_front %}<img src="{{ employee.face_photo_front.url }}" alt="Front face photo" class="emp-face-slot__preview">{% endif %}
-            <button
-              type="button"
-              class="emp-btn emp-btn--ghost emp-btn--xs"
-              data-open-camera
-              data-camera-mode="face"
-              data-face-field="face_photo_front"
-              data-face-label="Front"
-            >{% if employee.face_photo_front %}Retake{% else %}Take Photo{% endif %}</button>
-          </div>
-
-          <div class="emp-face-slot">
-            <div class="emp-face-diagram">
-              <svg viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M16 20 L10 26 16 32" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="34" cy="34" r="20"/>
-                <circle cx="42" cy="30" r="2" fill="currentColor" stroke="none"/>
-                <path d="M26 30 Q22 34 26 38" stroke-linecap="round"/>
-                <path d="M30 42 Q34 47 42 42" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <strong class="emp-face-slot__title">Left</strong>
-            <p class="emp-face-slot__hint">Head turned to show your left profile</p>
-            {% if employee.face_photo_left %}<img src="{{ employee.face_photo_left.url }}" alt="Left face photo" class="emp-face-slot__preview">{% endif %}
-            <button
-              type="button"
-              class="emp-btn emp-btn--ghost emp-btn--xs"
-              data-open-camera
-              data-camera-mode="face"
-              data-face-field="face_photo_left"
-              data-face-label="Left"
-            >{% if employee.face_photo_left %}Retake{% else %}Take Photo{% endif %}</button>
-          </div>
-
-          <div class="emp-face-slot">
-            <div class="emp-face-diagram">
-              <svg viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M48 20 L54 26 48 32" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="30" cy="34" r="20"/>
-                <circle cx="22" cy="30" r="2" fill="currentColor" stroke="none"/>
-                <path d="M38 30 Q42 34 38 38" stroke-linecap="round"/>
-                <path d="M22 42 Q30 47 34 42" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <strong class="emp-face-slot__title">Right</strong>
-            <p class="emp-face-slot__hint">Head turned to show your right profile</p>
-            {% if employee.face_photo_right %}<img src="{{ employee.face_photo_right.url }}" alt="Right face photo" class="emp-face-slot__preview">{% endif %}
-            <button
-              type="button"
-              class="emp-btn emp-btn--ghost emp-btn--xs"
-              data-open-camera
-              data-camera-mode="face"
-              data-face-field="face_photo_right"
-              data-face-label="Right"
-            >{% if employee.face_photo_right %}Retake{% else %}Take Photo{% endif %}</button>
-          </div>
-
-          <div class="emp-face-slot">
-            <div class="emp-face-diagram">
-              <svg viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M26 8 L32 15 38 8" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="32" cy="36" r="20"/>
-                <circle cx="25" cy="30" r="2" fill="currentColor" stroke="none"/>
-                <circle cx="39" cy="30" r="2" fill="currentColor" stroke="none"/>
-                <path d="M25 46 Q32 49 39 46" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <strong class="emp-face-slot__title">Top</strong>
-            <p class="emp-face-slot__hint">Chin down, eyes looking up toward the camera</p>
-            {% if employee.face_photo_top %}<img src="{{ employee.face_photo_top.url }}" alt="Top face photo" class="emp-face-slot__preview">{% endif %}
-            <button
-              type="button"
-              class="emp-btn emp-btn--ghost emp-btn--xs"
-              data-open-camera
-              data-camera-mode="face"
-              data-face-field="face_photo_top"
-              data-face-label="Top"
-            >{% if employee.face_photo_top %}Retake{% else %}Take Photo{% endif %}</button>
-          </div>
-
-          <div class="emp-face-slot">
-            <div class="emp-face-diagram">
-              <svg viewBox="0 0 64 64" width="52" height="52" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M26 56 L32 49 38 56" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="32" cy="28" r="20"/>
-                <circle cx="25" cy="34" r="2" fill="currentColor" stroke="none"/>
-                <circle cx="39" cy="34" r="2" fill="currentColor" stroke="none"/>
-                <path d="M25 22 Q32 19 39 22" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <strong class="emp-face-slot__title">Bottom</strong>
-            <p class="emp-face-slot__hint">Chin up, eyes looking down toward the camera</p>
-            {% if employee.face_photo_bottom %}<img src="{{ employee.face_photo_bottom.url }}" alt="Bottom face photo" class="emp-face-slot__preview">{% endif %}
-            <button
-              type="button"
-              class="emp-btn emp-btn--ghost emp-btn--xs"
-              data-open-camera
-              data-camera-mode="face"
-              data-face-field="face_photo_bottom"
-              data-face-label="Bottom"
-            >{% if employee.face_photo_bottom %}Retake{% else %}Take Photo{% endif %}</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="emp-profile-card">
-        <h3 class="emp-section-title">Mark Yourself On Leave</h3>
-        <p class="emp-section-hint">Block out future dates you won't be available for — this lets the owner know when assigning new jobs.</p>
-
-        <form method="post" action="{% url 'employee_dashboard' %}" class="emp-form">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="request_leave">
-          <div class="emp-form-grid">
-            <div class="emp-field">
-              <label for="emp-leave-start">From</label>
-              <input type="date" id="emp-leave-start" name="start_date" min="{{ today_date|date:'Y-m-d' }}" required>
-            </div>
-            <div class="emp-field">
-              <label for="emp-leave-end">To</label>
-              <input type="date" id="emp-leave-end" name="end_date" min="{{ today_date|date:'Y-m-d' }}" required>
-            </div>
-          </div>
-          <p class="emp-leave-duration-preview" data-leave-duration-preview hidden></p>
-          <div class="emp-field">
-            <label for="emp-leave-reason">Reason (optional)</label>
-            <input type="text" id="emp-leave-reason" name="reason" placeholder="e.g. Family function">
-          </div>
-          <button type="submit" class="emp-btn emp-btn--progress emp-btn--sm">Request Leave</button>
-        </form>
-
-        {% if upcoming_leaves %}
-          <div class="emp-leave-list">
-            {% for leave in upcoming_leaves %}
-              <div class="emp-leave-item">
-                <div>
-                  <div class="emp-leave-dates">
-                    {{ leave.start_date|date:"M j" }} – {{ leave.end_date|date:"M j, Y" }}
-                    <span class="emp-leave-duration">· {{ leave.duration_days }} day{{ leave.duration_days|pluralize }}</span>
-                  </div>
-                  {% if leave.reason %}<div class="emp-leave-reason">{{ leave.reason }}</div>{% endif %}
-                </div>
-                <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form" data-confirm="Cancel this leave request?">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="cancel_leave">
-                  <input type="hidden" name="leave_id" value="{{ leave.id }}">
-                  <button type="submit" class="emp-btn emp-btn--ghost emp-btn--xs">Cancel</button>
-                </form>
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <p class="emp-section-hint">No upcoming leave scheduled.</p>
-        {% endif %}
-      </div>
     </div>
 
     </div>
@@ -631,16 +425,17 @@
     });
 
     // ------------------------------------------------------------------
-    // Shared camera modal for both the arrival ("face verification") photo
-    // and the 5 profile face-reference photos — deliberately no
-    // <input type="file"> anywhere in either flow. getUserMedia +
-    // <canvas> is the only way to get a photo into the upload, so there
-    // is no gallery-picker path to bypass "live" capture with an old or
-    // borrowed photo. Which action/fields get POSTed depends on
-    // data-camera-mode ("verification" vs "face") on the button that
-    // opened the modal. The modal itself lives outside #empDashboardRoot
-    // (so it's never destroyed/rebuilt by an AJAX swap), but the buttons
-    // that open it live inside — hence the delegated click listener.
+    // Camera modal for the arrival ("face verification") photo —
+    // deliberately no <input type="file">. getUserMedia + <canvas> is
+    // the only way to get a photo into the upload, so there's no
+    // gallery-picker path to bypass "live" capture with an old or
+    // borrowed photo. (The 5 profile face-reference photos moved to
+    // their own page — employee_profile_view — with an identical but
+    // separate copy of this modal, since each page now only ever
+    // handles one photo kind.) The modal itself lives outside
+    // #empDashboardRoot (so it's never destroyed/rebuilt by an AJAX
+    // swap), but the buttons that open it live inside — hence the
+    // delegated click listener.
     // ------------------------------------------------------------------
     document.addEventListener('DOMContentLoaded', function () {
       var modal = document.getElementById('empCameraModal');
@@ -658,9 +453,7 @@
 
       var stream = null;
       var capturedBlob = null;
-      var activeMode = null;
       var activeBookingId = null;
-      var activeFaceField = null;
 
       function showError(message) {
         errorEl.textContent = message;
@@ -696,23 +489,15 @@
       function closeModal() {
         stopStream();
         modal.hidden = true;
-        activeMode = null;
         activeBookingId = null;
-        activeFaceField = null;
       }
 
       document.addEventListener('click', function (e) {
         var btn = e.target.closest('[data-open-camera]');
         if (!btn) return;
 
-        activeMode = btn.dataset.cameraMode;
-        if (activeMode === 'face') {
-          activeFaceField = btn.dataset.faceField;
-          titleEl.textContent = 'Face Photo — ' + btn.dataset.faceLabel;
-        } else {
-          activeBookingId = btn.dataset.bookingId;
-          titleEl.textContent = 'Arrival Photo — #' + btn.dataset.bookingNumber;
-        }
+        activeBookingId = btn.dataset.bookingId;
+        titleEl.textContent = 'Arrival Photo — #' + btn.dataset.bookingNumber;
         resetToLiveView();
         modal.hidden = false;
 
@@ -752,21 +537,14 @@
       });
 
       saveBtn.addEventListener('click', function () {
-        if (!capturedBlob) return;
+        if (!capturedBlob || !activeBookingId) return;
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving…';
 
         var formData = new FormData();
-        if (activeMode === 'face') {
-          if (!activeFaceField) return;
-          formData.append('action', 'upload_face_photos');
-          formData.append(activeFaceField, capturedBlob, activeFaceField + '.jpg');
-        } else {
-          if (!activeBookingId) return;
-          formData.append('action', 'upload_verification');
-          formData.append('booking_id', activeBookingId);
-          formData.append('verification_photo', capturedBlob, 'arrival.jpg');
-        }
+        formData.append('action', 'upload_verification');
+        formData.append('booking_id', activeBookingId);
+        formData.append('verification_photo', capturedBlob, 'arrival.jpg');
 
         fetch('{% url "employee_dashboard" %}', {
           method: 'POST',
