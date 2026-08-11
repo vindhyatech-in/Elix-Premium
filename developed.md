@@ -4,6 +4,90 @@ Read this first. It's written so an agent (or a new dev) can get full context
 in one pass without re-reading every file. Update it whenever architecture,
 data flow, or scope changes.
 
+## Current state (as of 2026-08-11)
+
+Everything below "What this is" is a **chronological changelog** — dated
+sections, oldest first, each explaining a *why* at the time it was
+written. It is not re-edited once superseded, so several early sections
+describe things that no longer exist (e.g. "Catalog & Bookings models"
+describes a single `Service` model with a `kind` field — split into
+real separate `Service`/`Package` models later; "Package Services
+Auto-Calculation Backend & DB" describes a `PackageVariant` model —
+removed later still). Treat the changelog as history/rationale, not as
+a schema reference. **This section is the one place meant to stay
+accurate** — update it whenever models, roles, or major URLs change,
+the same way you'd update a README.
+
+- **What it is**: Elix, an on-demand home beauty service. Four
+  surfaces in one Django project: the marketing landing page (`/`),
+  the real booking app (`/booking/`), the owner dashboard
+  (`/dashboard/`), and the employee/beautician dashboard (`/employee/`).
+- **Stack**: Django, django-allauth for auth, Razorpay for payments,
+  Cloudinary for all user-uploaded images, hand-authored CSS (no
+  Tailwind/build step — see "Why no Tailwind" below), GSAP/AOS/Swiper/
+  Lenis via CDN on the marketing page.
+- **Database**: Postgres when `.env` has real server DB creds (`DB_HOST`
+  set — see `GlamourAtHome/settings.py`), SQLite otherwise. No mock data
+  anywhere in the codebase — every dynamic-looking section, including
+  the marketing landing page's decorative content, is a real model.
+- **Apps**: `core` (marketing views + models — hero/testimonials/
+  gallery/etc., owner + employee dashboard views, shared
+  `booking_data.py`), `accounts` (`Profile`/`Address`/`Employee`/
+  `EmployeeLeave` models, the auth adapter/forms/phone-login views),
+  `catalog` (`Category`/`Service`/`ServiceVariant`/`Package` models),
+  `bookings` (`Booking`/`BookingItem`/`Review`/`Offer` models, checkout,
+  Razorpay, reviews, invoices), `api` (a handful of small REST-style
+  endpoints: serviceability, categories, services).
+- **Roles**: three Django `Group`s — `owner` (full dashboard access,
+  grantable only from the Django admin site by a superuser), `emp`
+  (employee dashboard only, assigned automatically when an owner
+  creates a beautician login), `customer` (assigned automatically on
+  self-signup). Enforced via `core/decorators.py`
+  (`@owner_required`/`@owner_or_emp_required`) and
+  `core/middleware.py::RoleRedirectMiddleware`. **Never** gated on
+  `is_staff`/`is_superuser` — those stay reserved for real
+  Django-admin-site access.
+- **Catalog models** (`catalog/models.py`) — `Category` (slug, name,
+  description, image). `Service` + `ServiceVariant`: a service can have
+  several priced/duration options (e.g. different wax types), each a
+  separate `ServiceVariant` row. `Package`: its own `price`/`mrp`/
+  `duration_mins` fields directly (no separate variant model — a
+  package only ever has one sellable price in practice) plus
+  `included_services`, an M2M to `Service` (never to another
+  `Package`). `Service` and `Package` are genuinely separate
+  tables/models, not one table with a kind discriminator.
+- **Bookings models** (`bookings/models.py`) — `Booking` (snapshotted
+  address + pricing, status workflow, OTP arrival gate, Razorpay
+  fields). `BookingItem` (exactly one of `service_variant`/`package`
+  is set, both `SET_NULL`, plus frozen name/price/duration snapshots so
+  a past booking never changes if the catalog does). `Review` (exactly
+  one of `service`/`package` set, one star rating per `BookingItem`).
+  `Offer` (coupon codes, used at checkout).
+- **Marketing content models** (`core/models.py`) — the landing page's
+  hero, value pillars, how-it-works steps, trust points/badges,
+  beauticians, testimonials, gallery (before/afters + portfolio),
+  beauty tips, and FAQs are all real, admin-editable models now
+  (`Hero`/`ValuePillar`/`HowItWorksStep`/`TrustPoint`/`TrustBadge`/
+  `Beautician`/`Testimonial`/`GalleryBeforeAfter`/`GalleryPortfolioItem`/
+  `BeautyTip`/`FAQ`), plus `SiteNotification`/`TrendingSearch` backing
+  the booking app's notification bell and trending-search chips.
+- **Auth**: three-tier priority — Google/Apple OAuth first, phone-number
+  OTP second (real MessageCentral integration,
+  `accounts/messagecentral.py`), username/email + password third. A
+  custom `AccountAdapter` (`accounts/adapter.py`) handles role
+  assignment on signup, beautician-style username auto-generation, and
+  the phone-verification adapter hooks allauth needs.
+- **Admin dashboard** (`/dashboard/`, owner-only) — Overview, Bookings,
+  Services, **Packages** (its own page, own model, own add/edit form —
+  not a filtered view of Services), Employees, Categories, Offers.
+- **Employee dashboard** (`/employee/`) — assigned job cards, status
+  workflow, arrival-photo + start-OTP gate.
+- **Customer booking app** (`/booking/`) — catalog browse/search/
+  filter/sort, cart (`localStorage`), checkout (Razorpay or pay-at-home,
+  price always recomputed server-side), a "my bookings" dashboard
+  (rebook, star reviews, PDF invoice, cancel), express/urgent same-day
+  booking with a 50-minute advance-notice rule.
+
 ## What this is
 
 A premium, single-page marketing/landing site for **Elix** ("Premium Salon
@@ -2277,4 +2361,399 @@ for `accounts/views.py::profile_view`'s phone field. Verified: blank
 phones/emails never collide with each other, real duplicates are
 blocked with a clean message (not a 500) at every write path checked,
 and normal signup/profile-edit/employee-creation are all unaffected.
+
+## Role-based access control: owner/emp/customer groups (added 2026-08-08)
+
+Surfaced by a real bug: an employee account (`sachinshah`) had
+`is_staff=True` — never set by any app code, presumably left over from
+`createsuperuser`/manual DB edits — which incidentally granted full
+owner-dashboard access alongside the employee dashboard, since
+permission checks up to this point leaned on `is_staff`/`is_superuser`
+rather than anything role-specific. Fixed by removing `is_staff`/
+`is_superuser` from every dashboard permission check and replacing them
+with real Django `Group` membership — `is_staff` now stays reserved for
+actual Django-admin-site access, never dashboard access.
+
+- **Three groups** (`owner`/`emp`/`customer`), created + backfilled by
+  `accounts/migrations/0008_create_role_groups.py` (existing
+  `Employee`-linked users → `emp`, everyone else → `customer`,
+  superusers untouched).
+- **Assignment is automatic, never self-service**: `accounts/adapter.py`
+  (new) — `AccountAdapter.save_user()` adds `customer` on self-signup
+  (covers social signup too, since `DefaultSocialAccountAdapter.save_user()`
+  calls into the same account adapter method);
+  `core/admin_dashboard_views.py::_create_employee_login()` adds `emp`
+  when an owner creates a beautician login. `owner` is **only** ever
+  granted from the Django admin site by a superuser — no code path
+  grants it.
+- **`core/decorators.py`** (new) — `is_owner`/`is_emp` predicates,
+  `@owner_required`/`@owner_or_emp_required` view decorators, replacing
+  every prior `is_staff`/`employee_profile` check across
+  `core/admin_dashboard_views.py` and `core/employee_dashboard_views.py`.
+- **`core/middleware.py`** (new) — `RoleRedirectMiddleware`, registered
+  after `AuthenticationMiddleware`/`AccountMiddleware`: owner → redirected
+  off the marketing page straight to `/dashboard/`, emp → `/employee/`,
+  customer → normal marketing/booking access. `ALWAYS_ALLOWED_PREFIXES`
+  (`/dashboard/`, `/employee/`, `/accounts/`, `/admin/`, `/static/`,
+  `/media/`, `/api/`) exempts the pages a role redirect would otherwise
+  loop against.
+- **`AccountAdapter.get_login_redirect_url()`** sends each role to its
+  landing page right after login, same role→URL mapping as the
+  middleware.
+- **`core/context_processors.py::user_roles()`** exposes
+  `is_owner`/`is_emp`/`user_role_label` globally — used by
+  `templates/booking/components/profile_dropdown.html` to show the
+  account's actual role instead of a generic "Signed in".
+
+Verified: `sachinshah` (now `emp`-only, `is_staff=False`) can reach
+`/employee/` and is correctly blocked from `/dashboard/`; a fresh
+self-signup lands in `customer` and gets the marketing/booking flow; an
+owner-created beautician login lands in `emp` and redirects straight to
+`/employee/` on login.
+
+## Admin dashboard UI polish + Category.icon removed (added 2026-08-08)
+
+A run of small, mid-session UI requests, tracked and applied without
+dropping the larger work in progress:
+
+- Compressed `admin-table` row height/padding, `admin-service-card`
+  vertical height, and the services toolbar (search/filter/sort) from a
+  sprawling multi-row layout down to two rows (`admin-toolbar__row`/
+  `admin-toolbar__actions` added to `static/css/admin_dashboard.css`).
+- **`Category.icon` removed entirely** — model field, `catalog/admin.py`,
+  `core/admin_dashboard_views.py`'s add/edit-category handling,
+  `core/booking_data.py::get_booking_categories()`, `api/views.py::
+  get_categories()`, and the categories-list admin template all dropped
+  every icon/emoji reference. Migration:
+  `catalog/migrations/0008_remove_category_icon.py`.
+- Added an "Employee Dashboard" link to the owner sidebar
+  (`templates/admin_dashboard/layouts/admin_base.html`) — previously
+  there was no way for an owner to reach their own employee-facing view
+  without typing the URL directly.
+
+## Services vs. Packages: UI split, then the real model split (added 2026-08-08)
+
+Two distinct pieces of work, prompted by a direct client question
+midway through ("have you actually created separate tables for these?")
+that the first pass had honestly not done yet.
+
+**Pass 1 — UI-only.** The admin Services page (one list behind an
+All/Services/Packages filter tab) became two pages/URLs
+(`/dashboard/services/`, `/dashboard/packages/`), each locked to one
+`kind` — but still backed by the **same** `Service` table with a `kind`
+discriminator column, same as before. `_handle_catalog_post_action`
+(shared add/edit/delete/variant logic) and `_dashboard_catalog_list`
+(shared kind-locked GET listing) were extracted in
+`core/admin_dashboard_views.py` to avoid duplicating that logic across
+the two new view functions.
+
+**Pass 2 — the real split**, once asked to actually do it:
+`catalog/models.py` gained an abstract `CatalogItemBase` (slug, name,
+description, photo fields, tone, rating, reviews_count,
+popularity_score, badges, available_today, is_active, timestamps —
+everything `Service` and `Package` share) and an abstract `VariantBase`
+(label, duration_mins, price, mrp, is_default, is_active, sort_order).
+`Service`/`Package` became separate concrete models/tables (each with
+its own `category` FK and `related_name`), `ServiceVariant`/
+`PackageVariant` likewise separate, `Package.included_services` an M2M
+to `Service` only (never to another `Package`).
+
+- **Four sequential migrations** (`catalog.0009` create Package/
+  PackageVariant → `bookings.0012` add `BookingItem.package_variant`/
+  `Review.package` nullable FKs + make `Review.service` nullable →
+  `bookings.0013` **data migration**: move every real `kind='package'`
+  row into the new tables (variant, `included_services` M2M,
+  `BookingItem`/`Review` FK rewrites), then delete the old row →
+  `catalog.0010` remove `Service.kind`/`included_services`. Dependency
+  ordering had to be hand-corrected once (Django auto-generated a
+  dependency on the not-yet-written removal migration).
+- **`auto_now_add`/`auto_now` gotcha**: the data migration's
+  `Package.objects.create(...)` would force `created_at`/`updated_at` to
+  migration-run-time regardless of the value passed — fixed by following
+  `.create()` with a `.filter(pk=...).update(created_at=..., updated_at=...)`,
+  which bypasses both.
+- **Every consumer updated for two real models**: `bookings/views.py`'s
+  `_resolve_cart_pricing`/`create_booking`/`submit_review`/rebook logic,
+  `core/booking_data.py`'s catalog-building (`Service` and `Package`
+  queried separately, merge-sorted by `created_at` — no longer `id`,
+  since the two now have independent PK sequences), `core/views.py::
+  service_detail` (tries `Service` first, falls back to `Package`),
+  `core/admin_dashboard_views.py`'s services/packages dashboard views,
+  and `accounts/views.py::delete_account`'s review-cascade rating
+  recompute (now handles `Review.package_id` alongside
+  `Review.service_id`).
+- **Backed up `db.sqlite3` before running any of it** against real data
+  — same discipline as every other schema-altering migration this
+  project has run.
+
+Verified end-to-end afterward: catalog JSON (merged service+package
+list), both detail pages, admin CRUD for both models, checkout with a
+cart containing one of each, review submission, rebook, and account
+deletion's rating recompute.
+
+## PackageVariant removed — a package prices itself directly (added 2026-08-08)
+
+Raised as a direct question ("do we really need a PackageVariant?") and
+confirmed: unlike a `Service` (which legitimately needs several price/
+duration options — different wax types, durations), a `Package` only
+ever has **one** sellable price in practice. A `PackageVariant` table
+that could hold at most one real row per package was pure overhead, so
+it was removed and `Package` gained `price`/`mrp`/`duration_mins` fields
+directly, plus `discount_pct`/`duration_label` properties mirroring
+`VariantBase`'s (deliberately same names/shapes, so call sites that
+resolve "the priced thing" for an item use a `ServiceVariant` for a
+`Service` and the `Package` instance itself for a `Package`, with no
+special-casing needed downstream).
+
+- **Seven-migration sequence**: `catalog.0011` add nullable
+  `price`/`mrp`/`duration_mins` to `Package` → `bookings.0014` add
+  nullable `BookingItem.package` (FK straight to `catalog.Package`,
+  replacing the old `package_variant` FK) → `bookings.0015` **data
+  migration** copying every `BookingItem.package_variant.package_id`
+  onto the new field → `bookings.0016` drop the old
+  `package_variant` field → `catalog.0012` **data migration**
+  backfilling each `Package`'s `price`/`mrp`/`duration_mins` from its
+  existing default `PackageVariant` → `catalog.0013` make `price`/
+  `duration_mins` non-nullable → `catalog.0014` delete the
+  `PackageVariant` model. Ordering matters both directions: `Package`'s
+  own fields must be backfilled before being made non-nullable, and
+  `PackageVariant` can't be dropped until nothing (the old
+  `BookingItem.package_variant` FK) still points at it.
+- **`bookings/views.py`, `core/booking_data.py`, `core/views.py`,
+  `core/admin_dashboard_views.py` updated**: anywhere that used to do
+  `package.default_variant.price` now either reads `package.price`
+  directly or (in the two admin/booking views that resolve "the priced
+  thing" generically for either a `Service` or `Package`) sets a local
+  `variant = item if is_package else item.default_variant` — a plain
+  Python variable, not a fake model property — so downstream code
+  reading `variant.price`/`.discount_pct` doesn't need to know which
+  kind it got.
+- **`core/admin_dashboard_views.py`'s `add_service`/`edit_service`**
+  actions split into clean per-kind branches — a package's add/edit
+  parses a single scalar `price`/`mrp`/`duration_mins` from the POST
+  body directly, no longer a list of "variant rows" with only the first
+  row actually used.
+- **Real data-loss incident during this work** (worth recording as
+  context, not a code change): the project's one real `Package` row and
+  its `package` `Category` were deleted from the live database mid-work
+  via the admin dashboard — traced precisely (only those two rows
+  gone, everything else — 38 services, 65 variants, both real bookings —
+  untouched) and confirmed with the client to be an intentional delete,
+  not corruption, so nothing was restored from the pre-migration backup.
+  Later verification in this same block of work used a freshly created,
+  then cleaned-up, test package instead of the original.
+
+## Dedicated Package add/edit form, split from Service's (added 2026-08-08)
+
+`templates/admin_dashboard/services_list.html` had, since the Pass-1 UI
+split above, used **one shared modal** (`addServiceModal`/
+`editServiceModal`) for both Services and Packages, with JS
+(`toggleKindFields()`) showing/hiding fields based on `locked_kind` —
+harmless while both kinds still saved through the same "variant rows"
+shape, but left over and increasingly inaccurate once `PackageVariant`
+was removed above (the modal still labeled its one price row a
+"variant", still had "Add Another Variant" logic to hide for packages).
+
+- **`services_list.html`** trimmed to Service-only — no more
+  `locked_kind` branching anywhere in the template, multi-variant Add/
+  Edit modals and the separate Add/Edit Variant modals unchanged.
+- **`packages_list.html`** (new) — its own Add/Edit Package modal with
+  plain `price`/`mrp`/`duration_mins` fields (matching `Package`'s own
+  field names, no "variant" wording), the included-services checklist
+  with live MRP/duration auto-calc kept as-is, and no "Add Another
+  Variant" control at all.
+- **New capability, not just a rename**: Edit Package now lets you
+  change price/mrp/duration directly. The old shared modal's Edit path
+  never had anywhere clean to put that for a package (only Add did,
+  via the first "variant row") — a genuine gap in the old form, now
+  fixed rather than carried over.
+- `core/admin_dashboard_views.py::dashboard_packages` points at the new
+  template; `_handle_catalog_post_action`'s `add_service`/`edit_service`
+  package branches read the new scalar field names directly.
+
+## Two demo packages added, then all bridal content removed (added 2026-08-08)
+
+Two real packages were created through the actual admin flow (not
+raw DB inserts) to exercise the new form end-to-end — "Arms & Legs Wax
+Combo" (body-wax) and "Bridal Glow Facial & Threading Combo" (premium-
+facial, built around the catalog's existing "O3 Bridal Facial (Vitamin
+C)" service) — both with real included services and admin-auto-
+calculated MRP/duration.
+
+The client then clarified: **the business doesn't do bridal makeup or
+anything bridal-branded at all.** Removed, rather than renamed, since
+neither had any real bookings or reviews attached (confirmed before
+deleting):
+
+- The real `Service` "O3 Bridal Facial (Vitamin C)" and the "Bridal Glow
+  Facial & Threading Combo" `Package` built on it.
+- Every bridal reference in marketing mock content, none of it real
+  catalog data but all of it user-facing copy that misrepresented what
+  the business actually offers: `core/mock_data.py`'s featured-service
+  entry (replaced with a real non-bridal facial), a beautician's
+  specialty+skills (`Bridal Makeup Artist` → `Waxing & Threading
+  Specialist`), a testimonial's quote+service, a before/after gallery
+  entry (removed outright rather than relabeled — no non-bridal photo
+  existed to swap in, and relabeling an actual bridal photo would still
+  be misleading), a portfolio item's label (its photo was already reused
+  elsewhere for "packages" generally, so relabeling it was safe), and a
+  beauty-tip article; `core/booking_data.py::get_trending_searches()`'s
+  "Bridal Makeup" entry; the SEO `<meta keywords>` tag; the contact
+  form's example placeholder; the admin package-form's example
+  placeholder; and the Flutter mobile app's (`mobile_app/lib/main.dart`)
+  "Bridal & Makeup" category card.
+
+Verified: a full source-tree grep for "bridal" (excluding build
+artifacts) returns nothing, `manage.py check` passes, and the landing
+page's rendered HTML contains no bridal references.
+
+## Postgres for the server, SQLite locally; mock_data.py fully retired; Cloudinary for images (added 2026-08-11)
+
+Prompted by real credentials landing in `.env` — a Postgres server DB
+and (mid-task) Cloudinary. Three changes, done together since they all
+touch the same "where does persisted content actually live" question.
+
+**Database becomes per-environment.** `GlamourAtHome/settings.py`'s
+`DATABASES` now branches on `DB_HOST`: set → Postgres (`DB_NAME`/
+`DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD` from `.env`), unset →
+SQLite (unchanged default). This was chosen deliberately over a
+DEBUG-based or always-SQLite-locally switch: as soon as real Postgres
+creds exist in a `.env`, that same checkout talks to Postgres
+immediately, including locally — there's no separate override once the
+creds are present, so an environment that shouldn't be a shared DB's
+neighbor simply shouldn't have those creds in its `.env`. Added
+`psycopg2-binary` to `requirements.txt`. **First connection attempt
+failed** — `password authentication failed for user "vindhyatech"` —
+not a network/firewall issue (the driver reached the server fine), so
+this was reported back rather than guessed around; a `.env` fix (the
+real var names turned out to be `DB_USER`/`DB_PORT`, not the
+`DB_USERNAME`/`PORT` first assumed from an earlier, since-corrected
+read of the file) resolved it.
+
+**Every marketing-page mock function became a real model.** The
+landing page's decorative content (hero, value pillars, how-it-works,
+trust points/badges, beauticians, testimonials, gallery, beauty tips,
+FAQs) and the booking app's notification-bell/trending-search content
+were, until now, hardcoded Python dicts in `core/mock_data.py` — the
+last piece of "everything real except this" left in the project. 13
+new models in `core/models.py`, one per section, deliberately keeping
+every field name the templates already read (`pillar.index`,
+`step.step`, `n.time_label`, etc.) so most templates needed zero
+changes. `SiteImageMixin` (this app's own copy of `catalog.
+CatalogItemBase`'s photo/photo_image/photo_url/`display_photo_url`
+pattern — not shared cross-app, since no cross-app base exists to hang
+it off) backs every model with a real photo. Two migrations: `core.
+0001_initial` (schema) and `core.0002_seed_site_content` (a data
+migration seeding every value `mock_data.py` used to hardcode — the
+actual "migrate the data" step, not just a schema move). `core/views.
+py::index()` and `core/booking_data.py::get_notifications_mock()`/
+`get_trending_searches()` now query these models directly;
+`core/mock_data.py` was deleted outright once nothing imported it
+anymore. One dead code path found and dropped along the way:
+`get_featured_services()`/the `featured_services` context key were
+passed into `featured_services.html` but that template never actually
+read them (it renders the real catalog categories instead) — not
+migrated to a model since migrating unused content would just be
+new dead code with extra steps.
+
+Two template patterns needed real edits, not just a data-source swap:
+`hero.primary_cta.href`/`.label` (a nested-dict lookup that only worked
+because the old mock value was a literal dict) became flat
+`hero.primary_cta_href`/`.primary_cta_label` fields; every
+`{% static x.photo %}` tag (works only for a bare relative path) became
+`{{ x.display_photo_url }}` (a real resolved URL, required once photos
+can be uploads or external links, not just static assets) —
+`hero.html`, `beauticians.html`, `gallery.html` (before **and** after,
+plus the portfolio grid), `beauty_tips.html`.
+
+**Cloudinary for all image uploads** (mid-task addition, once those
+creds landed in `.env` too — superseding the original "keep images
+local for now" plan). `django-cloudinary-storage` + `cloudinary` added
+to `requirements.txt`; Django's `STORAGES['default']` now points at
+`cloudinary_storage.storage.MediaCloudinaryStorage`, configured from
+`CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET`
+(`STORAGES['staticfiles']` stays local — this only affects user
+uploads, never code-shipped static assets). Verified with a real
+upload/fetch/delete round-trip against the live Cloudinary account
+before trusting it with real data. Of the 13 files sitting in the old
+local `media/` folder, only 4 were still actually referenced by a real
+DB row (four `Category.image` uploads — the rest were orphaned test
+uploads from earlier sessions) — those 4 were re-saved through their
+model field so Django's storage API re-uploaded them to Cloudinary and
+rewrote the DB path; the orphaned local files were left alone (not
+deleted — harmless, and deleting unreferenced files wasn't asked for).
+
+**Copying real data from SQLite to the new Postgres DB.** `migrate` on
+a fresh Postgres DB necessarily reruns every `RunPython`/`RunSQL` seed
+migration (`catalog.0002_seed_catalog`, `accounts.0008_create_role_
+groups`, `bookings.0011_seed_offers`, `core.0002_seed_site_content`),
+which would collide with a straight `dumpdata`/`loaddata` copy of the
+real SQLite data on top. Fixed by `TRUNCATE ... RESTART IDENTITY
+CASCADE` on every real app table right after `migrate` (before loading
+anything), giving Postgres a genuinely clean slate; then `dumpdata
+--natural-foreign --natural-primary` (excluding `contenttypes`/`auth.
+permission`/`sessions.session`/`admin.logentry`, Django's own
+regenerated-not-transferred tables) from SQLite, `loaddata` into
+Postgres, then `manage.py sqlsequencereset` — `loaddata` inserts
+explicit PKs without advancing Postgres's sequences, so skipping this
+would make the next INSERT collide with an existing row. Verified: a
+per-model row-count comparison between SQLite and Postgres matched
+exactly for every app (`catalog`/`bookings`/`accounts`/`core`, plus
+`auth.User`/`Group`), and a fresh `Category.objects.create()` after
+the reset landed on a correct, non-colliding next id.
+
+## Real transactional email via Brevo (added 2026-08-11)
+
+`EMAIL_BACKEND` was the console backend (emails just printed to the
+runserver log) — every allauth email (password reset, optional
+verification) was silently going nowhere real. Switched to `django-
+anymail`'s Brevo backend (`anymail.backends.brevo.EmailBackend`),
+configured from `BREVO_API_KEY`/`DEFAULT_FROM_EMAIL` in `.env`. Falls
+back to the console backend when no key is configured (a local
+checkout with no `.env` secrets doesn't need real email to run) — same
+"reserved slot, works once filled in" pattern as every other
+credential-gated integration in this project (Google Maps, Razorpay,
+Google/Apple OAuth). No application code sends email directly yet
+(grepped — zero `send_mail`/`EmailMessage` call sites outside
+allauth's own internals), so this change is purely "make the existing
+allauth emails actually deliver," not new email-sending functionality.
+Verified with a real self-addressed `send_mail()` call — Brevo
+accepted it (`send_mail` returned 1, no exception) — before trusting it
+with real password-reset traffic.
+
+## Beautician merged into Employee — the "meet the team" carousel now shows real staff (added 2026-08-11)
+
+`core.Beautician` (added earlier the same day, as part of moving
+`mock_data.py` off the landing page) was decorative content — four
+fictional profiles unrelated to any real employee. Asked directly why
+two models existed for what's conceptually one person, and then to
+combine them: `core.Beautician` is deleted; `accounts.Employee` gained
+`slug`/`reviews`/`skills`/`sort_order`/`photo_image`/`photo_url` (plus
+a `display_photo_url` property, same upload-wins-over-url-wins-over-
+static-fallback pattern used throughout the project) so the one real
+staff model now also backs the public carousel. `specialties`/
+`experience_years`/`rating` already existed on `Employee` for
+operational use and needed no new fields — the template was updated to
+read those instead of `specialty`/`experience`/a separate `rating`
+duplicate. `core/views.py::index()`'s `beauticians` context now queries
+`Employee.objects.filter(status='active')` — only active staff are
+advertised publicly; on_leave/inactive employees keep their record
+without appearing on the homepage.
+
+`slug` needed the careful nullable → backfill → non-null migration
+sequence (same pattern as `Package.price` earlier) since it's
+`unique=True` and one real row already existed: `accounts.0009` adds it
+nullable, `0010` backfills every existing employee via the same
+"lowercase, collision-suffixed" scheme every other model's slug uses
+(reimplemented inline in the migration, not imported, so it can't break
+if the app-code version changes later), `0011` makes it required.
+`core/admin_dashboard_views.py`'s `add_employee` action — the real
+creation path, not just the migration's one-time backfill — was updated
+to call `generate_unique_slug(Employee, name)`, otherwise a second
+employee would have hit the unique constraint immediately. Verified:
+the real employee ("sachin shah") now renders on the live landing page
+with real specialties/experience; creating a same-named second employee
+through the actual dashboard form correctly got a collision-suffixed
+slug (`sachin-shah-2`); applied to both SQLite and the Postgres server
+DB.
 

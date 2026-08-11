@@ -26,7 +26,7 @@ def verify_serviceability(request):
 
 def get_categories(request):
     """Get active catalog categories."""
-    categories = Category.objects.all().values('id', 'slug', 'name', 'icon')
+    categories = Category.objects.all().values('id', 'slug', 'name')
     return JsonResponse({'status': 'success', 'categories': list(categories)})
 
 def get_services(request):
@@ -40,7 +40,6 @@ def get_services(request):
             'slug': s.slug,
             'name': s.name,
             'category_id': s.category_id,
-            'kind': s.kind,
             'description': s.description,
             'photo': s.photo,
             'rating': float(s.rating),

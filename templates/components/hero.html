@@ -1,6 +1,6 @@
 {% load static %}
 <section class="hero" id="hero" data-api="/api/v1/hero/" aria-label="Introduction">
-  <img class="hero__photo" src="{% static hero.photo %}" alt="" aria-hidden="true">
+  <img class="hero__photo" src="{{ hero.display_photo_url }}" alt="" aria-hidden="true">
   <div class="hero__scrim" aria-hidden="true"></div>
   <canvas class="hero__canvas" id="hero-canvas" aria-hidden="true"></canvas>
 
@@ -34,7 +34,7 @@
         </div>
 
         <div class="hero__actions" data-aos="fade-up" data-aos-delay="250">
-          <a href="{{ hero.primary_cta.href }}" class="btn btn--primary">{{ hero.primary_cta.label }}</a>
+          <a href="{{ hero.primary_cta_href }}" class="btn btn--primary">{{ hero.primary_cta_label }}</a>
           <a href="{% url 'services_booking' %}?category=package" class="btn btn--ghost-light">Explore Packages</a>
         </div>
       </div>

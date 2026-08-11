@@ -11,11 +11,11 @@
       {% for item in gallery.before_after %}
         <div class="compare" data-compare>
           <div class="compare__before compare__before--{{ item.tone }}">
-            <img src="{% static item.before_photo %}" alt="{{ item.label }} — before" loading="lazy">
+            <img src="{{ item.display_before_photo_url }}" alt="{{ item.label }} — before" loading="lazy">
             <span class="compare__tag">Before</span>
           </div>
           <div class="compare__after compare__after--{{ item.tone }}" data-compare-after style="--pos: 50%;">
-            <img src="{% static item.after_photo %}" alt="{{ item.label }} — after" loading="lazy">
+            <img src="{{ item.display_after_photo_url }}" alt="{{ item.label }} — after" loading="lazy">
             <span class="compare__tag">After</span>
           </div>
           <div class="compare__handle" data-compare-handle style="left: 50%;" aria-hidden="true">
@@ -35,7 +35,7 @@
     <div class="gallery__masonry" data-aos="fade-up" data-aos-delay="100">
       {% for item in gallery.portfolio %}
         <figure class="portfolio-item portfolio-item--{{ item.tone }}">
-          <img src="{% static item.photo %}" alt="{{ item.label }}" loading="lazy">
+          <img src="{{ item.display_photo_url }}" alt="{{ item.label }}" loading="lazy">
           <figcaption>{{ item.label }}</figcaption>
         </figure>
       {% endfor %}

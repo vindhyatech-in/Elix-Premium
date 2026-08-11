@@ -3,12 +3,12 @@ import secrets
 from datetime import timedelta
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Sum
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
+from core.decorators import is_owner, owner_or_emp_required
 from core.utils import get_object_or_404_safe, looks_like_phone, validate_image_upload
 
 # How long a generated start OTP stays valid — long enough that a slow
@@ -90,7 +90,7 @@ def _build_month_calendar(employee, year, month, today_date):
     return weeks
 
 
-@login_required(login_url='account_login')
+@owner_or_emp_required
 def employee_dashboard(request):
     """
     Employee / Beautician Dashboard: Mobile-first control panel for assigned jobs,
@@ -110,15 +110,19 @@ def employee_dashboard(request):
     # already has `employee_profile` set directly.
     employee = user.employee_profile if hasattr(user, 'employee_profile') else None
 
-    if not employee and user.is_staff:
-        # Staff/Owner previewing the employee view
+    if not employee and is_owner(user):
+        # Owner/superuser previewing the employee view
         emp_id = request.GET.get('emp_id')
         if emp_id and emp_id.isdigit():
             employee = Employee.objects.filter(id=emp_id).first()
         if not employee:
             employee = Employee.objects.first()
 
-    if not employee and not user.is_staff:
+    if not employee:
+        # Reachable if an 'emp' group member somehow has no linked
+        # Employee row (e.g. it was deleted after the login was
+        # created) — the decorator above already lets them through
+        # since group membership alone doesn't guarantee the link.
         messages.error(request, 'You do not have an assigned Beautician profile.')
         return redirect('services_booking')
 
@@ -358,7 +362,7 @@ def employee_dashboard(request):
         'total_earnings': total_earnings,
         'today_date': today_date,
         'upcoming_leaves': upcoming_leaves,
-        'all_employees': Employee.objects.all() if user.is_staff else None,
+        'all_employees': Employee.objects.all() if is_owner(user) else None,
         'calendar_weeks': _build_month_calendar(employee, cal_year, cal_month, today_date),
         'calendar_label': f'{MONTH_NAMES[cal_month - 1]} {cal_year}',
         'calendar_prev': {'month': prev_month, 'year': prev_year},

@@ -161,8 +161,20 @@ class Booking(models.Model):
 
 class BookingItem(models.Model):
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='items')
+    # Exactly one of these two is set, never both — which one tells you
+    # whether this line was a single service or a package (Service/
+    # Package are separate models+tables, see catalog/models.py). Both
+    # SET_NULL, same reasoning: a deleted/repriced variant must not
+    # retroactively change what a past booking shows (see the snapshot
+    # fields below, which are what job cards/receipts actually display).
     service_variant = models.ForeignKey(
         'catalog.ServiceVariant', on_delete=models.SET_NULL, null=True, blank=True, related_name='booking_items',
+    )
+    # Points at the Package directly (not a variant model — a package only
+    # ever has one sellable price, see catalog/models.py::Package's
+    # docstring, so there's no separate PackageVariant to point at).
+    package = models.ForeignKey(
+        'catalog.Package', on_delete=models.SET_NULL, null=True, blank=True, related_name='booking_items',
     )
     # Snapshotted for the same reason as Booking's amounts above — a
     # deleted/repriced variant must not change what a past booking shows.
@@ -173,7 +185,7 @@ class BookingItem(models.Model):
 
     # Only populated for a package item — a snapshot of each included
     # service's name/variant/price/duration at booking time (see
-    # bookings/views.py::create_booking), since Service.included_services
+    # bookings/views.py::create_booking), since Package.included_services
     # only defines what a package *can* include, not what a specific past
     # booking actually had — that's what lets job cards/dashboards list a
     # package's contents instead of showing just its one line.
@@ -181,6 +193,10 @@ class BookingItem(models.Model):
 
     def __str__(self):
         return f'{self.name_snapshot} x{self.quantity}'
+
+    @property
+    def is_package(self):
+        return self.package_id is not None
 
 
 class Review(models.Model):
@@ -196,16 +212,20 @@ class Review(models.Model):
     the current UI only ever writes `rating` here; free-text feedback is
     collected once for the whole order instead.
 
-    `service` is denormalized here rather than reached via
-    `booking_item.service_variant.service` because `service_variant` is
-    nullable (SET_NULL — see BookingItem above): a review must keep
-    pointing at the right Service even after its originating variant is
-    deleted, since Service.rating/reviews_count are recomputed from real
-    Review rows on every submission (see submit_review).
+    `service`/`package` are denormalized here rather than reached via
+    `booking_item.service_variant.service` because that FK is nullable
+    (SET_NULL — see BookingItem above): a review must keep pointing at
+    the right catalog row even after its originating variant is deleted,
+    since Service/Package.rating/reviews_count are recomputed from real
+    Review rows on every submission (see submit_review). Exactly one of
+    `service`/`package` is set, matching whichever BookingItem this
+    reviews (Service and Package are separate models — see
+    catalog/models.py).
     """
     booking_item = models.OneToOneField(BookingItem, on_delete=models.CASCADE, related_name='review')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reviews')
-    service = models.ForeignKey('catalog.Service', on_delete=models.CASCADE, related_name='reviews')
+    service = models.ForeignKey('catalog.Service', on_delete=models.CASCADE, null=True, blank=True, related_name='reviews')
+    package = models.ForeignKey('catalog.Package', on_delete=models.CASCADE, null=True, blank=True, related_name='reviews')
     rating = models.PositiveSmallIntegerField()
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -214,7 +234,11 @@ class Review(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.service.name} — {self.rating}★ by {self.user}'
+        return f'{self.reviewed_item.name} — {self.rating}★ by {self.user}'
+
+    @property
+    def reviewed_item(self):
+        return self.service or self.package
 
     @property
     def display_name(self):

@@ -28,7 +28,7 @@
               </span>
             {% endif %}
             <span style="background: var(--ink); color: #fff; font-weight: 600; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px;">
-              {{ service.get_kind_display }}
+              {{ kind_display }}
             </span>
             {% for b in service.badges %}
               <span style="background: var(--blue); color: #fff; font-weight: 600; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px;">
@@ -80,7 +80,7 @@
         </div>
 
         <!-- Single Service Variant Selector -->
-        {% if service.kind == 'service' and variants|length > 1 %}
+        {% if kind == 'service' and variants|length > 1 %}
           <div style="display: flex; flex-direction: column; gap: 0.5rem;">
             <label style="font-weight: 700; font-size: 0.85rem; color: var(--text-body);">Choose Service Option / Variant:</label>
             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
@@ -104,7 +104,7 @@
         {% endif %}
 
         <!-- Package Included Services Breakdown (Small Cards with Images) -->
-        {% if service.kind == 'package' and included_services %}
+        {% if kind == 'package' and included_services %}
           <div style="background: var(--surface-1); border: 1px solid var(--border-hairline); border-radius: var(--radius-md); padding: 1rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
               <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-body); text-transform: uppercase; letter-spacing: 0.04em;">
@@ -354,7 +354,7 @@
       return;
     }
     const variantId = activeVariantId ? parseInt(activeVariantId, 10) : null;
-    if ('{{ service.kind }}' === 'package') {
+    if ('{{ kind }}' === 'package') {
       GB.addItem(itemSlug, variantId, GB.gatherIncludedSelections(document));
     } else {
       GB.addItem(itemSlug, variantId);

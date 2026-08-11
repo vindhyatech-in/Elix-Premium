@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.templatetags.static import static
 
 
 class Profile(models.Model):
@@ -46,6 +47,17 @@ class Address(models.Model):
 
 
 class Employee(models.Model):
+    """
+    The one real staff model — also backs the marketing landing page's
+    "meet the team" carousel now (merged 2026-08-11; that carousel used
+    to be `core.Beautician`, a separate decorative model with fictional
+    profiles unrelated to real staff). `slug`/`reviews`/`skills`/
+    `sort_order`/`photo_image`/`photo_url` exist only for that public
+    display — real hiring/job-assignment fields above are unaffected.
+    Only `status='active'` employees are shown publicly (see
+    `core/views.py::index`) — on_leave/inactive employees keep their
+    record without being advertised.
+    """
     STATUS_CHOICES = [
         ('active', 'Active'),
         ('on_leave', 'On Leave'),
@@ -53,14 +65,20 @@ class Employee(models.Model):
     ]
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='employee_profile')
+    slug = models.SlugField(max_length=110, unique=True, blank=True)
     name = models.CharField(max_length=100)
     phone = models.CharField(max_length=20)
     email = models.EmailField(blank=True)
     specialties = models.CharField(max_length=200, help_text="e.g. Hair Spa, Facials, Makeup")
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='active')
     rating = models.DecimalField(max_digits=2, decimal_places=1, default=5.0)
+    reviews = models.PositiveIntegerField(default=0, help_text='Shown on the public "meet the team" card')
+    skills = models.JSONField(default=list, blank=True, help_text='List of short skill strings, e.g. ["Threading", "Honey Wax"] — shown on the public card')
+    sort_order = models.PositiveSmallIntegerField(default=0, help_text='Ordering on the public "meet the team" carousel')
     experience_years = models.PositiveIntegerField(default=1)
-    photo = models.CharField(max_length=200, blank=True, help_text="Static photo path")
+    photo = models.CharField(max_length=200, blank=True, help_text="Static fallback photo path — only used if neither field below is set.")
+    photo_image = models.ImageField(upload_to='employees/%Y/%m/', null=True, blank=True)
+    photo_url = models.URLField(max_length=500, blank=True)
 
     # Reference photos for job-site arrival verification (see
     # bookings.Booking.verification_photo / core/employee_dashboard_views.py)
@@ -86,6 +104,18 @@ class Employee(models.Model):
             self.face_photo_front, self.face_photo_left, self.face_photo_right,
             self.face_photo_top, self.face_photo_bottom,
         ])
+
+    @property
+    def display_photo_url(self):
+        """The public "meet the team" card's photo — an upload wins over
+        a plain URL, which wins over the static fallback path. Distinct
+        from the face_photo_* fields above (verification reference
+        photos, never shown publicly)."""
+        if self.photo_image:
+            return self.photo_image.url
+        if self.photo_url:
+            return self.photo_url
+        return static(self.photo) if self.photo else static('images/artist-1.jpg')
 
 
 class EmployeeLeave(models.Model):

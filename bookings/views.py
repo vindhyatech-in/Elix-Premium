@@ -16,7 +16,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
 from django.views.decorators.http import require_POST
 
-from catalog.models import Service
+from catalog.models import Package, Service
 from core import booking_data
 
 from . import razorpay_client
@@ -42,19 +42,29 @@ class CartError(Exception):
 
 def _resolve_cart_pricing(cart, coupon_code_raw):
     """
-    Cart -> real ServiceVariant prices, server-side (never trust
-    client-sent totals) — shared by create_booking and
+    Cart -> real ServiceVariant/Package prices, server-side (never
+    trust client-sent totals) — shared by create_booking and
     create_razorpay_order so the amount a customer actually pays through
     Razorpay and the amount their booking is created for can never drift
     apart from computing it two different ways.
 
-    A line's variantId (set once the quick-view variant picker exists —
-    see developed.md "Catalog & Bookings models") picks a specific
-    ServiceVariant; omitted/blank (packages, or a line added from the
-    marketing page, which has no picker) falls back to the service's
+    A line's `id` (slug) is looked up against `Service` first, then
+    `Package` — the two are separate tables/models now (see
+    catalog/models.py), but a cart line has no other way to say which
+    one it means, so whichever table actually has that slug wins (slugs
+    are kept unique across both at creation time — see
+    core/admin_dashboard_views.py — so this is never actually ambiguous
+    in practice). A line's variantId (set once the quick-view variant
+    picker exists — see developed.md "Catalog & Bookings models") picks
+    a specific variant; omitted/blank (packages, or a line added from
+    the marketing page, which has no picker) falls back to the item's
     default variant, same as before variants were selectable.
 
     Returns (line_items, subtotal, discount_amount, total_amount, coupon_code).
+    Each line_items entry additionally carries 'is_package' so callers
+    know whether to set BookingItem.service_variant or .package. A
+    package line's 'variant' is the Package instance itself, not a
+    separate variant row — see Package's docstring in catalog/models.py.
     Raises CartError with a user-facing message on any invalid line.
     """
     if not cart:
@@ -71,21 +81,30 @@ def _resolve_cart_pricing(cart, coupon_code_raw):
             raise CartError('Invalid cart quantity.')
         if qty > 20:
             raise CartError('Quantity per item is capped at 20 — contact us for bulk bookings.')
-        service = Service.objects.filter(slug=slug, is_active=True).first()
-        if not service:
+
+        is_package = False
+        item = Service.objects.filter(slug=slug, is_active=True).first()
+        if not item:
+            item = Package.objects.filter(slug=slug, is_active=True).first()
+            is_package = True
+        if not item:
             raise CartError(f'"{slug}" is no longer available.')
-        if variant_id:
-            variant = service.variants.filter(id=variant_id, is_active=True).first()
+        if is_package:
+            # A package has no separate variant row to resolve — it IS
+            # the priced thing (see catalog/models.py::Package).
+            variant = item
+        elif variant_id:
+            variant = item.variants.filter(id=variant_id, is_active=True).first()
         else:
-            variant = service.default_variant
+            variant = item.default_variant
         if not variant:
             raise CartError(f'"{slug}" is no longer available.')
 
         price, duration, included_snapshot = variant.price, variant.duration_mins, []
-        if service.kind == 'package':
+        if is_package:
             included_map = line.get('included') or {}
             resolved, any_customized = [], False
-            for inc_service in service.included_services.filter(is_active=True):
+            for inc_service in item.included_services.filter(is_active=True):
                 inc_default = inc_service.default_variant
                 if not inc_default:
                     continue
@@ -110,8 +129,8 @@ def _resolve_cart_pricing(cart, coupon_code_raw):
             # Only override the package's own price/duration when the
             # customer actually picked something other than every included
             # service's default — an un-customized package keeps charging
-            # exactly what it always did (the ServiceVariant's own stored
-            # price), so this can never silently drift for the common case.
+            # exactly what it always did (the Package's own stored price),
+            # so this can never silently drift for the common case.
             if any_customized:
                 total_mrp = sum((cv.price for _, cv in resolved), Decimal('0'))
                 total_duration = sum(cv.duration_mins for _, cv in resolved)
@@ -122,7 +141,10 @@ def _resolve_cart_pricing(cart, coupon_code_raw):
                     price = total_mrp
                 duration = total_duration
 
-        line_items.append({'variant': variant, 'qty': qty, 'price': price, 'duration': duration, 'included_snapshot': included_snapshot})
+        line_items.append({
+            'variant': variant, 'is_package': is_package, 'item_name': item.name,
+            'qty': qty, 'price': price, 'duration': duration, 'included_snapshot': included_snapshot,
+        })
         subtotal += price * qty
 
     coupon_code = (coupon_code_raw or '').strip().upper()
@@ -353,8 +375,14 @@ def create_booking(request):
             BookingItem.objects.bulk_create([
                 BookingItem(
                     booking=booking,
-                    service_variant=li['variant'],
-                    name_snapshot=f"{li['variant'].service.name} — {li['variant'].label}" if li['variant'].label else li['variant'].service.name,
+                    service_variant=None if li['is_package'] else li['variant'],
+                    package=li['variant'] if li['is_package'] else None,
+                    # A package has no variant `.label` to suffix — it's
+                    # sold at one price, not several named options.
+                    name_snapshot=(
+                        li['item_name'] if li['is_package'] or not li['variant'].label
+                        else f"{li['item_name']} — {li['variant'].label}"
+                    ),
                     price_snapshot=li['price'],
                     duration_snapshot=li['duration'],
                     included_snapshot=li['included_snapshot'],
@@ -387,23 +415,27 @@ def bookings_dashboard(request):
     bookings_dashboard.js) rather than a server endpoint — it's the exact
     same {id, variantId, qty} shape booking.js's cart already uses, so no
     new persistence is needed. Each booking's rebookable items (only those
-    whose ServiceVariant/Service still exist and are active — a booking
-    can reference a since-deactivated variant via service_variant=NULL,
-    see BookingItem.service_variant's on_delete=SET_NULL) are attached as
-    a plain Python attribute for the template to serialize per-booking via
-    json_script, keyed by booking_number.
+    whose variant/parent still exist and are active — a booking can
+    reference a since-deactivated variant via service_variant=NULL/
+    package=NULL, both on_delete=SET_NULL) are attached as a plain Python
+    attribute for the template to serialize per-booking via json_script,
+    keyed by booking_number. A package's `variantId` is always null — a
+    package has no separate variant to select, addItem() already treats a
+    null variantId as "use the item's own current price" either way.
     """
     bookings = list(
         request.user.bookings
-        .prefetch_related('items__service_variant__service', 'items__review')
+        .prefetch_related('items__service_variant__service', 'items__package', 'items__review')
         .all()
     )
     for booking in bookings:
-        booking.rebook_items = [
-            {'id': item.service_variant.service.slug, 'variantId': item.service_variant.id, 'qty': item.quantity}
-            for item in booking.items.all()
-            if item.service_variant and item.service_variant.is_active and item.service_variant.service.is_active
-        ]
+        rebook_items = []
+        for item in booking.items.all():
+            if item.service_variant and item.service_variant.is_active and item.service_variant.service.is_active:
+                rebook_items.append({'id': item.service_variant.service.slug, 'variantId': item.service_variant.id, 'qty': item.quantity})
+            elif item.package and item.package.is_active:
+                rebook_items.append({'id': item.package.slug, 'variantId': None, 'qty': item.quantity})
+        booking.rebook_items = rebook_items
         # Client-side search match target (bookings_dashboard.js) — booking
         # number plus every item name, so "haircut" or "ELX123456" both find
         # the right card without a server round-trip for what's at most a
@@ -486,13 +518,13 @@ def submit_review(request, item_id):
     as the ownership check, same 404-not-403 pattern as cancel_booking
     above.
 
-    Recomputes the Service's aggregate `rating`/`reviews_count` from real
-    Review rows on every submission, replacing whatever mock values it was
-    seeded with — see catalog/models.py.
+    Recomputes the Service/Package's aggregate `rating`/`reviews_count`
+    from real Review rows on every submission, replacing whatever mock
+    values it was seeded with — see catalog/models.py.
     """
     item = get_object_or_404(BookingItem, id=item_id, booking__user=request.user, booking__status='completed')
 
-    if not item.service_variant:
+    if not item.service_variant and not item.package:
         return JsonResponse({'ok': False, 'error': 'This service is no longer available to rate.'}, status=400)
 
     try:
@@ -502,16 +534,22 @@ def submit_review(request, item_id):
     if rating not in range(1, 6):
         return JsonResponse({'ok': False, 'error': 'Rating must be between 1 and 5 stars.'}, status=400)
 
-    service = item.service_variant.service
+    is_package = item.package_id is not None
+    reviewed = item.package if is_package else item.service_variant.service
     Review.objects.update_or_create(
         booking_item=item,
-        defaults={'user': request.user, 'service': service, 'rating': rating},
+        defaults={
+            'user': request.user,
+            'package': reviewed if is_package else None,
+            'service': None if is_package else reviewed,
+            'rating': rating,
+        },
     )
 
-    agg = service.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
-    service.rating = round(agg['avg'] or 0, 1)
-    service.reviews_count = agg['count'] or 0
-    service.save(update_fields=['rating', 'reviews_count'])
+    agg = reviewed.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
+    reviewed.rating = round(agg['avg'] or 0, 1)
+    reviewed.reviews_count = agg['count'] or 0
+    reviewed.save(update_fields=['rating', 'reviews_count'])
 
     return JsonResponse({'ok': True, 'rating': rating})
 

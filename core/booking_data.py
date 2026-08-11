@@ -13,18 +13,21 @@ added 2026-07-31) but keep their exact function names and the exact same
 return shape, so `core/views.py::services_booking` and every template/JS
 consumer needed zero changes. See developed.md "Catalog & Bookings models".
 `get_booking_offers()`/`get_notifications_mock()`/`get_trending_searches()`
-below remain genuine mock data — not asked to become models yet.
+are all real DB-backed models now too (added 2026-08-11) — no mock data
+remains anywhere in this module.
 """
 from django.templatetags.static import static
 
 from bookings.models import Offer
-from catalog.models import Category, Service
+from catalog.models import Category, Package, Service
+
+from .models import SiteNotification, TrendingSearch
 
 
 def get_booking_categories():
     """Endpoint: GET /api/v1/categories/"""
     return [
-        {'slug': cat.slug, 'name': cat.name, 'icon': cat.icon}
+        {'slug': cat.slug, 'name': cat.name}
         for cat in Category.objects.all()
     ]
 
@@ -80,11 +83,8 @@ def get_landing_categories():
 def get_landing_packages():
     """Returns real package offerings from the database for the marketing landing page."""
     packages = []
-    pkgs_qs = Service.objects.filter(kind='package', is_active=True).prefetch_related('included_services', 'variants')
+    pkgs_qs = Package.objects.filter(is_active=True).prefetch_related('included_services')
     for pkg in pkgs_qs:
-        v = pkg.default_variant
-        if not v:
-            continue
         inc_names = [inc.name for inc in pkg.included_services.all()]
         features = inc_names if inc_names else ['Custom beauty bundle', 'Certified beautician', 'Sealed products']
 
@@ -92,9 +92,9 @@ def get_landing_packages():
             'id': pkg.slug,
             'name': pkg.name,
             'tagline': pkg.description or 'Curated super saver beauty combo',
-            'price': float(v.price),
-            'mrp': float(v.mrp) if v.mrp else None,
-            'discount_pct': v.discount_pct,
+            'price': float(pkg.price),
+            'mrp': float(pkg.mrp) if pkg.mrp else None,
+            'discount_pct': pkg.discount_pct,
             'featured': 'Bestseller' in (pkg.badges or []) or pkg.popularity_score > 80,
             'photo': pkg.display_photo_url,
             'features': features,
@@ -113,6 +113,100 @@ def get_booking_offers():
     )
 
 
+def _catalog_entry(item, kind):
+    """
+    One get_booking_catalog() dict — shared between `Service` and
+    `Package` since both are `CatalogItemBase` subclasses with the same
+    shape (see catalog/models.py); `kind` is tagged manually here since
+    it's no longer a model field distinguishing rows in one shared
+    table. Returns None if `item` has no active variant to price it by.
+
+    `price`/`mrp`/`rating` are cast to `float()` explicitly: `json_script`
+    (how this reaches `booking.js` via `catalog_grid.html`) serializes
+    `Decimal` through `DjangoJSONEncoder` as a *string* — left as Decimal,
+    `item.price * qty` in JS would silently become string concatenation
+    instead of multiplication. `discount_pct`/`duration_label` stay
+    derived (properties, not stored fields) rather than stored, same
+    anti-drift reasoning the mock version used.
+    """
+    if kind == 'package':
+        # A package has no separate variant row — it's priced directly
+        # (see catalog/models.py::Package's docstring), and it never has
+        # more than one price point, so there's no real "variants" list
+        # to build; the JS cart already treats a missing/empty one as
+        # "use the item's own top-level price" for packages.
+        variant = item
+        all_variants = []
+    else:
+        variant = item.default_variant
+        if not variant:
+            return None
+        all_variants = sorted(
+            (v for v in item.variants.all() if v.is_active),
+            key=lambda v: (v.sort_order, v.id),
+        )
+
+    included_services_data = []
+    if kind == 'package':
+        for inc in item.included_services.all():
+            inc_vars = [
+                {
+                    'id': iv.id,
+                    'label': iv.label or iv.duration_label,
+                    'price': float(iv.price),
+                    'duration_mins': iv.duration_mins,
+                    'duration_label': iv.duration_label,
+                }
+                for iv in inc.variants.filter(is_active=True)
+            ]
+            inc_default = inc.default_variant
+            if inc_default:
+                included_services_data.append({
+                    'id': inc.id,
+                    'name': inc.name,
+                    'photo': inc.display_photo_url,
+                    'selected_variant_id': inc_default.id,
+                    'price': float(inc_default.price),
+                    'duration_mins': inc_default.duration_mins,
+                    'duration_label': inc_default.duration_label,
+                    'variants': inc_vars,
+                })
+
+    return {
+        'id': item.slug,
+        'kind': kind,
+        'category': item.category.slug,
+        'name': item.name,
+        'description': item.description,
+        'duration_mins': variant.duration_mins,
+        'price': float(variant.price),
+        'mrp': float(variant.mrp) if variant.mrp else None,
+        'rating': float(item.rating),
+        'reviews_count': item.reviews_count,
+        'popularity_score': item.popularity_score,
+        'badges': item.badges,
+        'available_today': item.available_today,
+        'tone': item.tone,
+        'photo': item.display_photo_url,
+        'discount_pct': variant.discount_pct,
+        'duration_label': variant.duration_label,
+        'included_services': included_services_data,
+        'variants': [
+            {
+                'id': v.id,
+                'label': v.label or v.duration_label,
+                'price': float(v.price),
+                'mrp': float(v.mrp) if v.mrp else None,
+                'duration_mins': v.duration_mins,
+                'duration_label': v.duration_label,
+                'discount_pct': v.discount_pct,
+                'is_default': v.id == variant.id,
+            }
+            for v in all_variants
+        ],
+    }
+
+
 def get_booking_catalog():
     """
     Endpoint: GET /api/v1/services/ + GET /api/v1/packages/ (merged).
@@ -124,128 +218,47 @@ def get_booking_catalog():
     have always consumed — `core/views.py` and every template/JS consumer
     needed zero changes for this migration.
 
-    Ordered by `id` (creation order), not `Service.Meta.ordering`
-    (`-popularity_score`) — `booking.js`'s "Newest" sort assumes the
-    embedded catalog array's order reflects chronological order and
-    reverses it for "newest first"; sorting by popularity here would
-    silently break that sort option.
-
-    `price`/`mrp`/`rating` are cast to `float()` explicitly: `json_script`
-    (how this reaches `booking.js` via `catalog_grid.html`) serializes
-    `Decimal` through `DjangoJSONEncoder` as a *string* — left as Decimal,
-    `item.price * qty` in JS would silently become string concatenation
-    instead of multiplication. `discount_pct`/`duration_label` stay derived
-    (now `ServiceVariant` properties) rather than stored, same anti-drift
-    reasoning the mock version used.
+    Merge-sorted by `created_at`, not `id` — `Service` and `Package` are
+    separate tables/id-sequences now (see catalog/models.py), so an id
+    comparison across the two would no longer reflect real chronological
+    order the way it did when both lived in one table. `booking.js`'s
+    "Newest" sort assumes the embedded catalog array's order reflects
+    chronological order and reverses it for "newest first".
     """
-    catalog = []
-    services = (
+    services = list(
         Service.objects.filter(is_active=True)
         .select_related('category')
-        .prefetch_related('variants', 'included_services__variants')
-        .order_by('id')
+        .prefetch_related('variants')
     )
-    for service in services:
-        variant = service.default_variant
-        if not variant:
-            continue
-        all_variants = sorted(
-            (v for v in service.variants.all() if v.is_active),
-            key=lambda v: (v.sort_order, v.id),
-        )
+    packages = list(
+        Package.objects.filter(is_active=True)
+        .select_related('category')
+        .prefetch_related('included_services__variants')
+    )
+    tagged_items = [(s, 'service') for s in services] + [(p, 'package') for p in packages]
+    tagged_items.sort(key=lambda pair: pair[0].created_at)
 
-        included_services_data = []
-        if service.kind == 'package':
-            for inc in service.included_services.all():
-                inc_vars = [
-                    {
-                        'id': iv.id,
-                        'label': iv.label or iv.duration_label,
-                        'price': float(iv.price),
-                        'duration_mins': iv.duration_mins,
-                        'duration_label': iv.duration_label,
-                    }
-                    for iv in inc.variants.filter(is_active=True)
-                ]
-                inc_default = inc.default_variant
-                if inc_default:
-                    included_services_data.append({
-                        'id': inc.id,
-                        'name': inc.name,
-                        'photo': inc.display_photo_url,
-                        'selected_variant_id': inc_default.id,
-                        'price': float(inc_default.price),
-                        'duration_mins': inc_default.duration_mins,
-                        'duration_label': inc_default.duration_label,
-                        'variants': inc_vars,
-                    })
-
-        catalog.append({
-            'id': service.slug,
-            'kind': service.kind,
-            'category': service.category.slug,
-            'name': service.name,
-            'description': service.description,
-            'duration_mins': variant.duration_mins,
-            'price': float(variant.price),
-            'mrp': float(variant.mrp) if variant.mrp else None,
-            'rating': float(service.rating),
-            'reviews_count': service.reviews_count,
-            'popularity_score': service.popularity_score,
-            'badges': service.badges,
-            'available_today': service.available_today,
-            'tone': service.tone,
-            'photo': service.display_photo_url,
-            'discount_pct': variant.discount_pct,
-            'duration_label': variant.duration_label,
-            'included_services': included_services_data,
-            'variants': [
-                {
-                    'id': v.id,
-                    'label': v.label or v.duration_label,
-                    'price': float(v.price),
-                    'mrp': float(v.mrp) if v.mrp else None,
-                    'duration_mins': v.duration_mins,
-                    'duration_label': v.duration_label,
-                    'discount_pct': v.discount_pct,
-                    'is_default': v.id == variant.id,
-                }
-                for v in all_variants
-            ],
-        })
+    catalog = []
+    for item, kind in tagged_items:
+        entry = _catalog_entry(item, kind)
+        if entry:
+            catalog.append(entry)
     return catalog
 
 
 def get_notifications_mock():
-    """Endpoint: GET /api/v1/notifications/"""
-    return [
-        {
-            'id': 1,
-            'title': 'Booking confirmed',
-            'body': 'Your Signature Hair Spa is confirmed for tomorrow, 11 AM.',
-            'time_label': '2h ago',
-            'read': False,
-            'icon': 'check',
-        },
-        {
-            'id': 2,
-            'title': 'Limited slots left',
-            'body': 'Keratin Smoothing has only 3 weekend slots remaining in your area.',
-            'time_label': '1d ago',
-            'read': False,
-            'icon': 'clock',
-        },
-        {
-            'id': 3,
-            'title': 'New offer for you',
-            'body': 'Use WEEKDAY15 for 15% off your next Monday-Thursday booking.',
-            'time_label': '3d ago',
-            'read': True,
-            'icon': 'tag',
-        },
-    ]
+    """Endpoint: GET /api/v1/notifications/ — real `core.SiteNotification`
+    rows now (added 2026-08-11), not mock data. Still generic example
+    content rather than tied to real per-user booking events — that's a
+    distinct future feature. Kept the function name/shape (list of
+    dicts with the same keys) so every existing template/consumer
+    needed zero changes."""
+    return list(
+        SiteNotification.objects.values('id', 'title', 'body', 'time_label', 'read', 'icon')
+    )
 
 
 def get_trending_searches():
-    """Endpoint: GET /api/v1/search/trending/"""
-    return ['Bridal Makeup', 'Keratin Smoothing', 'Deep Cleanse Facial', 'Head Massage', 'Gel Manicure']
+    """Endpoint: GET /api/v1/search/trending/ — real `core.TrendingSearch`
+    rows now, not a hardcoded list."""
+    return list(TrendingSearch.objects.values_list('term', flat=True))

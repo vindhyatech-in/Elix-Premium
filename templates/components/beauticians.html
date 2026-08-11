@@ -17,12 +17,12 @@
             <div class="swiper-slide">
               <article class="artist-card">
                 <div class="artist-card__visual">
-                  <img src="{% static artist.photo %}" alt="{{ artist.name }}, {{ artist.specialty }}" loading="lazy">
+                  <img src="{{ artist.display_photo_url }}" alt="{{ artist.name }}, {{ artist.specialties }}" loading="lazy">
                 </div>
                 <div class="artist-card__body">
                   <h3 class="artist-card__name">{{ artist.name }}</h3>
-                  <p class="artist-card__specialty">{{ artist.specialty }}</p>
-                  <p class="artist-card__experience">{{ artist.experience }}</p>
+                  <p class="artist-card__specialty">{{ artist.specialties }}</p>
+                  <p class="artist-card__experience">{{ artist.experience_years }} yrs experience</p>
                   <div class="artist-card__rating">
                     <span class="stars" aria-label="Rated {{ artist.rating }} out of 5">★ {{ artist.rating }}</span>
                     <span class="artist-card__reviews">({{ artist.reviews }} reviews)</span>

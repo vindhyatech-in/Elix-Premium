@@ -1,5 +1,6 @@
 from allauth.account.adapter import DefaultAccountAdapter
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
+from django.urls import reverse
 
 from accounts.models import Profile
 from accounts.utils import generate_username_from_name
@@ -23,6 +24,44 @@ class AccountAdapter(DefaultAccountAdapter):
 
     def populate_username(self, request, user):
         user.username = generate_username_from_name(user.first_name, user.last_name)
+
+    def save_user(self, request, user, form, commit=True):
+        """
+        Every self-service signup — plain form or social (Google/Apple;
+        allauth's DefaultSocialAccountAdapter.save_user() routes through
+        this same account adapter's save_user()) — lands in the
+        'customer' role group automatically. 'emp' is only ever assigned
+        by an owner creating a login from the dashboard
+        (core/admin_dashboard_views.py::_create_employee_login); 'owner'
+        is never assigned by app code at all, only by hand via the
+        Django admin's Group editor. See core/decorators.py and
+        core/middleware.py for how these three groups gate access.
+        """
+        user = super().save_user(request, user, form, commit)
+        if commit:
+            customer_group, _ = Group.objects.get_or_create(name='customer')
+            user.groups.add(customer_group)
+        return user
+
+    def get_login_redirect_url(self, request):
+        """
+        Sends an owner straight to their dashboard and an emp straight
+        to theirs — never the marketing/booking app — instead of the
+        default LOGIN_REDIRECT_URL ('/booking/'). Only applies when
+        there's no explicit `?next=` (allauth itself gives that
+        precedence over this method entirely); RoleRedirectMiddleware
+        is the actual enforcement point for every subsequent request,
+        this is just so a normal login doesn't need a second hop through
+        it.
+        """
+        user = request.user
+        if user.is_superuser:
+            return super().get_login_redirect_url(request)
+        if user.groups.filter(name='owner').exists():
+            return reverse('admin_dashboard_overview')
+        if user.groups.filter(name='emp').exists():
+            return reverse('employee_dashboard')
+        return super().get_login_redirect_url(request)
 
     def get_login_stages(self):
         """

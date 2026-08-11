@@ -8,6 +8,37 @@ never hardcode business details in markup.
 from django.conf import settings
 
 
+def user_roles(request):
+    """
+    `is_owner`/`is_emp`/`user_role_label` for templates —
+    profile_dropdown.html uses `is_owner`/`is_emp` to decide which
+    dashboard link(s) to show, and `user_role_label` to show the
+    account's role instead of `user.is_staff`/`user.employee_profile`
+    directly (see core/decorators.py for why `is_staff` specifically is
+    no longer used for this). One `.groups` query for both booleans, not
+    two — an anonymous visitor never even reaches it. `user_role_label`
+    distinguishes superuser from a plain 'owner' group member even
+    though both get `is_owner=True` (superuser needs the wider label
+    since "super admin will have access of all things", not just the
+    owner dashboard).
+    """
+    user = request.user
+    if not user.is_authenticated:
+        return {'is_owner': False, 'is_emp': False, 'user_role_label': ''}
+    if user.is_superuser:
+        return {'is_owner': True, 'is_emp': False, 'user_role_label': 'Super Admin'}
+    group_names = set(user.groups.values_list('name', flat=True))
+    is_owner = 'owner' in group_names
+    is_emp = 'emp' in group_names
+    if is_owner:
+        role_label = 'Owner'
+    elif is_emp:
+        role_label = 'Employee'
+    else:
+        role_label = 'Customer'
+    return {'is_owner': is_owner, 'is_emp': is_emp, 'user_role_label': role_label}
+
+
 def site_meta(request):
     return {
         'SITE': {

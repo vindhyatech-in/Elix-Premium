@@ -1,0 +1,470 @@
+{% extends "admin_dashboard/layouts/admin_base.html" %}
+
+{% block content %}
+  <!-- Toolbar -->
+  <div class="admin-toolbar admin-toolbar--sticky">
+    <div class="admin-toolbar__row">
+      <div class="admin-toolbar__title-text">
+        <h2>Packages</h2>
+      </div>
+
+      <div class="admin-toolbar__actions">
+        <button type="button" class="admin-btn admin-btn--green" onclick="document.getElementById('addPackageModal').style.display='flex'">
+          + Add New Package
+        </button>
+      </div>
+    </div>
+
+    <form method="get" action="{{ request.path }}" class="admin-toolbar__form">
+      <div class="admin-toolbar__group">
+        <input
+          type="text"
+          name="q"
+          value="{{ search_query }}"
+          placeholder="Search package name, description..."
+          class="admin-input admin-input--search"
+        >
+
+        <select name="category" class="admin-select" onchange="this.form.submit()">
+          <option value="all">All Categories</option>
+          {% for cat in categories %}
+            <option value="{{ cat.slug }}" {% if category_slug == cat.slug %}selected{% endif %}>{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+
+        <select name="sort" class="admin-select" onchange="this.form.submit()">
+          <option value="-created_at" {% if sort == '-created_at' %}selected{% endif %}>Newest First</option>
+          <option value="created_at" {% if sort == 'created_at' %}selected{% endif %}>Oldest First</option>
+          <option value="name" {% if sort == 'name' %}selected{% endif %}>Name (A-Z)</option>
+          <option value="-name" {% if sort == '-name' %}selected{% endif %}>Name (Z-A)</option>
+          <option value="price" {% if sort == 'price' %}selected{% endif %}>Price (Low to High)</option>
+          <option value="-price" {% if sort == '-price' %}selected{% endif %}>Price (High to Low)</option>
+        </select>
+
+        <button type="submit" class="admin-btn admin-btn--primary">Filter</button>
+        {% if search_query or category_slug != 'all' or sort != '-created_at' %}
+          <a href="{{ request.path }}" class="admin-btn admin-btn--ghost">Clear</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Packages List Cards -->
+  <div class="admin-services-container">
+    {% if services %}
+      {% for package in services %}
+        <div class="admin-service-card {% if not package.is_active %}is-disabled{% endif %}">
+          <!-- Package Header -->
+          <div class="admin-service-card__head">
+            <div class="admin-service-card__main">
+              <div class="admin-service-card__title-row">
+                <h3 class="admin-service-card__name">{{ package.name }}</h3>
+                <span class="admin-badge admin-badge--category">{{ package.category.name }}</span>
+                <span class="admin-badge admin-badge--subtle">Package</span>
+                {% if package.badges %}
+                  {% for badge in package.badges %}
+                    <span class="admin-badge admin-badge--gold-tag">{{ badge }}</span>
+                  {% endfor %}
+                {% endif %}
+              </div>
+              <p class="admin-service-card__desc">{{ package.description|default:"No description provided." }}</p>
+              {% if package.included_services.exists %}
+                <div class="admin-included-services-box" style="margin-top: 0.5rem; padding: 0.5rem; background: var(--surface-1); border-radius: var(--radius-sm); font-size: 0.8rem; border: 1px solid var(--border-hairline);">
+                  <strong>Included Services ({{ package.included_services.count }}):</strong>
+                  <ul style="margin: 0.25rem 0 0 1.2rem; padding: 0;">
+                    {% for inc in package.included_services.all %}
+                      <li>{{ inc.name }} — {{ inc.default_variant.duration_label }} (₹{{ inc.default_variant.price }})</li>
+                    {% endfor %}
+                  </ul>
+                  <div style="margin-top: 0.35rem; color: var(--blue); font-weight: 700;">
+                    Auto-calculated MRP: ₹{{ package.total_included_mrp|floatformat:2 }} | Total Duration: {{ package.total_included_duration }} mins
+                  </div>
+                </div>
+              {% endif %}
+              <small class="admin-text-muted" style="display: block; margin-top: 0.25rem;">Slug: <code>{{ package.slug }}</code></small>
+            </div>
+
+            <div class="admin-service-card__actions">
+              <!-- Toggle Active -->
+              <form method="post" action="{{ request.path }}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('Are you sure you want to {% if package.is_active %}disable{% else %}enable{% endif %} &quot;{{ package.name|escapejs }}&quot;?').then(ok => { if (ok) this.submit(); }); return false;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_service">
+                <input type="hidden" name="service_id" value="{{ package.id }}">
+                <button type="submit" class="admin-toggle-btn {% if package.is_active %}is-active{% endif %}">
+                  {% if package.is_active %}Enabled{% else %}Disabled{% endif %}
+                </button>
+              </form>
+
+              <!-- Edit Package Details -->
+              <button
+                type="button"
+                class="admin-btn admin-btn--ghost admin-btn--xs"
+                onclick="openEditPackageModal({{ package.id }}, '{{ package.name|escapejs }}', '{{ package.category.id }}', '{{ package.description|escapejs }}', '{{ package.badges|join:", "|escapejs }}', '{{ package.display_photo_url|escapejs }}', '{{ package.price }}', '{{ package.mrp|default:"" }}', '{{ package.duration_mins }}', [{% for inc in package.included_services.all %}{{ inc.id }}{% if not forloop.last %},{% endif %}{% endfor %}])"
+              >
+                ✏ Edit Package
+              </button>
+
+              <!-- Delete Package -->
+              <form method="post" action="{{ request.path }}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('Are you sure you want to delete package &quot;{{ package.name|escapejs }}&quot;? This action cannot be undone.').then(ok => { if (ok) this.submit(); }); return false;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_service">
+                <input type="hidden" name="service_id" value="{{ package.id }}">
+                <button type="submit" class="admin-btn admin-btn--danger admin-btn--xs">
+                  🗑 Delete
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Package Summary Box -->
+          <div class="admin-variants-box" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding: 0.85rem 1.25rem;">
+            <div>
+              <span style="font-size: 0.85rem; font-weight: 700; color: var(--ink-muted); text-transform: uppercase;">Package Price:</span>
+              <strong class="admin-text-gold" style="font-size: 1.1rem; margin-left: 0.35rem;">₹{{ package.price }}</strong>
+              {% if package.mrp %}
+                <span class="admin-price-mrp" style="margin-left: 0.5rem;">₹{{ package.mrp }}</span>
+                <span class="admin-price-discount" style="color: var(--green); font-weight: 700; margin-left: 0.25rem;">({{ package.discount_pct }}% OFF)</span>
+              {% endif %}
+            </div>
+            <div>
+              <span style="font-size: 0.85rem; font-weight: 700; color: var(--ink-muted); text-transform: uppercase;">Total Duration:</span>
+              <span style="font-size: 0.95rem; font-weight: 600; margin-left: 0.35rem; color: var(--text-body);">{{ package.duration_label }}</span>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="admin-card-table-box admin-empty-state">
+        <p>No packages found matching your criteria.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  {% include "admin_dashboard/partials/pagination.html" %}
+
+  <!-- Add Package Modal -->
+  <div id="addPackageModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal admin-modal--large">
+      <div class="admin-modal__head">
+        <h2>Add New Beauty Package</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('addPackageModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{{ request.path }}" class="admin-modal__body" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_service">
+
+        <div class="admin-form-group">
+          <label>Package Name *</label>
+          <input type="text" name="name" required class="admin-input" placeholder="e.g. Arms & Legs Wax Combo">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Category *</label>
+          <select name="category_id" required class="admin-select">
+            {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Photo — Upload</label>
+            <input type="file" name="photo_image" accept="image/*" class="admin-input">
+          </div>
+          <div class="admin-form-group">
+            <label>Photo — or Image URL</label>
+            <input type="url" name="photo_url" class="admin-input" placeholder="https://example.com/photo.jpg">
+          </div>
+        </div>
+        <small class="admin-text-muted" style="display: block; margin-top: -0.5rem; margin-bottom: 0.75rem;">Provide either one — an upload takes priority if both are given. Leave both blank to use a generic placeholder photo.</small>
+
+        <div class="admin-form-group">
+          <label>Select Included Services (For Auto-Calculation)</label>
+          <input
+            type="text"
+            placeholder="🔍 Search service name..."
+            class="admin-input"
+            style="margin-bottom: 0.5rem; font-size: 0.85rem;"
+            onkeyup="filterPackageServiceList(this, 'add')"
+          >
+          <div id="pkgServicesList_add" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 0.5rem; background: var(--surface-1);">
+            {% for single in single_services %}
+              <div class="pkg-svc-row" data-name="{{ single.name|lower }}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px dashed var(--border-hairline);">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer; flex: 1; min-width: 0;">
+                  <input
+                    type="checkbox"
+                    name="included_service_ids"
+                    value="{{ single.id }}"
+                    data-price="{{ single.default_variant.price|default:0 }}"
+                    data-duration="{{ single.default_variant.duration_mins|default:0 }}"
+                    onchange="recalculatePackageTotals('add')"
+                  >
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><strong>{{ single.name }}</strong></span>
+                </label>
+                {% if single.variants.all|length > 1 %}
+                  <select
+                    class="admin-select admin-select--sm pkg-variant-picker"
+                    style="font-size: 0.75rem; padding: 0.15rem 0.35rem; max-width: 170px;"
+                    onchange="updateServiceVariantData(this, 'add')"
+                  >
+                    {% for v in single.variants.all %}
+                      <option value="{{ v.id }}" data-price="{{ v.price }}" data-duration="{{ v.duration_mins }}" {% if v.is_default %}selected{% endif %}>
+                        {{ v.label|default:"Standard" }} (₹{{ v.price|floatformat:0 }}, {{ v.duration_label }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                {% else %}
+                  <small style="font-size: 0.75rem; color: var(--ink-muted); font-weight: 600; white-space: nowrap;">
+                    {{ single.default_variant.duration_label }} (₹{{ single.default_variant.price|floatformat:0 }})
+                  </small>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          <div id="addPackageTotalsSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--blue); margin-top: 0.35rem; display: none;">
+            Auto-calculated Combined MRP: ₹<span id="addCalculatedMrp">0.00</span> | Total Duration: <span id="addCalculatedDuration">0</span> mins
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Description</label>
+          <textarea name="description" class="admin-textarea" rows="2" placeholder="Describe the package..."></textarea>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Badges (Comma separated)</label>
+          <input type="text" name="badges" class="admin-input" placeholder="e.g. Bestseller, New">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Package Price (₹) *</label>
+            <input type="number" step="0.01" name="price" required class="admin-input" placeholder="549" id="addPackagePrice">
+          </div>
+          <div class="admin-form-group">
+            <label>MRP (₹)</label>
+            <input type="number" step="0.01" name="mrp" class="admin-input" placeholder="647" id="addPackageMrp">
+          </div>
+          <div class="admin-form-group">
+            <label>Duration (Mins) *</label>
+            <input type="number" name="duration_mins" value="30" required class="admin-input" id="addPackageDuration">
+          </div>
+        </div>
+        <small class="admin-text-muted" style="display: block; margin-top: -0.5rem; margin-bottom: 0.75rem;">MRP and duration auto-fill from the included services above once checked, but selling price is always yours to set — that's the discount decision.</small>
+
+        <div class="admin-modal__foot">
+          <button type="button" class="admin-btn admin-btn--ghost" onclick="document.getElementById('addPackageModal').style.display='none'">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn--primary">Create Package</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Package Modal -->
+  <div id="editPackageModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal admin-modal--large">
+      <div class="admin-modal__head">
+        <h2>Edit Package Details</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('editPackageModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{{ request.path }}" class="admin-modal__body" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit_service">
+        <input type="hidden" name="service_id" id="editPackageId">
+
+        <div class="admin-form-group">
+          <label>Package Name *</label>
+          <input type="text" name="name" id="editPackageName" required class="admin-input">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Category *</label>
+          <select name="category_id" id="editPackageCategoryId" required class="admin-select">
+            {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Current Photo</label>
+          <div>
+            <img id="editPackageCurrentPhoto" src="" alt="" class="admin-category-thumb">
+          </div>
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Replace Photo — Upload</label>
+            <input type="file" name="photo_image" accept="image/*" class="admin-input">
+          </div>
+          <div class="admin-form-group">
+            <label>Replace Photo — or Image URL</label>
+            <input type="url" name="photo_url" id="editPackagePhotoUrl" class="admin-input" placeholder="https://example.com/photo.jpg">
+          </div>
+        </div>
+        <small class="admin-text-muted" style="display: block; margin-top: -0.5rem; margin-bottom: 0.75rem;">Leave both blank to keep the current photo. An upload takes priority if both are given.</small>
+
+        <div class="admin-form-group">
+          <label>Included Single Services</label>
+          <input
+            type="text"
+            placeholder="🔍 Search service name..."
+            class="admin-input"
+            style="margin-bottom: 0.5rem; font-size: 0.85rem;"
+            onkeyup="filterPackageServiceList(this, 'edit')"
+          >
+          <div id="pkgServicesList_edit" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 0.5rem; background: var(--surface-1);">
+            {% for single in single_services %}
+              <div class="pkg-svc-row" data-name="{{ single.name|lower }}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px dashed var(--border-hairline);">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer; flex: 1; min-width: 0;">
+                  <input
+                    type="checkbox"
+                    name="included_service_ids"
+                    value="{{ single.id }}"
+                    class="edit-inc-svc-checkbox"
+                    id="editIncSvc_{{ single.id }}"
+                    data-price="{{ single.default_variant.price|default:0 }}"
+                    data-duration="{{ single.default_variant.duration_mins|default:0 }}"
+                    onchange="recalculatePackageTotals('edit')"
+                  >
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><strong>{{ single.name }}</strong></span>
+                </label>
+                {% if single.variants.all|length > 1 %}
+                  <select
+                    class="admin-select admin-select--sm pkg-variant-picker"
+                    style="font-size: 0.75rem; padding: 0.15rem 0.35rem; max-width: 170px;"
+                    onchange="updateServiceVariantData(this, 'edit')"
+                  >
+                    {% for v in single.variants.all %}
+                      <option value="{{ v.id }}" data-price="{{ v.price }}" data-duration="{{ v.duration_mins }}" {% if v.is_default %}selected{% endif %}>
+                        {{ v.label|default:"Standard" }} (₹{{ v.price|floatformat:0 }}, {{ v.duration_label }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                {% else %}
+                  <small style="font-size: 0.75rem; color: var(--ink-muted); font-weight: 600; white-space: nowrap;">
+                    {{ single.default_variant.duration_label }} (₹{{ single.default_variant.price|floatformat:0 }})
+                  </small>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          <div id="editPackageTotalsSummary" style="font-size: 0.8rem; font-weight: 700; color: var(--blue); margin-top: 0.35rem; display: none;">
+            Auto-calculated Combined MRP: ₹<span id="editCalculatedMrp">0.00</span> | Total Duration: <span id="editCalculatedDuration">0</span> mins
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Description</label>
+          <textarea name="description" id="editPackageDescription" class="admin-textarea" rows="3"></textarea>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Badges (Comma separated)</label>
+          <input type="text" name="badges" id="editPackageBadges" class="admin-input" placeholder="e.g. Bestseller, New">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Package Price (₹) *</label>
+            <input type="number" step="0.01" name="price" id="editPackagePrice" required class="admin-input">
+          </div>
+          <div class="admin-form-group">
+            <label>MRP (₹)</label>
+            <input type="number" step="0.01" name="mrp" id="editPackageMrp" class="admin-input">
+          </div>
+          <div class="admin-form-group">
+            <label>Duration (Mins) *</label>
+            <input type="number" name="duration_mins" id="editPackageDuration" required class="admin-input">
+          </div>
+        </div>
+        <small class="admin-text-muted" style="display: block; margin-top: -0.5rem; margin-bottom: 0.75rem;">MRP and duration re-auto-calculate from whichever included services are checked when you save.</small>
+
+        <div class="admin-modal__foot">
+          <button type="button" class="admin-btn admin-btn--ghost" onclick="document.getElementById('editPackageModal').style.display='none'">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn--primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function filterPackageServiceList(inputEl, mode) {
+      const query = inputEl.value.toLowerCase().trim();
+      const container = mode === 'add' ? document.getElementById('pkgServicesList_add') : document.getElementById('pkgServicesList_edit');
+      if (!container) return;
+      const rows = container.querySelectorAll('.pkg-svc-row');
+      rows.forEach(row => {
+        const name = row.dataset.name || '';
+        row.style.display = name.includes(query) ? 'flex' : 'none';
+      });
+    }
+
+    function updateServiceVariantData(selectEl, mode) {
+      const selectedOpt = selectEl.options[selectEl.selectedIndex];
+      const row = selectEl.closest('.pkg-svc-row');
+      if (!row || !selectedOpt) return;
+      const cb = row.querySelector('input[type="checkbox"]');
+      if (cb) {
+        cb.dataset.price = selectedOpt.dataset.price || 0;
+        cb.dataset.duration = selectedOpt.dataset.duration || 0;
+      }
+      recalculatePackageTotals(mode);
+    }
+
+    function recalculatePackageTotals(mode) {
+      const group = mode === 'add' ? document.getElementById('pkgServicesList_add') : document.getElementById('pkgServicesList_edit');
+      const summary = mode === 'add' ? document.getElementById('addPackageTotalsSummary') : document.getElementById('editPackageTotalsSummary');
+      if (!group) return;
+      const checkboxes = group.querySelectorAll('input[type="checkbox"]:checked');
+      let totalMrp = 0;
+      let totalDur = 0;
+      checkboxes.forEach(cb => {
+        totalMrp += parseFloat(cb.dataset.price || 0);
+        totalDur += parseInt(cb.dataset.duration || 0, 10);
+      });
+      if (summary) summary.style.display = checkboxes.length ? 'block' : 'none';
+
+      const mrpInput = mode === 'add' ? document.getElementById('addPackageMrp') : document.getElementById('editPackageMrp');
+      const durInput = mode === 'add' ? document.getElementById('addPackageDuration') : document.getElementById('editPackageDuration');
+      if (mode === 'add') {
+        document.getElementById('addCalculatedMrp').textContent = totalMrp.toFixed(2);
+        document.getElementById('addCalculatedDuration').textContent = totalDur;
+      } else {
+        document.getElementById('editCalculatedMrp').textContent = totalMrp.toFixed(2);
+        document.getElementById('editCalculatedDuration').textContent = totalDur;
+      }
+      if (mrpInput && totalMrp > 0) mrpInput.value = totalMrp.toFixed(2);
+      if (durInput && totalDur > 0) durInput.value = totalDur;
+    }
+
+    function openEditPackageModal(id, name, categoryId, description, badges, currentPhotoUrl, price, mrp, durationMins, includedIds) {
+      document.getElementById('editPackageId').value = id;
+      document.getElementById('editPackageName').value = name;
+      document.getElementById('editPackageCategoryId').value = categoryId;
+      document.getElementById('editPackageDescription').value = description;
+      document.getElementById('editPackageBadges').value = badges;
+      document.getElementById('editPackageCurrentPhoto').src = currentPhotoUrl;
+      document.getElementById('editPackagePrice').value = price;
+      document.getElementById('editPackageMrp').value = mrp;
+      document.getElementById('editPackageDuration').value = durationMins;
+      // Deliberately left blank, not pre-filled with the package's own
+      // current URL — this is a "replace" field, and pre-filling it
+      // would make an unrelated save (e.g. just editing the name)
+      // silently re-submit that URL as if it had been re-entered.
+      document.getElementById('editPackagePhotoUrl').value = '';
+
+      document.querySelectorAll('#pkgServicesList_edit input[type="checkbox"]').forEach((cb) => {
+        cb.checked = Array.isArray(includedIds) && includedIds.includes(parseInt(cb.value, 10));
+      });
+      const summary = document.getElementById('editPackageTotalsSummary');
+      if (summary) summary.style.display = includedIds.length ? 'block' : 'none';
+
+      document.getElementById('editPackageModal').style.display = 'flex';
+    }
+  </script>
+{% endblock %}

@@ -18,9 +18,11 @@ class AddressAdmin(admin.ModelAdmin):
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'status', 'specialties', 'experience_years', 'rating')
+    list_display = ('name', 'status', 'specialties', 'experience_years', 'rating', 'reviews', 'sort_order')
     list_filter = ('status',)
+    list_editable = ('sort_order',)
     search_fields = ('name', 'email', 'phone', 'specialties')
+    prepopulated_fields = {'slug': ('name',)}
 
 
 @admin.register(EmployeeLeave)

@@ -34,13 +34,13 @@
                   {% if cat.display_image_url %}
                     <img src="{{ cat.display_image_url }}" alt="{{ cat.name }}" class="admin-category-thumb">
                   {% else %}
-                    <span class="admin-category-thumb admin-category-thumb--placeholder">{{ cat.icon|default:"🗂" }}</span>
+                    <span class="admin-category-thumb admin-category-thumb--placeholder">🗂</span>
                   {% endif %}
                 </td>
                 <td>
                   <strong>{{ cat.name }}</strong>
                   <div class="admin-text-muted" style="font-size: 0.8rem;">
-                    {% if cat.icon %}{{ cat.icon }} · {% endif %}<code>{{ cat.slug }}</code>
+                    <code>{{ cat.slug }}</code>
                   </div>
                 </td>
                 <td>
@@ -54,7 +54,7 @@
                     <button
                       type="button"
                       class="admin-btn admin-btn--ghost admin-btn--xs"
-                      onclick="openEditCategoryModal('{{ cat.id }}', '{{ cat.name|escapejs }}', '{{ cat.icon|escapejs }}', '{{ cat.description|escapejs }}', '{% if cat.display_image_url %}{{ cat.display_image_url|escapejs }}{% endif %}')"
+                      onclick="openEditCategoryModal('{{ cat.id }}', '{{ cat.name|escapejs }}', '{{ cat.description|escapejs }}', '{% if cat.display_image_url %}{{ cat.display_image_url|escapejs }}{% endif %}')"
                     >
                       Edit
                     </button>
@@ -99,11 +99,6 @@
         </div>
 
         <div class="admin-form-group">
-          <label>Icon (emoji, optional)</label>
-          <input type="text" name="icon" class="admin-input" placeholder="e.g. 💇" maxlength="40">
-        </div>
-
-        <div class="admin-form-group">
           <label>Description</label>
           <textarea name="description" class="admin-textarea" rows="3" placeholder="Shown under the category photo on the landing page…"></textarea>
         </div>
@@ -143,11 +138,6 @@
         </div>
 
         <div class="admin-form-group">
-          <label>Icon (emoji, optional)</label>
-          <input type="text" name="icon" id="editCategoryIcon" class="admin-input" maxlength="40">
-        </div>
-
-        <div class="admin-form-group">
           <label>Description</label>
           <textarea name="description" id="editCategoryDescription" class="admin-textarea" rows="3"></textarea>
         </div>
@@ -179,10 +169,9 @@
 
 {% block extra_body %}
   <script>
-    function openEditCategoryModal(id, name, icon, description, displayImageUrl) {
+    function openEditCategoryModal(id, name, description, displayImageUrl) {
       document.getElementById('editCategoryId').value = id;
       document.getElementById('editCategoryName').value = name;
-      document.getElementById('editCategoryIcon').value = icon;
       document.getElementById('editCategoryDescription').value = description;
       // Deliberately left blank, not pre-filled with the category's
       // current URL — this is a "replace" field, and pre-filling it

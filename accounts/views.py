@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from bookings.models import Review
-from catalog.models import Service
+from catalog.models import Package, Service
 from core import booking_data
 
 from .fields import IndianPhoneField
@@ -76,12 +76,16 @@ def delete_account(request):
     revenue history from the admin dashboard.
 
     Since Review.user is still CASCADE, this also drops the user's own
-    reviews — which leaves the affected services' cached rating/
-    reviews_count (Service.rating/reviews_count, normally recomputed in
-    submit_review) stale unless recomputed here too.
+    reviews — which leaves the affected services'/packages' cached rating/
+    reviews_count (CatalogItemBase.rating/reviews_count, normally
+    recomputed in submit_review) stale unless recomputed here too. A
+    review points at exactly one of Review.service/Review.package (see
+    catalog model split, 2026-08-08), so both are collected here.
     """
     user = request.user
-    affected_service_ids = list(Review.objects.filter(user=user).values_list('service_id', flat=True).distinct())
+    user_reviews = Review.objects.filter(user=user)
+    affected_service_ids = list(user_reviews.exclude(service_id=None).values_list('service_id', flat=True).distinct())
+    affected_package_ids = list(user_reviews.exclude(package_id=None).values_list('package_id', flat=True).distinct())
 
     user.delete()
     logout(request)
@@ -94,6 +98,15 @@ def delete_account(request):
         service.rating = round(agg['avg'] or 0, 1)
         service.reviews_count = agg['count'] or 0
         service.save(update_fields=['rating', 'reviews_count'])
+
+    for package_id in affected_package_ids:
+        package = Package.objects.filter(id=package_id).first()
+        if not package:
+            continue
+        agg = package.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
+        package.rating = round(agg['avg'] or 0, 1)
+        package.reviews_count = agg['count'] or 0
+        package.save(update_fields=['rating', 'reviews_count'])
 
     messages.success(request, 'Your account has been permanently deleted.')
     return redirect('index')

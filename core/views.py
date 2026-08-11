@@ -1,11 +1,11 @@
 """
 Views for the marketing landing page.
 
-The index view assembles context from `core.mock_data` — a stand-in for
-REST calls the frontend will make once the API ships (see developed.md for
-the endpoint map). Keeping data-shaping out of templates means swapping a
-mock function for `requests.get(...)` (or moving the fetch client-side) is
-a one-file change.
+The index view assembles context from real DB-backed models — `core.models`
+for marketing content (hero, testimonials, gallery, etc.) and `catalog`/
+`bookings` for real business data (see `booking_data.py`). No mock data is
+used anywhere in this view (see developed.md "Marketing content moved off
+mock_data.py").
 """
 from django.conf import settings
 from django.http import HttpResponse
@@ -14,29 +14,37 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_GET
 
-from . import booking_data, mock_data
+from accounts.models import Employee
+
+from . import booking_data
+from .models import (
+    FAQ, BeautyTip, GalleryBeforeAfter, GalleryPortfolioItem,
+    Hero, HowItWorksStep, Testimonial, TrustBadge, TrustPoint, ValuePillar,
+)
 
 
 def index(request):
     catalog = booking_data.get_booking_catalog()
 
     context = {
-        'hero': mock_data.get_hero(),
-        'value_pillars': mock_data.get_value_pillars(),
+        'hero': Hero.objects.filter(is_active=True).first(),
+        'value_pillars': ValuePillar.objects.all(),
         'service_categories': booking_data.get_landing_categories(),
-        'featured_services': mock_data.get_featured_services(),
         'packages': booking_data.get_landing_packages(),
         'booking_categories': booking_data.get_booking_categories(),
         'booking_offers': booking_data.get_booking_offers(),
         'booking_catalog': catalog,
-        'how_it_works': mock_data.get_how_it_works(),
-        'trust_points': mock_data.get_trust_points(),
-        'trust_badges': mock_data.get_trust_badges(),
-        'beauticians': mock_data.get_beauticians(),
-        'testimonials': mock_data.get_testimonials(),
-        'gallery': mock_data.get_gallery(),
-        'beauty_tips': mock_data.get_beauty_tips(),
-        'faqs': mock_data.get_faqs(),
+        'how_it_works': HowItWorksStep.objects.all(),
+        'trust_points': TrustPoint.objects.all(),
+        'trust_badges': TrustBadge.objects.all(),
+        'beauticians': Employee.objects.filter(status='active').order_by('sort_order', 'name'),
+        'testimonials': Testimonial.objects.all(),
+        'gallery': {
+            'before_after': GalleryBeforeAfter.objects.all(),
+            'portfolio': GalleryPortfolioItem.objects.all(),
+        },
+        'beauty_tips': BeautyTip.objects.all(),
+        'faqs': FAQ.objects.all(),
     }
     return render(request, 'index.html', context)
 
@@ -65,18 +73,33 @@ def service_detail(request, slug):
     customer reviews & ratings, FAQs, and related services recommendations.
     """
     from django.shortcuts import get_object_or_404
-    from catalog.models import Service
+    from catalog.models import Package, Service
 
-    service = get_object_or_404(
-        Service.objects.select_related('category').prefetch_related('variants', 'included_services__variants'),
-        slug=slug,
-        is_active=True
-    )
-    default_var = service.default_variant
+    # Service and Package are separate tables/slug-namespaces since the
+    # catalog model split (see catalog/models.py) — a detail slug can land
+    # in either, so try Service first (the common case) then Package.
+    try:
+        service = Service.objects.select_related('category').prefetch_related('variants').get(
+            slug=slug, is_active=True,
+        )
+        kind = 'service'
+    except Service.DoesNotExist:
+        service = get_object_or_404(
+            Package.objects.select_related('category').prefetch_related('included_services__variants'),
+            slug=slug,
+            is_active=True,
+        )
+        kind = 'package'
+
+    # A package has no separate variant row to resolve — it's priced
+    # directly on the model (see catalog/models.py::Package's docstring),
+    # so the package instance itself stands in for "the priced thing"
+    # everywhere the template reads `default_variant.<field>`.
+    default_var = service if kind == 'package' else service.default_variant
 
     # Prepare included services list for packages
     included_services_data = []
-    if service.kind == 'package':
+    if kind == 'package':
         for inc in service.included_services.all():
             inc_vars = [
                 {
@@ -141,14 +164,18 @@ def service_detail(request, slug):
         },
     ]
 
-    # Related items from the same category or overall catalog
-    related_qs = Service.objects.filter(category=service.category, is_active=True).exclude(id=service.id)[:3]
+    # Related items from the same category — same model as the item being
+    # viewed, since Service/Package are separate tables now.
+    related_model = Package if kind == 'package' else Service
+    related_qs = related_model.objects.filter(category=service.category, is_active=True).exclude(id=service.id)[:3]
 
     context = {
         'page_title': f"{service.name} — {settings.SITE_NAME}",
         'service': service,
+        'kind': kind,
+        'kind_display': 'Package' if kind == 'package' else 'Service',
         'default_variant': default_var,
-        'variants': service.variants.filter(is_active=True),
+        'variants': service.variants.filter(is_active=True) if kind == 'service' else [],
         'included_services': included_services_data,
         'reviews': reviews,
         'faqs': faqs,

@@ -84,7 +84,14 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    # Must come before django.contrib.staticfiles per django-cloudinary-
+    # storage's own docs. Only MEDIA (user uploads) is routed to
+    # Cloudinary below — static assets (CSS/JS/site-shipped images)
+    # stay served locally, unaffected.
+    'cloudinary_storage',
     'django.contrib.staticfiles',
+    'cloudinary',
+    'anymail',
 
     # django-allauth — see "Authentication" in developed.md. django.contrib.sites
     # is a hard requirement of allauth (it associates SocialApps with a Site).
@@ -112,6 +119,11 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    # Must come after AuthenticationMiddleware (needs request.user) and
+    # AccountMiddleware (allauth's own login-stage/flow redirects take
+    # priority — this only concerns itself with role-based routing once
+    # a user is fully authenticated). See core/middleware.py.
+    'core.middleware.RoleRedirectMiddleware',
 ]
 
 ROOT_URLCONF = 'GlamourAtHome.urls'
@@ -130,6 +142,7 @@ TEMPLATES = [
                 # Injects brand/site-wide data (name, contact, socials, app links)
                 # into every template so navbar/footer never hardcode it.
                 'core.context_processors.site_meta',
+                'core.context_processors.user_roles',
             ],
         },
     },
@@ -151,12 +164,32 @@ AUTHENTICATION_BACKENDS = [
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Postgres when server DB creds are present in .env (DB_HOST is the
+# signal — a plain local checkout with no creds falls back to SQLite
+# automatically), SQLite otherwise. Locally that means: as soon as this
+# .env has real Postgres creds, `runserver` talks to that Postgres
+# instance directly — there's no separate "local mode" override once
+# the creds exist, so don't drop real Postgres creds into a local .env
+# unless you actually want this machine writing to that database.
+DB_HOST = config('DB_HOST', default='')
+if DB_HOST:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME'),
+            'HOST': DB_HOST,
+            'PORT': config('DB_PORT', default='5432'),
+            'USER': config('DB_USER'),
+            'PASSWORD': config('DB_PASSWORD'),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -198,12 +231,24 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'  # collectstatic target for production
 
 # User-uploaded files (employee face-verification photos, job-site arrival
-# photos — see accounts.Employee / bookings.Booking). First real file
-# uploads in this project; served via urls.py's static() helper in DEBUG,
-# same as STATIC_URL above — needs a real storage backend (e.g. S3) before
-# production, since this local MEDIA_ROOT won't persist/scale there.
+# photos, catalog/marketing-content images — see accounts.Employee /
+# bookings.Booking / catalog.* / core.models). Routed to Cloudinary
+# (added 2026-08-11) rather than local disk — MEDIA_ROOT below is kept
+# only as the fallback local path Django's FileField API still wants
+# defined, not actually where uploads land once CLOUDINARY_STORAGE is
+# configured.
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME', default=''),
+    'API_KEY': config('CLOUDINARY_API_KEY', default=''),
+    'API_SECRET': config('CLOUDINARY_API_SECRET', default=''),
+}
+STORAGES = {
+    'default': {'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage'},
+    'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -334,10 +379,17 @@ LOGIN_URL = '/accounts/login/'
 # click was a redundant second confirmation, not a security boundary.
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
-# Prints emails (password reset, optional verification) to the runserver
-# console instead of actually sending — see developed.md for the real-SMTP swap.
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = SITE_EMAIL
+# Real transactional email via Brevo (through Anymail's Brevo backend) —
+# added 2026-08-11, replacing the console backend that just printed emails
+# (password reset, optional verification) to the runserver log. Falls back
+# to the console backend if no API key is configured (e.g. a local
+# checkout with no .env secrets), so email sending never hard-fails setup.
+if config('BREVO_API_KEY', default=''):
+    EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'
+    ANYMAIL = {'BREVO_API_KEY': config('BREVO_API_KEY')}
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=SITE_EMAIL)
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
