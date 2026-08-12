@@ -291,6 +291,8 @@
       if (!text) { GB.showToast('Enter your full address'); return; }
 
       addressSaveBtn.disabled = true;
+      const GF = window.GlamourFeedback;
+      if (GF) GF.showLoading('Saving address…');
       let data;
       try {
         const response = await fetch('/booking/addresses/', {
@@ -306,14 +308,17 @@
         });
         data = await response.json();
         if (!response.ok || !data.ok) {
-          GB.showToast(data.error || 'Something went wrong — please try again.');
+          if (GF) GF.showError('Error', data.error || 'Something went wrong — please try again.');
+          else GB.showToast(data.error || 'Something went wrong — please try again.');
           return;
         }
       } catch (err) {
-        GB.showToast('Network error — please try again.');
+        if (GF) GF.showError('Network Error', 'Please try again.');
+        else GB.showToast('Network error — please try again.');
         return;
       } finally {
         addressSaveBtn.disabled = false;
+        if (GF) GF.hideLoading();
       }
 
       addressCache.push(data.address);
@@ -612,6 +617,8 @@
 
       btn.disabled = true;
       paymentStatusEl.textContent = 'Starting secure checkout…';
+      const GF = window.GlamourFeedback;
+      if (GF) GF.showLoading('Starting payment…');
 
       let order;
       try {
@@ -624,14 +631,18 @@
         if (!response.ok || !order.ok) {
           paymentStatusEl.textContent = '';
           btn.disabled = false;
-          GB.showToast(order.error || 'Couldn’t start payment — please try again.');
+          if (GF) GF.showError('Payment Error', order.error || 'Couldn’t start payment — please try again.');
+          else GB.showToast(order.error || 'Couldn’t start payment — please try again.');
           return;
         }
       } catch (err) {
         paymentStatusEl.textContent = '';
         btn.disabled = false;
-        GB.showToast('Network error — please try again.');
+        if (GF) GF.showError('Network Error', 'Please try again.');
+        else GB.showToast('Network error — please try again.');
         return;
+      } finally {
+        if (GF) GF.hideLoading();
       }
 
       const rzp = new Razorpay({
@@ -786,6 +797,8 @@
 
       nextBtn.disabled = true;
       nextBtn.textContent = 'Confirming…';
+      const GF = window.GlamourFeedback;
+      if (GF) GF.showLoading('Confirming your booking…');
 
       let data;
       try {
@@ -798,7 +811,8 @@
         if (!response.ok || !data.ok) {
           nextBtn.disabled = false;
           nextBtn.textContent = 'Confirm Booking';
-          GB.showToast(data.error || 'Something went wrong — please try again.');
+          if (GF) GF.showError('Booking Failed', data.error || 'Something went wrong — please try again.');
+          else GB.showToast(data.error || 'Something went wrong — please try again.');
           if (data.login_required) {
             const loginUrl = document.body.dataset.loginUrl || '/accounts/login/';
             window.location.href = `${loginUrl}?next=${encodeURIComponent(window.location.pathname)}`;
@@ -808,8 +822,11 @@
       } catch (err) {
         nextBtn.disabled = false;
         nextBtn.textContent = 'Confirm Booking';
-        GB.showToast('Network error — please try again.');
+        if (GF) GF.showError('Network Error', 'Please try again.');
+        else GB.showToast('Network error — please try again.');
         return;
+      } finally {
+        if (GF) GF.hideLoading();
       }
 
       drawer.querySelector('[data-confirmation-id]').textContent = data.booking_number;
@@ -823,7 +840,8 @@
       // undoing the confirmation screen just shown above.
       justConfirmed = true;
       GB.saveCart([]);
-      GB.showToast('Booking confirmed!');
+      if (GF) GF.showSuccess('Booking Confirmed!', 'You’ll receive a confirmation shortly.', 4000);
+      else GB.showToast('Booking confirmed!');
     }
 
     drawer.querySelector('[data-booking-done]').addEventListener('click', () => {

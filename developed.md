@@ -2757,3 +2757,27 @@ through the actual dashboard form correctly got a collision-suffixed
 slug (`sachin-shah-2`); applied to both SQLite and the Postgres server
 DB.
 
+## Global AJAX Loading Spinner & Toast Feedback Module (added 2026-08-12)
+
+Every AJAX form submission previously either had custom inline loading logic, silenced failures, or relied on raw native page submits. Added a shared vanilla JS feedback library (`static/js/glamour_feedback.js`) exposing `window.GlamourFeedback`:
+- `showLoading(title)`: Renders a blocking, full-screen dark backdrop overlay with a brand-gold (`#c9a15a`) CSS spinner ring and status text. Non-dismissible by clicking outside.
+- `hideLoading()`: Collapses the loading overlay.
+- `showSuccess(title, text, timerMs)`: Displays an auto-dismissing green toast banner with an animated progress bar shrinking over `timerMs`.
+- `showError(title, text)`: Displays a persistent red toast banner with an `✕` dismiss button.
+
+Zero external dependencies (no SweetAlert2 or npm packages required). Styles are injected into `<head>` dynamically on first invocation. Included across all base templates: `templates/base.html`, `templates/admin_dashboard/layouts/admin_base.html`, `templates/employee_dashboard/emp_dashboard.html`, and `templates/employee_dashboard/emp_profile.html`.
+
+Wired into every fetch and AJAX interaction across the application:
+1. **Employee Dashboard**: `submitEmpForm` (all tab forms), verification arrival photo upload, and profile camera face-photo upload.
+2. **Admin Dashboard**: Bookings status/beautician update handler, schedule calendar navigation (`loadScheduleViaAjax`), and converted the Assign Beautician modal (`#assignModal`) in `overview.html` from a full native POST to an AJAX fetch with instant schedule wrapper re-rendering.
+3. **Public Booking App**: Booking drawer address creation, Razorpay order initialization, final booking confirmation checkout, profile address save & delete, and My Bookings review feedback submission.
+
+## Employee Absences & Breaks: Pagination & Type-Aware Overlap Protection (added 2026-08-12)
+
+Enhanced employee leave & short break management on the Beautician Dashboard (`/employee/`):
+- **Pagination**: Paginated **My Absences & Breaks History** to 10 items per page using Django's `Paginator` in `core/employee_dashboard_views.py`. Added `Page X of Y` indicator and `← Previous` / `Next →` navigation controls in `templates/employee_dashboard/emp_dashboard.html` preserving owner preview query parameters (`?emp_id=`).
+- **Feedback Clean-Up**: Removed duplicate Django `messages.success` notifications on leave creation and deletion so only the unified `GlamourFeedback` **"Saved ✓"** toast notification displays on submission.
+- **Type-Aware Overlap Validation**: Updated leave creation logic in `employee_dashboard_views.py` to prevent duplicate or conflicting entries:
+  - **Full-Day / Multi-Day Leaves**: Checks date range intersection (`start_date <= new_end AND end_date >= new_start`) against all existing leaves.
+  - **Short Intra-Day Breaks**: Checks if a full-day leave already exists for that date, or if another `short_break` on the same date has an intersecting time window (`start_time < new_end AND end_time > new_start`). Multiple non-overlapping short breaks on the same day (e.g. 1 PM–2 PM and 3 PM–4 PM) are explicitly allowed.
+

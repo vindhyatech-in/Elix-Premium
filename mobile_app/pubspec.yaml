@@ -35,6 +35,17 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Talks to the Django api/ app (see ApiClient) — real catalog/auth/
+  # bookings/profile data instead of the mock lists this scaffold
+  # started with.
+  http: ^1.2.2
+  # Persists the auth token (AuthService) and the cart (CartModel)
+  # across app restarts, same role localStorage plays on the web.
+  shared_preferences: ^2.3.3
+  # Shares AuthService/CartModel state across every screen without
+  # threading callbacks through the widget tree.
+  provider: ^6.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

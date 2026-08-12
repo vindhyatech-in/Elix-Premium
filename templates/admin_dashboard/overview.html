@@ -365,10 +365,13 @@
 
 <script>
 // AJAX Navigation for Schedule & Calendar
-function loadScheduleViaAjax(url, pushState = true) {
+function loadScheduleViaAjax(url, pushState) {
+  if (pushState === undefined) pushState = true;
   var wrapper = document.getElementById('adminScheduleWrapper');
   if (!wrapper) return;
 
+  var GF = window.GlamourFeedback;
+  if (GF) GF.showLoading('Loading…');
   wrapper.style.opacity = '0.5';
 
   fetch(url, {
@@ -387,10 +390,12 @@ function loadScheduleViaAjax(url, pushState = true) {
       }
     }
     wrapper.style.opacity = '1';
+    if (GF) GF.hideLoading();
   })
   .catch(function(err) {
     console.error('Failed to load schedule via AJAX', err);
     wrapper.style.opacity = '1';
+    if (GF) GF.hideLoading();
     window.location.href = url; // Fallback
   });
 }
@@ -450,5 +455,50 @@ function openAssignModal(bookingId, bookingNum, currentEmpId, timeSlot) {
 function closeAssignModal() {
   document.getElementById('assignModal').style.display = 'none';
 }
+
+// Convert Assign Beautician form to AJAX so we can show spinner + stay on page
+(function () {
+  function getCsrfToken() {
+    var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+    return match ? match[1] : '';
+  }
+
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    // Only intercept the assign-beautician form inside #assignModal
+    if (!form.closest('#assignModal')) return;
+    e.preventDefault();
+
+    var GF = window.GlamourFeedback;
+    if (GF) GF.showLoading('Assigning beautician…');
+
+    var saveBtn = form.querySelector('button[type="submit"]');
+    if (saveBtn) saveBtn.disabled = true;
+
+    fetch(window.location.href, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+      body: new FormData(form),
+    })
+      .then(function (resp) { return resp.text(); })
+      .then(function (html) {
+        // Swap the schedule wrapper so the assignment reflects immediately
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(html, 'text/html');
+        var newWrapper = doc.getElementById('adminScheduleWrapper');
+        var wrapper = document.getElementById('adminScheduleWrapper');
+        if (newWrapper && wrapper) wrapper.innerHTML = newWrapper.innerHTML;
+        closeAssignModal();
+        if (GF) GF.showSuccess('Assigned', 'Beautician assignment saved.', 3000);
+        else adminAlert('Assignment saved.');
+      })
+      .catch(function () {
+        if (saveBtn) saveBtn.disabled = false;
+        if (GF) GF.showError('Failed', 'Could not save assignment — check your connection and try again.');
+        else adminAlert('Could not save assignment — please try again.');
+      });
+  });
+})();
 </script>
 {% endblock %}

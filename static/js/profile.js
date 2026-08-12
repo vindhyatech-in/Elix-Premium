@@ -39,6 +39,8 @@
       const text = textInput.value.trim();
       if (!text) { showToast('Enter your full address'); return; }
 
+      const GF = window.GlamourFeedback;
+      if (GF) GF.showLoading('Saving address…');
       try {
         const response = await fetch('/booking/addresses/', {
           method: 'POST',
@@ -51,12 +53,16 @@
         });
         const data = await response.json();
         if (!response.ok || !data.ok) {
-          showToast(data.error || 'Something went wrong — please try again.');
+          if (GF) GF.showError('Error', data.error || 'Something went wrong — please try again.');
+          else showToast(data.error || 'Something went wrong — please try again.');
           return;
         }
       } catch (err) {
-        showToast('Network error — please try again.');
+        if (GF) GF.showError('Network Error', 'Please try again.');
+        else showToast('Network error — please try again.');
         return;
+      } finally {
+        if (GF) GF.hideLoading();
       }
       window.location.reload();
     });
@@ -71,6 +77,8 @@
         : window.confirm('Delete this address?');
       if (!confirmed) return;
 
+      const GF = window.GlamourFeedback;
+      if (GF) GF.showLoading('Deleting…');
       try {
         const response = await fetch(`/booking/addresses/${btn.dataset.addressId}/`, {
           method: 'DELETE',
@@ -78,12 +86,16 @@
         });
         const data = await response.json();
         if (!response.ok || !data.ok) {
-          showToast('Something went wrong — please try again.');
+          if (GF) GF.showError('Error', 'Something went wrong — please try again.');
+          else showToast('Something went wrong — please try again.');
           return;
         }
       } catch (err) {
-        showToast('Network error — please try again.');
+        if (GF) GF.showError('Network Error', 'Please try again.');
+        else showToast('Network error — please try again.');
         return;
+      } finally {
+        if (GF) GF.hideLoading();
       }
       window.location.reload();
     });

@@ -77,6 +77,22 @@ for origin in extra_origins:
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 
+# CORS (django-cors-headers) — only matters for the Flutter app's web
+# build (`flutter run -d chrome`, or a future web deploy); native
+# iOS/Android requests are never subject to CORS, only browsers enforce
+# it. No credentials/cookies involved (the mobile API uses a bearer
+# token — see api/auth.py), so CORS_ALLOW_CREDENTIALS is deliberately
+# left off. Regex, not a fixed port, because `flutter run -d chrome`
+# picks a random port each run unless --web-port is passed — same
+# "trust any local dev port" reasoning as the devtunnels wildcard
+# above, scoped to DEBUG the same way.
+CORS_ALLOWED_ORIGIN_REGEXES = []
+if DEBUG:
+    CORS_ALLOWED_ORIGIN_REGEXES = [
+        r'^http://localhost:\d+$',
+        r'^http://127\.0\.0\.1:\d+$',
+    ]
+
 # Cookie/transport hardening — gated on `not DEBUG` so local dev (plain
 # HTTP on localhost) is completely unaffected; only takes effect once a
 # real deploy sets DEBUG=False, at which point the site should only ever
@@ -110,6 +126,7 @@ INSTALLED_APPS = [
     # backend, since static files were never routed to Cloudinary anyway.
     'cloudinary',
     'anymail',
+    'corsheaders',
 
     # django-allauth — see "Authentication" in developed.md. django.contrib.sites
     # is a hard requirement of allauth (it associates SocialApps with a Site).
@@ -130,6 +147,12 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Must sit above CommonMiddleware — corsheaders' own docs require
+    # this ordering to actually attach CORS headers to the response.
+    # Only relevant to the Flutter app's web build (flutter run -d
+    # chrome / a web deploy) — native iOS/Android http calls are never
+    # subject to CORS, browsers are the only thing enforcing it.
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',

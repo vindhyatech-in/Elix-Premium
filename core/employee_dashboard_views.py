@@ -175,22 +175,79 @@ def employee_dashboard(request):
                         except ValueError:
                             pass
 
-                EmployeeLeave.objects.create(
-                    employee=employee,
-                    leave_type=leave_type,
-                    start_date=start_date,
-                    end_date=end_date,
-                    start_time=start_time,
-                    end_time=end_time,
-                    reason=reason,
-                )
-                messages.success(request, 'Leave / Break application recorded successfully.')
+                # ── Overlap check ──────────────────────────────────────────
+                # For full-day / multi-day leaves: reject if any existing leave
+                # (of any type) covers an overlapping date range.
+                #
+                # For short breaks: a different date on the same day is fine;
+                # only block if:
+                #   (a) there's already a full-day/multi-day leave covering
+                #       that date, OR
+                #   (b) another short_break on the same date has a time window
+                #       that overlaps (start_time < new_end AND end_time > new_start).
+                conflict_msg = None
+
+                if leave_type == 'short_break':
+                    # (a) Any full-day / multi-day leave covering this date?
+                    day_conflict = EmployeeLeave.objects.filter(
+                        employee=employee,
+                        start_date__lte=start_date,
+                        end_date__gte=start_date,
+                    ).exclude(leave_type='short_break').first()
+                    if day_conflict:
+                        conflict_msg = (
+                            f'A full-day leave already exists for {start_date}. '
+                            'Please cancel it first.'
+                        )
+                    elif start_time and end_time:
+                        # (b) Another short_break on the same date with overlapping time?
+                        time_conflict = EmployeeLeave.objects.filter(
+                            employee=employee,
+                            leave_type='short_break',
+                            start_date=start_date,
+                            start_time__lt=end_time,
+                            end_time__gt=start_time,
+                        ).first()
+                        if time_conflict:
+                            conflict_msg = (
+                                f'A short break on {start_date} already covers '
+                                f'{time_conflict.start_time.strftime("%H:%M")}–'
+                                f'{time_conflict.end_time.strftime("%H:%M")}. '
+                                'Please use a non-overlapping time window.'
+                            )
+                else:
+                    # Full-day / multi-day: standard date-range overlap check.
+                    date_conflict = EmployeeLeave.objects.filter(
+                        employee=employee,
+                        start_date__lte=end_date,
+                        end_date__gte=start_date,
+                    ).first()
+                    if date_conflict:
+                        conflict_msg = (
+                            f'A leave/break already exists that overlaps with this period '
+                            f'({date_conflict.start_date} – {date_conflict.end_date}). '
+                            'Please cancel the existing record first.'
+                        )
+
+                if conflict_msg:
+                    messages.error(request, conflict_msg)
+                else:
+                    EmployeeLeave.objects.create(
+                        employee=employee,
+                        leave_type=leave_type,
+                        start_date=start_date,
+                        end_date=end_date,
+                        start_time=start_time,
+                        end_time=end_time,
+                        reason=reason,
+                    )
+
 
         elif action == 'delete_leave' and employee:
             leave_id = request.POST.get('leave_id')
             leave = get_object_or_404_safe(EmployeeLeave, leave_id, employee=employee)
             leave.delete()
-            messages.success(request, 'Leave / Break record removed.')
+
 
         elif action == 'update_booking_status' and employee:
             booking_id = request.POST.get('booking_id')

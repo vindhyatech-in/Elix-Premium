@@ -19,6 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/employee_dashboard.css' %}">
+  <script src="{% static 'js/glamour_feedback.js' %}"></script>
 </head>
 <body class="emp-body">
 
@@ -587,6 +588,8 @@
     function submitEmpForm(form) {
       var submitBtn = form.querySelector('button[type=submit]');
       if (submitBtn) submitBtn.disabled = true;
+      var GF = window.GlamourFeedback;
+      if (GF) GF.showLoading('Saving…');
 
       // NOTE: every form here has <input name="action">, which shadows
       // the form element's own `.action` IDL property (a named form
@@ -600,10 +603,14 @@
         body: new FormData(form),
       })
         .then(function (resp) { return resp.text(); })
-        .then(applyDashboardHtml)
+        .then(function (html) {
+          if (GF) GF.showSuccess('Saved', '', 2500);
+          applyDashboardHtml(html);
+        })
         .catch(function () {
           if (submitBtn) submitBtn.disabled = false;
-          empAlert('Something went wrong — check your connection and try again.');
+          if (GF) GF.showError('Failed', 'Something went wrong — check your connection and try again.');
+          else empAlert('Something went wrong — check your connection and try again.');
         });
     }
 
@@ -758,6 +765,8 @@
         if (!capturedBlob || !activeBookingId) return;
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving…';
+        var GF = window.GlamourFeedback;
+        if (GF) GF.showLoading('Uploading photo…');
 
         var formData = new FormData();
         formData.append('action', 'upload_verification');
@@ -771,11 +780,13 @@
         })
           .then(function (resp) { return resp.text(); })
           .then(function (html) {
+            if (GF) GF.showSuccess('Photo uploaded', '', 2500);
             closeModal();
             applyDashboardHtml(html);
           })
           .catch(function () {
-            showError('Upload failed — check your connection and try again.');
+            if (GF) GF.showError('Upload failed', 'Check your connection and try again.');
+            else showError('Upload failed — check your connection and try again.');
             saveBtn.disabled = false;
             saveBtn.textContent = '✔ Use This Photo';
           });

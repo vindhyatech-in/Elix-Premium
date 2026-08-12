@@ -19,6 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/employee_dashboard.css' %}">
+  <script src="{% static 'js/glamour_feedback.js' %}"></script>
 </head>
 <body class="emp-body">
 
@@ -453,6 +454,8 @@
         if (!capturedBlob || !activeFaceField) return;
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving…';
+        var GF = window.GlamourFeedback;
+        if (GF) GF.showLoading('Saving photo…');
 
         var formData = new FormData();
         formData.append('action', 'upload_face_photos');
@@ -464,11 +467,13 @@
           body: formData,
         })
           .then(function () {
+            if (GF) GF.showSuccess('Photo saved', '', 2000);
             closeModal();
             window.location.reload();
           })
           .catch(function () {
-            showError('Upload failed — check your connection and try again.');
+            if (GF) GF.showError('Upload failed', 'Check your connection and try again.');
+            else showError('Upload failed — check your connection and try again.');
             saveBtn.disabled = false;
             saveBtn.textContent = '✔ Use This Photo';
           });

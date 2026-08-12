@@ -216,6 +216,9 @@
       var submitEls = form.querySelectorAll('button, select');
       submitEls.forEach(function (el) { el.disabled = true; });
 
+      var GF = window.GlamourFeedback;
+      if (GF) GF.showLoading('Updating…');
+
       // The table's own horizontal scroll (.admin-table-wrapper has
       // overflow-x: auto) resets to 0 on every swap below, since
       // innerHTML replacement creates a brand new element — the page's
@@ -244,10 +247,12 @@
             var newWrapper = document.querySelector('.admin-table-wrapper');
             if (newWrapper) newWrapper.scrollLeft = scrollLeft;
           }
+          if (GF) GF.showSuccess('Updated', '', 2000);
         })
         .catch(function () {
           submitEls.forEach(function (el) { el.disabled = false; });
-          adminAlert('Something went wrong — check your connection and try again.');
+          if (GF) GF.showError('Failed', 'Something went wrong — check your connection and try again.');
+          else adminAlert('Something went wrong — check your connection and try again.');
         });
     });
   </script>

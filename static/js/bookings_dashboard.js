@@ -201,6 +201,8 @@
       if (!block || !textarea) return;
 
       btn.disabled = true;
+      const GF = window.GlamourFeedback;
+      if (GF) GF.showLoading('Submitting feedback…');
       fetch(block.dataset.feedbackUrl, {
         method: 'POST',
         headers: { 'X-CSRFToken': getCsrfToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -211,9 +213,11 @@
           if (!data.ok) throw new Error('Failed to save feedback.');
           btn.textContent = 'Update Feedback';
           if (statusEl) statusEl.hidden = false;
+          if (GF) GF.showSuccess('Thank you!', 'Your feedback has been saved.', 3000);
         })
         .catch(() => {
-          window.GlamourBooking?.showToast?.('Something went wrong — please try again.');
+          if (GF) GF.showError('Error', 'Something went wrong — please try again.');
+          else window.GlamourBooking?.showToast?.('Something went wrong — please try again.');
         })
         .finally(() => { btn.disabled = false; });
     });
