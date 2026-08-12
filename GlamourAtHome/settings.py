@@ -65,12 +65,15 @@ if DEBUG:
     # listed unconditionally above with the fixed local ports.
     CSRF_TRUSTED_ORIGINS.append('https://*.devtunnels.ms')
 
-# The real deployed domain(s) — e.g. https://elix.vindhyatech.in — go in
-# .env, not here: this file is shared across every environment (local dev,
-# demo VM, anyone else's checkout), and the dev-only origins above must
-# stay in place regardless of what a given deploy's domain is. Comma-
-# separated, full scheme+host (CSRF_TRUSTED_ORIGINS requires a scheme).
-CSRF_TRUSTED_ORIGINS += config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
+extra_origins = config('CSRF_TRUSTED_ORIGINS', default='', cast=Csv())
+for origin in extra_origins:
+    origin = origin.strip()
+    if origin:
+        if not (origin.startswith('http://') or origin.startswith('https://')):
+            CSRF_TRUSTED_ORIGINS.append(f'https://{origin}')
+            CSRF_TRUSTED_ORIGINS.append(f'http://{origin}')
+        else:
+            CSRF_TRUSTED_ORIGINS.append(origin)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Cookie/transport hardening — gated on `not DEBUG` so local dev (plain
