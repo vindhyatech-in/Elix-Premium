@@ -77,18 +77,18 @@ class Employee(models.Model):
     sort_order = models.PositiveSmallIntegerField(default=0, help_text='Ordering on the public "meet the team" carousel')
     experience_years = models.PositiveIntegerField(default=1)
     photo = models.CharField(max_length=200, blank=True, help_text="Static fallback photo path — only used if neither field below is set.")
-    photo_image = models.ImageField(upload_to='employees/%Y/%m/', null=True, blank=True)
+    photo_image = models.ImageField(upload_to='employees/%Y/%m/', max_length=255, null=True, blank=True)
     photo_url = models.URLField(max_length=500, blank=True)
 
     # Reference photos for job-site arrival verification (see
     # bookings.Booking.verification_photo / core/employee_dashboard_views.py)
     # — one-time profile setup, not matched by any ML today (see that
     # field's docstring for why); just a human-checkable reference set.
-    face_photo_front = models.ImageField(upload_to='employee_faces/%Y/%m/', null=True, blank=True, help_text="Straight-on, looking directly at the camera")
-    face_photo_left = models.ImageField(upload_to='employee_faces/%Y/%m/', null=True, blank=True, help_text="Head turned to show your left profile")
-    face_photo_right = models.ImageField(upload_to='employee_faces/%Y/%m/', null=True, blank=True, help_text="Head turned to show your right profile")
-    face_photo_top = models.ImageField(upload_to='employee_faces/%Y/%m/', null=True, blank=True, help_text="Chin down, eyes looking up toward the camera")
-    face_photo_bottom = models.ImageField(upload_to='employee_faces/%Y/%m/', null=True, blank=True, help_text="Chin up, eyes looking down toward the camera")
+    face_photo_front = models.ImageField(upload_to='employee_faces/%Y/%m/', max_length=255, null=True, blank=True, help_text="Straight-on, looking directly at the camera")
+    face_photo_left = models.ImageField(upload_to='employee_faces/%Y/%m/', max_length=255, null=True, blank=True, help_text="Head turned to show your left profile")
+    face_photo_right = models.ImageField(upload_to='employee_faces/%Y/%m/', max_length=255, null=True, blank=True, help_text="Head turned to show your right profile")
+    face_photo_top = models.ImageField(upload_to='employee_faces/%Y/%m/', max_length=255, null=True, blank=True, help_text="Chin down, eyes looking up toward the camera")
+    face_photo_bottom = models.ImageField(upload_to='employee_faces/%Y/%m/', max_length=255, null=True, blank=True, help_text="Chin up, eyes looking down toward the camera")
 
     created_at = models.DateTimeField(auto_now_add=True)
 

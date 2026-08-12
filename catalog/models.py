@@ -18,7 +18,7 @@ class Category(models.Model):
     slug = models.SlugField(unique=True)
     name = models.CharField(max_length=60)
     description = models.TextField(blank=True)
-    image = models.ImageField(upload_to='categories/%Y/%m/', null=True, blank=True)
+    image = models.ImageField(upload_to='categories/%Y/%m/', max_length=255, null=True, blank=True)
     image_url = models.URLField(max_length=500, blank=True)
 
     class Meta:
@@ -68,7 +68,7 @@ class CatalogItemBase(models.Model):
     # `photo_image` (upload) or `photo_url` (link) instead, via
     # core/admin_dashboard_views.py.
     photo = models.CharField(max_length=200, blank=True, help_text="Static path, e.g. 'images/service-hair-spa.jpg' — only used if neither photo below is set.")
-    photo_image = models.ImageField(upload_to='catalog/%Y/%m/', null=True, blank=True)
+    photo_image = models.ImageField(upload_to='catalog/%Y/%m/', max_length=255, null=True, blank=True)
     photo_url = models.URLField(max_length=500, blank=True)
     tone = models.CharField(max_length=20, blank=True, help_text='Fallback gradient class while the photo loads (espresso/blush/gold/rose)')
     rating = models.DecimalField(max_digits=2, decimal_places=1, default=0)

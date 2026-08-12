@@ -98,7 +98,7 @@ class Booking(models.Model):
     # showed up, the owner has a timestamped photo to look at. The actual
     # gate that lets the employee move past "On The Way" is the OTP below,
     # not this photo.
-    verification_photo = models.ImageField(upload_to='job_verification/%Y/%m/', null=True, blank=True)
+    verification_photo = models.ImageField(upload_to='job_verification/%Y/%m/', max_length=255, null=True, blank=True)
 
     # OTP the customer reads out to the employee to confirm they're ready
     # to start — shown on the customer's own /booking/my-bookings/ page
