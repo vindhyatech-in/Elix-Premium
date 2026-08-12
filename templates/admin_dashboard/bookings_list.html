@@ -55,54 +55,86 @@
           </thead>
           <tbody>
             {% for booking in bookings %}
-              <tr>
+              <tr style="border-bottom: 1px solid var(--border-hairline);">
                 <!-- ID & Type -->
-                <td class="admin-td-id">
-                  <strong>{{ booking.booking_number }}</strong>
-                  <div class="admin-badge admin-badge--subtle">{{ booking.get_booking_type_display }}</div>
-                  <small class="admin-text-muted">Placed: {{ booking.created_at|date:"M j, H:i" }}</small>
+                <td class="admin-td-id" style="vertical-align: top; padding-top: 1rem;">
+                  <strong style="font-family: 'Inter', system-ui, monospace; font-size: 0.95rem; font-weight: 700; color: var(--accent-gold, #4f46e5); letter-spacing: 0.02em;">#{{ booking.booking_number }}</strong>
+                  <div style="margin-top: 0.35rem;">
+                    {% if booking.booking_type == 'urgent' or booking.booking_type == 'instant' %}
+                      <span style="background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.725rem; font-weight: 600;">⚡ Instant</span>
+                    {% else %}
+                      <span class="admin-badge admin-badge--subtle" style="font-size: 0.725rem;">📅 Regular</span>
+                    {% endif %}
+                  </div>
+                  <div style="font-size: 0.78rem; color: var(--ink-muted); margin-top: 0.35rem;">Placed {{ booking.created_at|date:"M j, H:i" }}</div>
                 </td>
 
                 <!-- Customer & Address -->
-                <td>
-                  <div class="admin-customer-box">
-                    <div class="admin-customer-name">{{ booking.customer_display_name }} {{ booking.user.last_name }}</div>
-                    <div class="admin-customer-email">✉ {{ booking.user.email }}</div>
-                    <div class="admin-customer-address">📍 <strong>{{ booking.address_label }}:</strong> {{ booking.address_text }}</div>
+                <td style="vertical-align: top; padding-top: 1rem;">
+                  <div class="admin-customer-box" style="display: flex; flex-direction: column; gap: 0.3rem;">
+                    <div class="admin-customer-name" style="font-weight: 600; color: var(--text-body); font-size: 0.92rem;">
+                      {{ booking.customer_display_name }} {{ booking.user.last_name }}
+                    </div>
+                    {% if booking.user.email %}
+                      <div style="font-size: 0.8rem; color: var(--ink-muted); display: flex; align-items: center; gap: 0.35rem;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        <span>{{ booking.user.email }}</span>
+                      </div>
+                    {% endif %}
+                    {% if booking.address_text %}
+                      <div style="font-size: 0.8rem; color: var(--text-body); margin-top: 0.15rem; line-height: 1.35; display: flex; align-items: flex-start; gap: 0.35rem;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" style="flex-shrink: 0; margin-top: 2px;"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                        <span>{% if booking.address_label and booking.address_label != 'Home' and booking.address_label != 'Work' %}<strong style="color: var(--text-body);">{{ booking.address_label }}:</strong> {% endif %}{{ booking.address_text }}</span>
+                      </div>
+                    {% endif %}
                   </div>
                 </td>
 
                 <!-- Schedule -->
-                <td>
-                  <div class="admin-schedule-box">
-                    <div class="admin-schedule-date">📅 {{ booking.scheduled_date|date:"D, M j, Y" }}</div>
-                    <div class="admin-schedule-time">⏰ {{ booking.get_time_slot_display|default:booking.exact_time }}</div>
+                <td style="vertical-align: top; padding-top: 1rem;">
+                  <div class="admin-schedule-box" style="display: flex; flex-direction: column; gap: 0.35rem;">
+                    <div style="font-weight: 600; color: var(--text-body); font-size: 0.88rem; display: flex; align-items: center; gap: 0.4rem;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                      <span>{{ booking.scheduled_date|date:"D, M j, Y" }}</span>
+                    </div>
+                    <div style="font-size: 0.8rem; color: var(--ink-muted); display: flex; align-items: center; gap: 0.4rem;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink: 0;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                      <span>{{ booking.get_time_slot_display|default:booking.exact_time }}</span>
+                    </div>
                   </div>
                 </td>
 
                 <!-- Items & Amounts -->
-                <td>
-                  <div class="admin-items-summary">
-                    <ul class="admin-items-list">
+                <td style="vertical-align: top; padding-top: 1rem;">
+                  <div class="admin-items-summary" style="display: flex; flex-direction: column; gap: 0.4rem;">
+                    <div style="font-size: 0.825rem; color: var(--text-body); line-height: 1.4;">
                       {% for item in booking.items.all %}
-                        <li>{{ item.name_snapshot }} (x{{ item.quantity }}) — ₹{{ item.price_snapshot }}</li>
+                        <div>• {{ item.name_snapshot }} <span style="color: var(--ink-muted);">(x{{ item.quantity }})</span> — <strong>₹{{ item.price_snapshot }}</strong></div>
                       {% endfor %}
-                    </ul>
-                    <div class="admin-items-total">
-                      <strong>Total: ₹{{ booking.total_amount }}</strong>
-                      <span class="admin-badge admin-badge--pay-{{ booking.payment_status }}">{{ booking.get_payment_method_display }} ({{ booking.get_payment_status_display }})</span>
+                    </div>
+                    <div style="margin-top: 0.25rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                      <span style="font-weight: 700; color: var(--text-body); font-size: 0.95rem;">Total: ₹{{ booking.total_amount }}</span>
+                      {% if booking.payment_status == 'paid' %}
+                        <span style="background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.15rem 0.55rem; border-radius: 9999px; font-size: 0.725rem; font-weight: 600;">
+                          🟢 {{ booking.get_payment_method_display }} (Paid)
+                        </span>
+                      {% else %}
+                        <span style="background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); padding: 0.15rem 0.55rem; border-radius: 9999px; font-size: 0.725rem; font-weight: 600;">
+                          ⏳ {{ booking.get_payment_method_display }} (Pending)
+                        </span>
+                      {% endif %}
                     </div>
                   </div>
                 </td>
 
                 <!-- Assigned Staff -->
-                <td>
+                <td style="vertical-align: top; padding-top: 1rem;">
                   <form method="post" action="{% url 'admin_dashboard_bookings' %}" class="admin-inline-form">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="assign_beautician">
                     <input type="hidden" name="booking_id" value="{{ booking.id }}">
                     
-                    <select name="beautician_id" class="admin-select admin-select--sm" onchange="this.form.requestSubmit()">
+                    <select name="beautician_id" class="admin-select admin-select--sm" style="background: var(--surface-1); border: 1px solid var(--border-hairline); border-radius: 8px; padding: 0.45rem 0.75rem; font-size: 0.82rem; color: var(--text-body);" onchange="this.form.requestSubmit()">
                       <option value="">-- Unassigned --</option>
                       {% for emp in employees %}
                         <option value="{{ emp.id }}" {% if booking.assigned_beautician_id == emp.id %}selected{% endif %}>
@@ -114,32 +146,32 @@
                 </td>
 
                 <!-- Update Status -->
-                <td>
+                <td style="vertical-align: top; padding-top: 1rem;">
                   <form method="post" action="{% url 'admin_dashboard_bookings' %}" class="admin-status-form">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="update_status">
                     <input type="hidden" name="booking_id" value="{{ booking.id }}">
                     
-                    <div class="admin-form-row">
-                      <div class="admin-status-field">
-                        <label class="admin-status-field__label" for="status-{{ booking.id }}">Order Status</label>
-                        <select id="status-{{ booking.id }}" name="status" class="admin-select admin-select--sm admin-select--status-{{ booking.status }}">
+                    <div class="admin-form-row" style="display: flex; align-items: flex-end; gap: 0.5rem; flex-wrap: wrap;">
+                      <div class="admin-status-field" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <label class="admin-status-field__label" for="status-{{ booking.id }}" style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--ink-muted);">Order Status</label>
+                        <select id="status-{{ booking.id }}" name="status" class="admin-select admin-select--sm admin-select--status-{{ booking.status }}" style="background: var(--surface-1); border: 1px solid var(--border-hairline); border-radius: 8px; padding: 0.45rem 0.65rem; font-size: 0.82rem;">
                           {% for code, label in status_choices %}
                             <option value="{{ code }}" {% if booking.status == code %}selected{% endif %}>{{ label }}</option>
                           {% endfor %}
                         </select>
                       </div>
 
-                      <div class="admin-status-field">
-                        <label class="admin-status-field__label" for="payment-{{ booking.id }}">Payment</label>
-                        <select id="payment-{{ booking.id }}" name="payment_status" class="admin-select admin-select--sm">
+                      <div class="admin-status-field" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <label class="admin-status-field__label" for="payment-{{ booking.id }}" style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--ink-muted);">Payment</label>
+                        <select id="payment-{{ booking.id }}" name="payment_status" class="admin-select admin-select--sm" style="background: var(--surface-1); border: 1px solid var(--border-hairline); border-radius: 8px; padding: 0.45rem 0.65rem; font-size: 0.82rem; color: var(--text-body);">
                           {% for code, label in payment_status_choices %}
                             <option value="{{ code }}" {% if booking.payment_status == code %}selected{% endif %}>{{ label }}</option>
                           {% endfor %}
                         </select>
                       </div>
 
-                      <button type="submit" class="admin-btn admin-btn--ghost admin-btn--xs">Save</button>
+                      <button type="submit" class="admin-btn admin-btn--primary admin-btn--xs" style="margin-bottom: 2px;">Save</button>
                     </div>
                   </form>
                 </td>

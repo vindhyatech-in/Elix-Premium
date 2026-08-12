@@ -302,6 +302,7 @@ def employee_dashboard(request):
         'completed_count': completed_count,
         'total_earnings': total_earnings,
         'today_date': today_date,
+        'is_owner': is_owner(user),
         'all_employees': Employee.objects.all() if is_owner(user) else None,
         'calendar_weeks': _build_month_calendar(employee, cal_year, cal_month, today_date),
         'calendar_label': f'{MONTH_NAMES[cal_month - 1]} {cal_year}',
@@ -430,6 +431,7 @@ def employee_profile_view(request):
         'employee': employee,
         'today_date': today_date,
         'upcoming_leaves': upcoming_leaves,
+        'is_owner': is_owner(request.user),
         'all_employees': Employee.objects.all() if is_owner(request.user) else None,
     }
     return render(request, 'employee_dashboard/emp_profile.html', context)

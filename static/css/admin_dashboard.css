@@ -574,10 +574,16 @@ body.admin-body {
 }
 
 .admin-filter-tab.is-active {
-  background: var(--gradient-gold);
-  color: var(--ink);
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--accent-gold, #4f46e5);
   font-weight: 600;
-  border-color: transparent;
+  border: 1px solid rgba(79, 70, 229, 0.3);
+}
+
+[data-theme='dark'] .admin-filter-tab.is-active {
+  background: rgba(99, 102, 241, 0.18);
+  color: #a5b4fc;
+  border-color: rgba(165, 180, 252, 0.3);
 }
 
 /* --- Card Table Box --- */
@@ -796,24 +802,20 @@ body.admin-body {
   transition: all 0.2s ease;
 }
 
-.admin-btn--primary {
-  background: var(--gradient-gold);
-  color: var(--ink);
-}
-.admin-btn--primary:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-gold);
-}
-
+.admin-btn--primary,
 .admin-btn--gold {
-  background: var(--blue);
-  color: #ffffff;
-  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--accent-gold, #4f46e5);
+  border: 1px solid rgba(79, 70, 229, 0.3);
+  font-weight: 600;
 }
+.admin-btn--primary:hover,
 .admin-btn--gold:hover {
-  background: var(--blue-deep);
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--accent-gold, #4f46e5);
+  border-color: var(--accent-gold, #4f46e5);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.12);
 }
 
 .admin-btn--green {
@@ -1315,9 +1317,29 @@ body.admin-body {
     padding: 1rem;
   }
 
-  .admin-variants-box {
-    padding: 0.75rem 0.5rem;
-  }
+/* --- Scrollable Staff Roster --- */
+.admin-staff-roster::-webkit-scrollbar {
+  width: 5px;
+}
+.admin-staff-roster::-webkit-scrollbar-track {
+  background: transparent;
+}
+/* --- Scrollable Table Wrapper --- */
+.admin-table-wrapper::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.admin-table-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+.admin-staff-roster::-webkit-scrollbar-thumb,
+.admin-table-wrapper::-webkit-scrollbar-thumb {
+  background: var(--border-hairline, rgba(0, 0, 0, 0.15));
+  border-radius: 9999px;
+}
+.admin-staff-roster::-webkit-scrollbar-thumb:hover,
+.admin-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-muted, #999);
 }
 
 

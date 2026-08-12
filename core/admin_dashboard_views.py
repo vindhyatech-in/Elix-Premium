@@ -1,6 +1,12 @@
+import calendar as calendar_module
 import secrets
 from datetime import datetime, timedelta
 from datetime import time as dt_time
+
+MONTH_NAMES = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+]
 
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
@@ -136,9 +142,32 @@ def _generate_temp_password(first_name):
 @owner_required
 def dashboard_overview(request):
     """
-    Main overview page for the owner/admin dashboard: KPI metrics,
-    order status breakdown, revenue calculation, and recent activity.
+    Combined Main Overview for Owner/Admin Dashboard:
+    KPI metrics, Order Lifecycle breakdown, Master Staff Schedule & Calendar,
+    1-click work assignment/reassignment, and Recent Orders.
     """
+    today_date = timezone.now().date()
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'assign_beautician':
+            booking_id = request.POST.get('booking_id')
+            beautician_id = request.POST.get('beautician_id')
+
+            booking = get_object_or_404_safe(Booking, booking_id)
+            if beautician_id and beautician_id.isdigit():
+                beautician = get_object_or_404_safe(Employee, beautician_id)
+                booking.assigned_beautician = beautician
+                booking.save(update_fields=['assigned_beautician'])
+                messages.success(request, f'Order #{booking.booking_number} assigned to {beautician.name}.')
+            else:
+                booking.assigned_beautician = None
+                booking.save(update_fields=['assigned_beautician'])
+                messages.success(request, f'Order #{booking.booking_number} set to Unassigned.')
+
+        return redirect(request.get_full_path())
+
     total_bookings = Booking.objects.count()
     completed_bookings = Booking.objects.filter(status='completed')
     total_revenue = completed_bookings.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
@@ -148,10 +177,6 @@ def dashboard_overview(request):
     completed_count = completed_bookings.count()
     cancelled_count = Booking.objects.filter(status='cancelled').count()
 
-    # Counts both models — before the Service/Package split (2026-08-08)
-    # this KPI counted every active catalog row regardless of kind, since
-    # both lived in one Service table; summing the two now preserves that
-    # same meaning instead of silently halving what "Active Services" means.
     active_services_count = Service.objects.filter(is_active=True).count() + Package.objects.filter(is_active=True).count()
     total_services_count = Service.objects.count() + Package.objects.count()
 
@@ -162,6 +187,114 @@ def dashboard_overview(request):
         Booking.objects.select_related('user', 'assigned_beautician')
         .prefetch_related('items')[:6]
     )
+
+    # Date navigation for calendar
+    selected_date_str = request.GET.get('date')
+    selected_date = parse_date(selected_date_str) if selected_date_str else today_date
+    if not selected_date:
+        selected_date = today_date
+
+    try:
+        year = int(request.GET.get('year', selected_date.year))
+        month = int(request.GET.get('month', selected_date.month))
+        if not 1 <= month <= 12:
+            raise ValueError
+    except ValueError:
+        year, month = selected_date.year, selected_date.month
+
+    # Build month grid
+    cal = calendar_module.Calendar(firstweekday=6)
+    month_dates = list(cal.itermonthdates(year, month))
+    range_start, range_end = month_dates[0], month_dates[-1]
+
+    # Fetch all employees
+    employees = Employee.objects.all().order_by('name')
+
+    # Fetch bookings in date range
+    bookings_qs = Booking.objects.filter(
+        scheduled_date__range=(range_start, range_end)
+    ).exclude(status='cancelled').select_related('assigned_beautician', 'user').prefetch_related('items')
+
+    # Group bookings by date
+    bookings_by_date = {}
+    for b in bookings_qs:
+        bookings_by_date.setdefault(b.scheduled_date, []).append(b)
+
+    # Fetch employee leaves in range
+    leaves_qs = EmployeeLeave.objects.filter(
+        start_date__lte=range_end, end_date__gte=range_start
+    ).select_related('employee')
+
+    leaves_by_date = {}
+    for leave in leaves_qs:
+        d = max(leave.start_date, range_start)
+        last = min(leave.end_date, range_end)
+        while d <= last:
+            leaves_by_date.setdefault(d, []).append(leave.employee_id)
+            d += timedelta(days=1)
+
+    # Build calendar weeks structure
+    weeks, week = [], []
+    for d in month_dates:
+        day_bookings = bookings_by_date.get(d, [])
+        unassigned_count = sum(1 for b in day_bookings if not b.assigned_beautician_id)
+        leave_emp_ids = set(leaves_by_date.get(d, []))
+        has_conflict = any(b.assigned_beautician_id in leave_emp_ids for b in day_bookings if b.assigned_beautician_id)
+
+        week.append({
+            'date': d,
+            'day': d.day,
+            'in_month': d.month == month,
+            'is_today': d == today_date,
+            'is_selected': d == selected_date,
+            'total_jobs': len(day_bookings),
+            'unassigned_jobs': unassigned_count,
+            'leave_count': len(leave_emp_ids),
+            'has_conflict': has_conflict,
+        })
+        if len(week) == 7:
+            weeks.append(week)
+            week = []
+
+    # Selected date breakdown for the daily roster
+    selected_day_bookings = bookings_by_date.get(selected_date, [])
+    selected_day_leaves = set(leaves_by_date.get(selected_date, []))
+
+    staff_roster = []
+    for emp in employees:
+        emp_jobs = [b for b in selected_day_bookings if b.assigned_beautician_id == emp.id]
+        is_on_leave = emp.id in selected_day_leaves
+
+        # Time slot conflict detection
+        slot_counts = {}
+        for b in emp_jobs:
+            slot = b.time_slot or 'flexible'
+            slot_counts[slot] = slot_counts.get(slot, 0) + 1
+
+        has_time_conflict = any(count > 1 for slot, count in slot_counts.items() if slot != 'flexible')
+        for b in emp_jobs:
+            b.has_slot_conflict = bool(b.time_slot and slot_counts.get(b.time_slot, 0) > 1)
+
+        busy_slots = [b.time_slot for b in emp_jobs if b.time_slot]
+
+        staff_roster.append({
+            'employee': emp,
+            'jobs': emp_jobs,
+            'is_on_leave': is_on_leave,
+            'is_busy': len(emp_jobs) > 0,
+            'has_conflict': (is_on_leave and len(emp_jobs) > 0) or has_time_conflict,
+            'has_leave_conflict': is_on_leave and len(emp_jobs) > 0,
+            'has_time_conflict': has_time_conflict,
+            'busy_slots': ','.join(busy_slots),
+        })
+
+    unassigned_day_jobs = [b for b in selected_day_bookings if not b.assigned_beautician_id]
+
+    prev_month, prev_year = (12, year - 1) if month == 1 else (month - 1, year)
+    next_month, next_year = (1, year + 1) if month == 12 else (month + 1, year)
+
+    today_bookings_count = len(bookings_by_date.get(today_date, []))
+    today_leaves_count = len(set(leaves_by_date.get(today_date, [])))
 
     context = {
         'page_title': 'Dashboard Overview',
@@ -177,6 +310,24 @@ def dashboard_overview(request):
         'active_staff_count': active_staff_count,
         'total_staff_count': total_staff_count,
         'recent_bookings': recent_bookings,
+        # Schedule & Calendar Context
+        'today_date': today_date,
+        'selected_date': selected_date,
+        'year': year,
+        'month': month,
+        'calendar_label': f'{MONTH_NAMES[month - 1]} {year}',
+        'calendar_prev': {'month': prev_month, 'year': prev_year},
+        'calendar_next': {'month': next_month, 'year': next_year},
+        'calendar_weeks': weeks,
+        'staff_roster': staff_roster,
+        'unassigned_day_jobs': unassigned_day_jobs,
+        'all_employees': employees,
+        'schedule_metrics': {
+            'active_staff': active_staff_count,
+            'today_jobs': today_bookings_count,
+            'today_leaves': today_leaves_count,
+            'unassigned_today': sum(1 for b in bookings_by_date.get(today_date, []) if not b.assigned_beautician_id),
+        }
     }
     return render(request, 'admin_dashboard/overview.html', context)
 
@@ -1049,3 +1200,11 @@ def dashboard_offers(request):
         'other_params': other_params,
     }
     return render(request, 'admin_dashboard/offers_list.html', context)
+
+
+@owner_required
+def dashboard_schedule(request):
+    """
+    Schedule & Calendar is now combined into the main Dashboard Overview.
+    """
+    return dashboard_overview(request)

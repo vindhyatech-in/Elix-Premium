@@ -1,0 +1,307 @@
+{% extends "admin_dashboard/layouts/admin_base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="admin-schedule-page">
+  <!-- KPI Metrics Grid -->
+  <div class="admin-kpi-grid" style="margin-bottom: 1.5rem;">
+    <div class="admin-kpi-card">
+      <div class="admin-kpi-card__head">
+        <span class="admin-kpi-card__label">Active Staff</span>
+        <span class="admin-kpi-card__icon" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">👩‍🎨</span>
+      </div>
+      <div class="admin-kpi-card__value">{{ metrics.active_staff }}</div>
+      <div class="admin-kpi-card__sub">Beauticians on team</div>
+    </div>
+
+    <div class="admin-kpi-card">
+      <div class="admin-kpi-card__head">
+        <span class="admin-kpi-card__label">Jobs Today</span>
+        <span class="admin-kpi-card__icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">📅</span>
+      </div>
+      <div class="admin-kpi-card__value">{{ metrics.today_jobs }}</div>
+      <div class="admin-kpi-card__sub">Scheduled for today</div>
+    </div>
+
+    <div class="admin-kpi-card">
+      <div class="admin-kpi-card__head">
+        <span class="admin-kpi-card__label">On Leave Today</span>
+        <span class="admin-kpi-card__icon" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">🏖️</span>
+      </div>
+      <div class="admin-kpi-card__value">{{ metrics.today_leaves }}</div>
+      <div class="admin-kpi-card__sub">Unavailable staff</div>
+    </div>
+
+    <div class="admin-kpi-card">
+      <div class="admin-kpi-card__head">
+        <span class="admin-kpi-card__label">Unassigned Today</span>
+        <span class="admin-kpi-card__icon" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">⚠️</span>
+      </div>
+      <div class="admin-kpi-card__value">{{ metrics.unassigned_today }}</div>
+      <div class="admin-kpi-card__sub">Pending beautician assignment</div>
+    </div>
+  </div>
+
+  <!-- Layout Grid: Left = Staff Daily Roster, Right = Month Calendar -->
+  <div class="admin-schedule-grid" style="display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem;">
+
+    <!-- Main Section: Selected Date Staff Roster & Work Assignment -->
+    <div class="admin-schedule-main">
+      <div class="admin-section-box">
+        <div class="admin-section-box__head" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem;">
+          <div>
+            <h2 class="admin-section-box__title" style="margin: 0;">
+              Daily Schedule — <span style="color: var(--accent-gold, #c9a227);">{{ selected_date|date:"l, M j, Y" }}</span>
+            </h2>
+            <p style="margin: 0.25rem 0 0; font-size: 0.85rem; color: var(--ink-muted);">
+              View beautician availability and assign incoming bookings.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <a href="?date={{ today_date|date:'Y-m-d' }}" class="admin-btn admin-btn--ghost admin-btn--sm">Today</a>
+          </div>
+        </div>
+
+        <!-- Unassigned Bookings Banner for Selected Date -->
+        {% if unassigned_day_jobs %}
+          <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md, 8px); padding: 0.9rem; margin-bottom: 1.25rem;">
+            <h4 style="margin: 0 0 0.5rem; font-size: 0.95rem; color: #f59e0b; display: flex; align-items: center; gap: 0.4rem;">
+              ⚠️ {{ unassigned_day_jobs|length }} Unassigned Booking{{ unassigned_day_jobs|pluralize }} on this date
+            </h4>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              {% for booking in unassigned_day_jobs %}
+                <div style="display: flex; align-items: center; justify-content: space-between; background: var(--surface-1); padding: 0.6rem 0.8rem; border-radius: var(--radius-md, 6px); flex-wrap: wrap; gap: 0.5rem; border: 1px solid var(--border-hairline);">
+                  <div>
+                    <strong style="color: var(--text-body);">#{{ booking.booking_number }}</strong> — <span style="color: var(--text-body);">{{ booking.user.email|default:"Guest" }}</span>
+                    <span style="color: var(--ink-muted); font-size: 0.85rem; margin-left: 0.5rem;">⏰ {{ booking.time_slot|default:"Flexible" }}</span>
+                    <span style="font-weight: 600; color: #10b981; margin-left: 0.5rem;">₹{{ booking.total_amount }}</span>
+                  </div>
+                  <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" onclick="openAssignModal('{{ booking.id }}', '{{ booking.booking_number }}', '', '{{ booking.time_slot }}')">
+                    + Assign Staff
+                  </button>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+
+        <!-- Staff Roster Table / Cards -->
+        <div class="admin-staff-roster" style="display: flex; flex-direction: column; gap: 1rem;">
+          {% for item in staff_roster %}
+            <div style="border: 1px solid var(--border-hairline); border-radius: var(--radius-lg, 10px); padding: 1rem; background: var(--surface-1);"
+                 data-emp-id="{{ item.employee.id }}"
+                 data-busy-slots="{{ item.busy_slots }}"
+                 data-on-leave="{% if item.is_on_leave %}true{% else %}false{% endif %}">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                  <span style="font-size: 1.3rem;">👩‍🎨</span>
+                  <div>
+                    <h3 style="margin: 0; font-size: 1rem; font-weight: 600; color: var(--text-body);">{{ item.employee.name }}</h3>
+                    <span style="font-size: 0.8rem; color: var(--ink-muted);">⭐ {{ item.employee.rating }} · {{ item.employee.specialties }}</span>
+                  </div>
+                </div>
+
+                <div>
+                  {% if item.has_leave_conflict %}
+                    <span style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
+                      ⚠️ Conflict: Assigned during Leave
+                    </span>
+                  {% elif item.has_time_conflict %}
+                    <span style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
+                      ⏰ Slot Overlap Conflict
+                    </span>
+                  {% elif item.is_on_leave %}
+                    <span style="background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.8rem; font-weight: 500;">
+                      🏖️ On Leave
+                    </span>
+                  {% elif item.is_busy %}
+                    <span style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.8rem; font-weight: 500;">
+                      🟢 {{ item.jobs|length }} Job{{ item.jobs|pluralize }} Scheduled
+                    </span>
+                  {% else %}
+                    <span style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.8rem; font-weight: 500;">
+                      ✨ Available
+                    </span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <!-- Employee's Assigned Jobs for Selected Date -->
+              {% if item.jobs %}
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
+                  {% for booking in item.jobs %}
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: var(--surface-2); padding: 0.6rem 0.8rem; border-radius: var(--radius-md, 6px); font-size: 0.88rem; border-top: 1px solid var(--border-hairline); border-right: 1px solid var(--border-hairline); border-bottom: 1px solid var(--border-hairline); border-left: 4px solid {% if booking.has_slot_conflict %}#ef4444{% else %}#10b981{% endif %};">
+                      <div style="color: var(--text-body);">
+                        <strong>#{{ booking.booking_number }}</strong> — {{ booking.user.email|default:"Guest" }}
+                        <span style="color: var(--ink-muted); margin-left: 0.5rem; font-weight: 500;">⏰ {{ booking.time_slot|default:"Flexible Slot" }}</span>
+                        {% if booking.has_slot_conflict %}
+                          <span style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239,68,68,0.4); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">⚠️ Time Overlap</span>
+                        {% endif %}
+                        <span style="margin-left: 0.5rem; font-size: 0.8rem; text-transform: uppercase;" class="admin-badge admin-badge--{{ booking.status }}">{{ booking.get_status_display }}</span>
+                      </div>
+                      <button type="button" class="admin-btn admin-btn--ghost admin-btn--xs" onclick="openAssignModal('{{ booking.id }}', '{{ booking.booking_number }}', '{{ item.employee.id }}', '{{ booking.time_slot }}')">
+                        Reassign
+                      </button>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p style="margin: 0; font-size: 0.85rem; color: var(--ink-muted); font-style: italic;">No jobs assigned on this date.</p>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar: Month Calendar Grid -->
+    <div class="admin-schedule-sidebar">
+      <div class="admin-section-box">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+          <h3 style="margin: 0; font-size: 1rem; color: var(--text-body);">{{ calendar_label }}</h3>
+          <div style="display: flex; gap: 0.25rem;">
+            <a href="?year={{ calendar_prev.year }}&month={{ calendar_prev.month }}&date={{ selected_date|date:'Y-m-d' }}" class="admin-btn admin-btn--ghost admin-btn--xs">‹</a>
+            <a href="?year={{ calendar_next.year }}&month={{ calendar_next.month }}&date={{ selected_date|date:'Y-m-d' }}" class="admin-btn admin-btn--ghost admin-btn--xs">›</a>
+          </div>
+        </div>
+
+        <!-- Month Grid Table -->
+        <table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.8rem;">
+          <thead>
+            <tr style="color: var(--ink-muted); border-bottom: 1px solid var(--border-hairline);">
+              <th style="padding: 0.4rem 0;">S</th>
+              <th style="padding: 0.4rem 0;">M</th>
+              <th style="padding: 0.4rem 0;">T</th>
+              <th style="padding: 0.4rem 0;">W</th>
+              <th style="padding: 0.4rem 0;">T</th>
+              <th style="padding: 0.4rem 0;">F</th>
+              <th style="padding: 0.4rem 0;">S</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for week in calendar_weeks %}
+              <tr>
+                {% for day in week %}
+                  <td style="padding: 0.2rem; height: 38px; vertical-align: top;">
+                    <a href="?date={{ day.date|date:'Y-m-d' }}&year={{ year }}&month={{ month }}"
+                       style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; text-decoration: none; border-radius: 6px; position: relative;
+                              {% if not day.in_month %}opacity: 0.3; color: var(--ink-muted);{% else %}color: var(--text-body);{% endif %}
+                              {% if day.is_selected %}background: rgba(79, 70, 229, 0.08); border: 2px solid var(--accent-gold, #4f46e5); color: var(--accent-gold, #4f46e5) !important; font-weight: bold;{% elif day.is_today %}border: 1px solid var(--border-hairline);{% endif %}">
+                      <span>{{ day.day }}</span>
+                      {% if day.total_jobs %}
+                        <span style="font-size: 0.65rem; padding: 0 4px; border-radius: 10px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 600;">
+                          {{ day.total_jobs }}
+                        </span>
+                      {% endif %}
+                      {% if day.has_conflict %}
+                        <span style="position: absolute; top: 2px; right: 2px; width: 6px; height: 6px; border-radius: 50%; background: #ef4444;"></span>
+                      {% endif %}
+                    </a>
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Assign/Reassign Modal -->
+<div id="assignModal" class="admin-modal-backdrop" style="display: none;">
+  <div class="admin-modal" style="max-width: 460px; background: var(--surface-2); border: 1px solid var(--border-hairline);">
+    <div class="admin-modal__header" style="display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-hairline);">
+      <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-body);">Assign Beautician</h3>
+      <button type="button" onclick="closeAssignModal()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-body);">✕</button>
+    </div>
+    <form method="post" action="">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="assign_beautician">
+      <input type="hidden" name="booking_id" id="modalBookingId">
+
+      <div class="admin-modal__body" style="padding: 1.25rem;">
+        <p style="margin: 0 0 1rem; font-size: 0.9rem; color: var(--ink-muted);">
+          Select a beautician for order <strong id="modalBookingNumber" style="color: var(--text-body);"></strong>
+          <span id="modalSlotIndicator" style="display: inline-block; margin-left: 0.4rem; padding: 2px 6px; border-radius: 4px; background: var(--surface-1); font-size: 0.8rem; color: var(--text-body);"></span>:
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 280px; overflow-y: auto;">
+          <label style="display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem; border: 1px solid var(--border-hairline); border-radius: var(--radius-md, 6px); cursor: pointer; color: var(--text-body); background: var(--surface-1);">
+            <input type="radio" name="beautician_id" value="" id="emp_radio_none">
+            <span>🚫 <em>Unassigned</em></span>
+          </label>
+
+          {% for emp in all_employees %}
+            <label style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem; border: 1px solid var(--border-hairline); border-radius: var(--radius-md, 6px); cursor: pointer; color: var(--text-body); background: var(--surface-1);"
+                   id="modal_emp_label_{{ emp.id }}">
+              <div style="display: flex; align-items: center; gap: 0.6rem;">
+                <input type="radio" name="beautician_id" value="{{ emp.id }}" id="emp_radio_{{ emp.id }}">
+                <div>
+                  <strong style="color: var(--text-body);">{{ emp.name }}</strong>
+                  <div style="font-size: 0.75rem; color: var(--ink-muted);">⭐ {{ emp.rating }} · {{ emp.specialties|truncatechars:25 }}</div>
+                </div>
+              </div>
+              <span style="font-size: 0.75rem;" id="modal_emp_status_{{ emp.id }}" class="admin-badge admin-badge--{{ emp.status }}">
+                {{ emp.get_status_display }}
+              </span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="admin-modal__foot" style="padding: 1rem 1.25rem; border-top: 1px solid var(--border-hairline); display: flex; justify-content: flex-end; gap: 0.5rem;">
+        <button type="button" class="admin-btn admin-btn--ghost" onclick="closeAssignModal()">Cancel</button>
+        <button type="submit" class="admin-btn admin-btn--primary">Save Assignment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openAssignModal(bookingId, bookingNum, currentEmpId, timeSlot) {
+  document.getElementById('modalBookingId').value = bookingId;
+  document.getElementById('modalBookingNumber').textContent = '#' + bookingNum;
+  document.getElementById('modalSlotIndicator').textContent = timeSlot ? '⏰ ' + timeSlot : 'Flexible Time';
+
+  var radios = document.querySelectorAll('input[name="beautician_id"]');
+  radios.forEach(function(r) { r.checked = false; });
+
+  if (currentEmpId) {
+    var selectedRadio = document.getElementById('emp_radio_' + currentEmpId);
+    if (selectedRadio) selectedRadio.checked = true;
+  } else {
+    document.getElementById('emp_radio_none').checked = true;
+  }
+
+  // Update staff availability badges in modal for the requested time slot
+  var staffCards = document.querySelectorAll('.admin-staff-roster [data-emp-id]');
+  staffCards.forEach(function(card) {
+    var empId = card.dataset.empId;
+    var busySlots = (card.dataset.busySlots || '').split(',');
+    var isOnLeave = card.dataset.onLeave === 'true';
+    var statusBadge = document.getElementById('modal_emp_status_' + empId);
+
+    if (statusBadge) {
+      if (isOnLeave) {
+        statusBadge.textContent = '🏖️ On Leave';
+        statusBadge.style.color = '#ef4444';
+      } else if (timeSlot && busySlots.includes(timeSlot)) {
+        statusBadge.textContent = '⚠️ Booked in ' + timeSlot;
+        statusBadge.style.color = '#f59e0b';
+      } else {
+        statusBadge.textContent = '🟢 Free';
+        statusBadge.style.color = '#10b981';
+      }
+    }
+  });
+
+  document.getElementById('assignModal').style.display = 'flex';
+}
+
+function closeAssignModal() {
+  document.getElementById('assignModal').style.display = 'none';
+}
+</script>
+{% endblock %}
