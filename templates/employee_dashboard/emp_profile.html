@@ -239,54 +239,6 @@
       </div>
     </div>
 
-    <div class="emp-profile-card">
-      <h3 class="emp-section-title">Mark Yourself On Leave</h3>
-      <p class="emp-section-hint">Block out future dates you won't be available for — this lets the owner know when assigning new jobs.</p>
-
-      <form method="post" action="" class="emp-form">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="request_leave">
-        <div class="emp-form-grid">
-          <div class="emp-field">
-            <label for="emp-leave-start">From</label>
-            <input type="date" id="emp-leave-start" name="start_date" min="{{ today_date|date:'Y-m-d' }}" required>
-          </div>
-          <div class="emp-field">
-            <label for="emp-leave-end">To</label>
-            <input type="date" id="emp-leave-end" name="end_date" min="{{ today_date|date:'Y-m-d' }}" required>
-          </div>
-        </div>
-        <p class="emp-leave-duration-preview" data-leave-duration-preview hidden></p>
-        <div class="emp-field">
-          <label for="emp-leave-reason">Reason (optional)</label>
-          <input type="text" id="emp-leave-reason" name="reason" placeholder="e.g. Family function">
-        </div>
-        <button type="submit" class="emp-btn emp-btn--progress emp-btn--sm">Request Leave</button>
-      </form>
-
-      {% if upcoming_leaves %}
-        <div class="emp-leave-list">
-          {% for leave in upcoming_leaves %}
-            <div class="emp-leave-item">
-              <div>
-                <div class="emp-leave-dates">
-                  {{ leave.start_date|date:"M j" }} – {{ leave.end_date|date:"M j, Y" }}
-                  <span class="emp-leave-duration">· {{ leave.duration_days }} day{{ leave.duration_days|pluralize }}</span>
-                </div>
-                {% if leave.reason %}<div class="emp-leave-reason">{{ leave.reason }}</div>{% endif %}
-              </div>
-              <form method="post" action="" class="emp-inline-form" data-confirm="Cancel this leave request?">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="cancel_leave">
-                <input type="hidden" name="leave_id" value="{{ leave.id }}">
-                <button type="submit" class="emp-btn emp-btn--ghost emp-btn--xs">Cancel</button>
-              </form>
-            </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="emp-section-hint">No upcoming leave scheduled.</p>
-      {% endif %}
     </div>
   </div>
 

@@ -499,6 +499,21 @@ body.emp-body {
   color: #ffffff;
 }
 
+.emp-btn--primary {
+  background: var(--gradient-primary, linear-gradient(135deg, #6366f1 0%, #4f46e5 100%));
+  color: #ffffff !important;
+  border: none;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+  font-weight: 700;
+}
+.emp-btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.45);
+}
+.emp-btn--primary:active {
+  transform: translateY(0);
+}
+
 .emp-btn--ghost {
   background: var(--surface-1);
   border: 1px solid var(--border-hairline);

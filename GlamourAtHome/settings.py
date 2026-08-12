@@ -161,6 +161,7 @@ TEMPLATES = [
                 # into every template so navbar/footer never hardcode it.
                 'core.context_processors.site_meta',
                 'core.context_processors.user_roles',
+                'core.context_processors.admin_sidebar_counts',
             ],
         },
     },

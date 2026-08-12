@@ -263,7 +263,7 @@ def dashboard_overview(request):
     staff_roster = []
     for emp in employees:
         emp_jobs = [b for b in selected_day_bookings if b.assigned_beautician_id == emp.id]
-        is_on_leave = emp.id in selected_day_leaves
+        is_on_leave = (emp.id in selected_day_leaves) or (emp.status != 'active')
 
         # Time slot conflict detection
         slot_counts = {}

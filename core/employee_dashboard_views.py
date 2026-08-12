@@ -3,6 +3,7 @@ import secrets
 from datetime import timedelta
 
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db.models import Count, Sum
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -144,12 +145,52 @@ def employee_dashboard(request):
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        if action == 'toggle_duty' and employee:
-            new_status = 'on_leave' if employee.status == 'active' else 'active'
-            employee.status = new_status
-            employee.save()
-            status_label = 'On Duty (Active)' if new_status == 'active' else 'Off Duty (On Leave)'
-            messages.success(request, f'Your status is now {status_label}.')
+        if action == 'add_leave' and employee:
+            leave_type = request.POST.get('leave_type', 'full_day')
+            start_date_str = request.POST.get('start_date')
+            end_date_str = request.POST.get('end_date') or start_date_str
+            start_time_str = request.POST.get('start_time')
+            end_time_str = request.POST.get('end_time')
+            reason = request.POST.get('reason', '').strip()
+
+            start_date = parse_date(start_date_str) if start_date_str else None
+            end_date = parse_date(end_date_str) if end_date_str else start_date
+
+            if not start_date:
+                messages.error(request, 'Please select a valid date for leave/break.')
+            elif end_date < start_date:
+                messages.error(request, 'End date cannot be earlier than start date.')
+            else:
+                start_time = None
+                end_time = None
+                if leave_type == 'short_break':
+                    if start_time_str:
+                        try:
+                            start_time = datetime.strptime(start_time_str, '%H:%M').time()
+                        except ValueError:
+                            pass
+                    if end_time_str:
+                        try:
+                            end_time = datetime.strptime(end_time_str, '%H:%M').time()
+                        except ValueError:
+                            pass
+
+                EmployeeLeave.objects.create(
+                    employee=employee,
+                    leave_type=leave_type,
+                    start_date=start_date,
+                    end_date=end_date,
+                    start_time=start_time,
+                    end_time=end_time,
+                    reason=reason,
+                )
+                messages.success(request, 'Leave / Break application recorded successfully.')
+
+        elif action == 'delete_leave' and employee:
+            leave_id = request.POST.get('leave_id')
+            leave = get_object_or_404_safe(EmployeeLeave, leave_id, employee=employee)
+            leave.delete()
+            messages.success(request, 'Leave / Break record removed.')
 
         elif action == 'update_booking_status' and employee:
             booking_id = request.POST.get('booking_id')
@@ -293,6 +334,13 @@ def employee_dashboard(request):
     prev_month, prev_year = (12, cal_year - 1) if cal_month == 1 else (cal_month - 1, cal_year)
     next_month, next_year = (1, cal_year + 1) if cal_month == 12 else (cal_month + 1, cal_year)
 
+    # Employee Leaves pagination (10 per page)
+    leaves_qs = EmployeeLeave.objects.filter(employee=employee).order_by('-start_date') if employee else EmployeeLeave.objects.none()
+    leaves_total_count = leaves_qs.count()
+    page_number = request.GET.get('page', 1)
+    leaves_paginator = Paginator(leaves_qs, 10)
+    employee_leaves_page = leaves_paginator.get_page(page_number)
+
     context = {
         'page_title': 'Beautician Dashboard',
         'employee': employee,
@@ -302,6 +350,8 @@ def employee_dashboard(request):
         'completed_count': completed_count,
         'total_earnings': total_earnings,
         'today_date': today_date,
+        'employee_leaves': employee_leaves_page,
+        'employee_leaves_total_count': leaves_total_count,
         'is_owner': is_owner(user),
         'all_employees': Employee.objects.all() if is_owner(user) else None,
         'calendar_weeks': _build_month_calendar(employee, cal_year, cal_month, today_date),

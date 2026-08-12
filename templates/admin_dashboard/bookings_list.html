@@ -138,7 +138,7 @@
                       <option value="">-- Unassigned --</option>
                       {% for emp in employees %}
                         <option value="{{ emp.id }}" {% if booking.assigned_beautician_id == emp.id %}selected{% endif %}>
-                          {{ emp.name }} ({% if emp.status == 'active' %}Available{% else %}{{ emp.get_status_display }}{% endif %}{% if emp.id in booking.conflicting_beautician_ids %} — ⚠ Time conflict{% endif %})
+                          {{ emp.name }} ({% if emp.status == 'active' %}🟢 Available{% elif emp.status == 'on_leave' %}🏖️ Off Duty{% else %}{{ emp.get_status_display }}{% endif %}{% if emp.id in booking.conflicting_beautician_ids %} — ⚠ Time conflict{% endif %})
                         </option>
                       {% endfor %}
                     </select>

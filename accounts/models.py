@@ -120,27 +120,34 @@ class Employee(models.Model):
 
 class EmployeeLeave(models.Model):
     """
-    A future date range an employee has marked themselves unavailable for,
-    self-declared from the employee dashboard (see
-    core/employee_dashboard_views.py). Effective immediately on save — no
-    approval workflow, matching this shop's single-owner-managed scale.
-    Surfaced on the owner's employees list (admin_dashboard) so bookings
-    aren't assigned to that employee during it; doesn't itself block
-    assignment, since that's a manual owner decision today.
+    A future date range or specific time slot an employee has marked themselves unavailable for.
+    Supports full-day absences as well as time-bounded intra-day breaks (e.g., lunch 1 PM - 2 PM).
     """
+    LEAVE_TYPE_CHOICES = [
+        ('full_day', 'Full Day Leave'),
+        ('short_break', 'Short Break / Time Slot'),
+        ('multi_day', 'Multi-Day Leave'),
+    ]
+
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='leaves')
+    leave_type = models.CharField(max_length=20, choices=LEAVE_TYPE_CHOICES, default='full_day')
     start_date = models.DateField()
     end_date = models.DateField()
+    start_time = models.TimeField(null=True, blank=True, help_text="Start time for short breaks (optional)")
+    end_time = models.TimeField(null=True, blank=True, help_text="End time for short breaks (optional)")
     reason = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['start_date']
+        ordering = ['start_date', 'start_time']
 
     def __str__(self):
+        if self.start_time and self.end_time:
+            return f'{self.employee.name}: {self.start_date} ({self.start_time.strftime("%H:%M")} - {self.end_time.strftime("%H:%M")})'
         return f'{self.employee.name}: {self.start_date} to {self.end_date}'
 
     @property
     def duration_days(self):
         return (self.end_date - self.start_date).days + 1
+
 

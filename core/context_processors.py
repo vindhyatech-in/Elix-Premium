@@ -61,3 +61,20 @@ def site_meta(request):
         'GOOGLE_MAPS_API_KEY': settings.GOOGLE_MAPS_API_KEY,
         'USE_GOOGLE_MAPS_FOR_ADDRESS': settings.USE_GOOGLE_MAPS_FOR_ADDRESS,
     }
+
+
+def admin_sidebar_counts(request):
+    """
+    Injects `unassigned_active_count` into templates rendered under `/dashboard/`
+    so the sidebar badge on Bookings shows the count of active unassigned tasks needing staff.
+    """
+    if request.path.startswith('/dashboard/'):
+        try:
+            from bookings.models import Booking
+            unassigned_active_count = Booking.objects.filter(
+                assigned_beautician__isnull=True
+            ).exclude(status__in=['completed', 'cancelled']).count()
+            return {'unassigned_active_count': unassigned_active_count}
+        except Exception:
+            return {'unassigned_active_count': 0}
+    return {}

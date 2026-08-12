@@ -120,10 +120,17 @@ body.admin-body {
   margin-left: auto;
   font-size: 0.72rem;
   font-weight: 700;
-  padding: 0.15rem 0.45rem;
+  padding: 0.15rem 0.5rem;
   border-radius: 9999px;
-  background: var(--accent-gold);
-  color: var(--ink);
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--accent-gold, #4f46e5);
+  border: 1px solid rgba(79, 70, 229, 0.25);
+}
+
+[data-theme='dark'] .admin-nav-count {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border-color: rgba(165, 180, 252, 0.3);
 }
 
 .admin-sidebar__footer {
