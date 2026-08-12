@@ -30,7 +30,7 @@
           <h1 class="emp-user-name">My Profile</h1>
           <div class="emp-user-meta">
             <span>{{ employee.name }}</span> ·
-            <a href="{% url 'employee_dashboard' %}">← Back to Dashboard</a>
+            <a href="{% url 'employee_dashboard' %}{% if request.GET.emp_id %}?emp_id={{ request.GET.emp_id }}{% endif %}">← Back to Dashboard</a>
           </div>
         </div>
       </div>
@@ -43,6 +43,17 @@
         <a href="{% url 'account_logout' %}" class="emp-btn emp-btn--ghost emp-btn--xs">Logout</a>
       </div>
     </header>
+
+    {% if all_employees %}
+      <div class="emp-preview-bar">
+        <span>Owner Mode: Previewing staff:</span>
+        <select onchange="location.href='?emp_id=' + this.value" class="emp-select emp-select--sm">
+          {% for emp in all_employees %}
+            <option value="{{ emp.id }}" {% if emp.id == employee.id %}selected{% endif %}>{{ emp.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
 
     {% if messages %}
       <div class="emp-messages">
@@ -57,7 +68,7 @@
       <p class="emp-section-hint">Shown to customers on the public "meet the team" section — separate from the face verification photos below, which are never shown publicly.</p>
       <div class="emp-profile-photo-row">
         <img src="{{ employee.display_photo_url }}" alt="{{ employee.name }}" class="emp-profile-photo-preview">
-        <form method="post" action="{% url 'employee_profile' %}" enctype="multipart/form-data" class="emp-form">
+        <form method="post" action="" enctype="multipart/form-data" class="emp-form">
           {% csrf_token %}
           <input type="hidden" name="action" value="update_profile_photo">
           <div class="emp-field">
@@ -78,7 +89,7 @@
         <div><small>Rating</small><span>⭐ {{ employee.rating }}</span></div>
       </div>
 
-      <form method="post" action="{% url 'employee_profile' %}" class="emp-form">
+      <form method="post" action="" class="emp-form">
         {% csrf_token %}
         <input type="hidden" name="action" value="update_profile">
         <div class="emp-form-grid">
@@ -227,7 +238,7 @@
       <h3 class="emp-section-title">Mark Yourself On Leave</h3>
       <p class="emp-section-hint">Block out future dates you won't be available for — this lets the owner know when assigning new jobs.</p>
 
-      <form method="post" action="{% url 'employee_profile' %}" class="emp-form">
+      <form method="post" action="" class="emp-form">
         {% csrf_token %}
         <input type="hidden" name="action" value="request_leave">
         <div class="emp-form-grid">
@@ -259,7 +270,7 @@
                 </div>
                 {% if leave.reason %}<div class="emp-leave-reason">{{ leave.reason }}</div>{% endif %}
               </div>
-              <form method="post" action="{% url 'employee_profile' %}" class="emp-inline-form" data-confirm="Cancel this leave request?">
+              <form method="post" action="" class="emp-inline-form" data-confirm="Cancel this leave request?">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="cancel_leave">
                 <input type="hidden" name="leave_id" value="{{ leave.id }}">
@@ -490,7 +501,7 @@
         formData.append('action', 'upload_face_photos');
         formData.append(activeFaceField, capturedBlob, activeFaceField + '.jpg');
 
-        fetch('{% url "employee_profile" %}', {
+        fetch(window.location.href, {
           method: 'POST',
           headers: { 'X-CSRFToken': getCsrfToken() },
           body: formData,

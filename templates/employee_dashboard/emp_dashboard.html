@@ -87,7 +87,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         <span>Completed</span>
       </button>
-      <a href="{% url 'employee_profile' %}" class="emp-tab emp-bottom-nav__item">
+      <a href="{% url 'employee_profile' %}{% if request.GET.emp_id %}?emp_id={{ request.GET.emp_id }}{% endif %}" class="emp-tab emp-bottom-nav__item">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span>Profile</span>
       </a>

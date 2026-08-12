@@ -421,7 +421,7 @@ def employee_profile_view(request):
             else:
                 messages.error(request, 'Invalid leave id.')
 
-        return redirect('employee_profile')
+        return redirect(request.get_full_path())
 
     upcoming_leaves = employee.leaves.filter(end_date__gte=today_date)
 
@@ -430,5 +430,6 @@ def employee_profile_view(request):
         'employee': employee,
         'today_date': today_date,
         'upcoming_leaves': upcoming_leaves,
+        'all_employees': Employee.objects.all() if is_owner(request.user) else None,
     }
     return render(request, 'employee_dashboard/emp_profile.html', context)
