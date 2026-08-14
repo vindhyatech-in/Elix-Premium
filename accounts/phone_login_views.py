@@ -37,7 +37,7 @@ def request_phone_login(request):
     API) — see accounts/messagecentral.py for the full explanation.
     """
     if request.user.is_authenticated:
-        return redirect('services_booking')
+        return redirect('index')
 
     if request.method == 'POST':
         form = PhoneLoginRequestForm(request.POST)
@@ -76,7 +76,7 @@ def confirm_phone_login(request):
     # already guards this the same way; this view just never had it.
     if request.user.is_authenticated:
         request.session.pop('phone_login', None)
-        return redirect('services_booking')
+        return redirect('index')
 
     state = request.session.get('phone_login')
     if not state:
@@ -131,7 +131,7 @@ def confirm_phone_login(request):
                 login(request, user, backend='django.contrib.auth.backends.ModelBackend')
                 next_url = state.get('next')
                 del request.session['phone_login']
-                return redirect(next_url or 'services_booking')
+                return redirect(next_url or 'index')
 
             state['attempts'] = state.get('attempts', 0) + 1
             request.session['phone_login'] = state

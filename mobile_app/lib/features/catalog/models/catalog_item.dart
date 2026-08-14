@@ -60,7 +60,7 @@ class IncludedService {
     required this.variants,
   });
 
-  String get photoUrl => photo.startsWith('http') ? photo : '${ApiConfig.baseUrl}$photo';
+  String get photoUrl => resolvePhotoUrl(photo);
 
   factory IncludedService.fromJson(Map<String, dynamic> json) => IncludedService(
         id: json['id'] as int,
@@ -121,7 +121,7 @@ class CatalogItem {
   });
 
   bool get isPackage => kind == 'package';
-  String get photoUrl => photo.startsWith('http') ? photo : '${ApiConfig.baseUrl}$photo';
+  String get photoUrl => resolvePhotoUrl(photo);
 
   factory CatalogItem.fromJson(Map<String, dynamic> json) => CatalogItem(
         id: json['id'] as String,

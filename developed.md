@@ -2781,3 +2781,26 @@ Enhanced employee leave & short break management on the Beautician Dashboard (`/
   - **Full-Day / Multi-Day Leaves**: Checks date range intersection (`start_date <= new_end AND end_date >= new_start`) against all existing leaves.
   - **Short Intra-Day Breaks**: Checks if a full-day leave already exists for that date, or if another `short_break` on the same date has an intersecting time window (`start_time < new_end AND end_time > new_start`). Multiple non-overlapping short breaks on the same day (e.g. 1 PM–2 PM and 3 PM–4 PM) are explicitly allowed.
 
+## Single Home Page Unification (added 2026-08-12)
+
+Unified the home navigation across desktop and mobile views so that the main marketing landing page (`/`, `views.index`) serves as the single Home page throughout the application:
+- **Bottom Navigation Bar (`templates/booking/components/bottom_nav.html`)**: Updated the "Home" navigation item to point to `{% url 'index' %}` (`/`).
+- **Header & App Navbar Logo (`templates/booking/components/app_navbar.html` & `templates/partials/navbar.html`)**: Updated the brand logo (`Elix`) link to point to `{% url 'index' %}` (`/`).
+- **Auth Shell & Navigation**: Updated the "Back to Elix" link in `templates/allauth/layouts/base.html`, login/logout redirects in `accounts/phone_login_views.py` and `templates/booking/components/profile_dropdown.html`, view-site links in `templates/admin_dashboard/layouts/admin_base.html`, and access-denied fallback redirects in `core/decorators.py` and `core/employee_dashboard_views.py` to point to `index` (`/`).
+- **Cleaned redundant button**: Removed the `.app-navbar__back` ("Back to Website") button from `templates/booking/components/app_navbar.html` since both the brand logo and the mobile Home button now navigate directly to the main site Home page (`/`).
+
+## Icon Buttons Soft Light Surface Styling (added 2026-08-12)
+
+Updated header and floating action icon buttons to use clean **Soft Light Surface** styling (`background: var(--surface-2)`, `border: 1px solid var(--border-hairline)`, and `color: var(--text-body)`):
+- **Header Avatar (`.app-navbar__avatar`)**: Replaced the solid purple/blue gradient fill with a clean white/surface background and crisp border.
+- **Header Action Icons (`.app-navbar__icon-btn`)**: Explicitly styled with `--surface-2` background and subtle shadow.
+- **Floating Chat FAB (`.chat-fab`) & Floating Cart Bubble (`.floating-cart__bubble`)**: Changed background from purple gradient to `--surface-2` white surface with hair-line outline border and dark icon contrast, matching header action icons.
+
+## Mobile Bottom Navigation & Profile Dropdown Fix (added 2026-08-13)
+
+- **Bottom Navigation Bar (`templates/booking/components/bottom_nav.html`)**: Replaced the "Bookings" tab with a "Services" tab (`{% url 'services_booking' %}`) featuring a 4-square grid icon.
+- **Profile Dropdown (`templates/booking/components/profile_dropdown.html`)**: Updated the "Bookings" menu item to "My Bookings" (`{% url 'bookings_dashboard' %}`), consolidating booking history management into the profile menu.
+- **Mobile Dropdown Trigger Fix (`static/css/booking.css` & `static/js/booking.js`)**: Fixed the CSS rule `.app-navbar__dropdown-panel.is-open` and updated mobile `#profile-panel` positioning (`bottom: calc(4.5rem + env(safe-area-inset-bottom))`, `z-index: 1000`, `opacity: 1`, `visibility: visible`) so tapping the Profile tab in the bottom nav smoothly pops up the profile panel directly above the bottom bar.
+- **Active Navigation Tracking (`static/js/booking.js`)**: Added `updateBottomNavActiveState()` to dynamically highlight the active bottom nav item (Home, Services, or Profile) based on the current URL path.
+- **Mobile Notifications Dropdown Overflow Fix (`static/css/booking.css` & `static/css/components.css`)**: Updated `#notifications-panel` on mobile (`position: fixed`, `top: 4.25rem`, `right: var(--space-sm)`, `width: min(22rem, calc(100vw - 2 * var(--space-sm)))`, `max-height: calc(80vh - 4rem)`) so the panel pops up directly under the header without spilling off the right edge of the screen. Fixed `.btn-icon:hover` and `.app-navbar__icon-btn:hover` to keep a light surface background (`var(--surface-2)` / `var(--surface-3)`) when clicked/hovered instead of turning dark navy.
+

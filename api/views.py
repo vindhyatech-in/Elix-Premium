@@ -13,11 +13,15 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.fields import IndianPhoneField
-from accounts.models import Address, Profile
+from accounts.models import Address, Employee, Profile
 from bookings.models import Booking, BookingItem
 from bookings.views import PAYMENT_METHOD_MAP, CartError, _resolve_cart_pricing
 from catalog.models import Category
 from core import booking_data
+from core.models import (
+    FAQ, GalleryBeforeAfter, Hero, HowItWorksStep, PromoBanner,
+    Testimonial, TrustBadge, TrustPoint,
+)
 
 from .auth import token_required
 from .models import AuthToken
@@ -75,6 +79,69 @@ def catalog_view(request):
 def offers_view(request):
     """Active coupon codes — GET /api/v1/offers/."""
     return JsonResponse({'status': 'success', 'offers': booking_data.get_booking_offers()})
+
+
+def home_view(request):
+    """GET /api/v1/home/ — the mobile app's landing-page equivalent, one
+    aggregated payload mirroring core/views.py::index()'s context
+    (marketing content, not the booking catalog — packages are served
+    by catalog_view above, kind='package', not duplicated here).
+    Public/anonymous, same as every other section it draws from."""
+    hero = Hero.objects.filter(is_active=True).first()
+    beauticians = Employee.objects.filter(status='active').order_by('sort_order', 'name')
+
+    return JsonResponse({
+        'status': 'success',
+        'hero': {
+            'eyebrow': hero.eyebrow,
+            'headline_lines': hero.headline_lines,
+            'subhead': hero.subhead,
+            'primary_cta_label': hero.primary_cta_label,
+            'primary_cta_href': hero.primary_cta_href,
+            'photo': hero.display_photo_url,
+        } if hero else None,
+        'promo_banners': [
+            {
+                'title': b.title,
+                'subtitle': b.subtitle,
+                'cta_label': b.cta_label,
+                'cta_href': b.cta_href,
+                'photo': b.display_photo_url,
+            }
+            for b in PromoBanner.objects.filter(is_active=True)
+        ],
+        'categories': booking_data.get_landing_categories(),
+        'how_it_works': list(HowItWorksStep.objects.values('step', 'title', 'body', 'icon')),
+        'before_after': [
+            {
+                'label': g.label,
+                'tone': g.tone,
+                'before_photo': g.display_before_photo_url,
+                'after_photo': g.display_after_photo_url,
+            }
+            for g in GalleryBeforeAfter.objects.all()
+        ],
+        'testimonials': list(Testimonial.objects.values('name', 'location', 'rating', 'quote', 'service')),
+        # Only public-safe fields — never phone/email/face_photo_* (job-
+        # verification photos), same boundary the web's own "meet the
+        # team" section already respects (see accounts/models.py::Employee).
+        'beauticians': [
+            {
+                'slug': e.slug,
+                'name': e.name,
+                'specialties': e.specialties,
+                'rating': float(e.rating),
+                'reviews': e.reviews,
+                'skills': e.skills,
+                'experience_years': e.experience_years,
+                'photo': e.display_photo_url,
+            }
+            for e in beauticians
+        ],
+        'trust_points': list(TrustPoint.objects.values('value', 'suffix', 'label', 'icon')),
+        'trust_badges': list(TrustBadge.objects.values('title', 'body')),
+        'faqs': list(FAQ.objects.values('question', 'answer')),
+    })
 
 
 @csrf_exempt

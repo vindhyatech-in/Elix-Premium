@@ -2,14 +2,20 @@ from django.contrib import admin
 
 from .models import (
     FAQ, BeautyTip, GalleryBeforeAfter, GalleryPortfolioItem,
-    Hero, HowItWorksStep, SiteNotification, Testimonial, TrendingSearch,
-    TrustBadge, TrustPoint, ValuePillar,
+    Hero, HowItWorksStep, PromoBanner, SiteNotification, Testimonial,
+    TrendingSearch, TrustBadge, TrustPoint, ValuePillar,
 )
 
 
 @admin.register(Hero)
 class HeroAdmin(admin.ModelAdmin):
     list_display = ('eyebrow', 'is_active')
+
+
+@admin.register(PromoBanner)
+class PromoBannerAdmin(admin.ModelAdmin):
+    list_display = ('title', 'is_active', 'sort_order')
+    list_editable = ('is_active', 'sort_order')
 
 
 @admin.register(ValuePillar)

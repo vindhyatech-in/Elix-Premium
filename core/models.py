@@ -66,6 +66,29 @@ class Hero(models.Model):
         return static(self.photo) if self.photo else static('images/hero-bg.jpg')
 
 
+class PromoBanner(SiteImageMixin, models.Model):
+    """Extra rotating hero slides shown after the singleton `Hero` row —
+    added for the Flutter app's home carousel (mirrors the reference
+    app's "salon info" banner followed by promo/offer banners): slide 1
+    is always `Hero`, these are slides 2+ ("any offer, any special
+    service"). Admin-managed the same way as every other marketing
+    model in this file — see core/admin.py — not wired into the web
+    templates, which still render `Hero` alone; nothing there needs to
+    change for this to exist."""
+    title = models.CharField(max_length=140)
+    subtitle = models.CharField(max_length=200, blank=True)
+    cta_label = models.CharField(max_length=60, blank=True)
+    cta_href = models.CharField(max_length=200, blank=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+
+    def __str__(self):
+        return self.title
+
+
 class ValuePillar(models.Model):
     """The "Why us" section's four pillars. `image` is a short key
     (e.g. 'verified') the template turns into a static path

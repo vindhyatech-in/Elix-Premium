@@ -375,6 +375,18 @@
   }
 
   function initDropdowns() {
+    // Booking pages load both main.js and booking.js (see
+    // booking_base.html), and both files carry this exact same dropdown
+    // system — marketing's navbar.html and booking's app_navbar.html
+    // both reuse the same data-dropdown/-trigger/-panel markup, so a
+    // per-element scope check can't tell the two apart either. Without
+    // this guard, a click double-fires (both scripts' listeners toggle
+    // the same panel in the same event), which opens then immediately
+    // closes it again — every dropdown trigger on booking pages,
+    // including the bottom nav's Profile button, silently does nothing.
+    if (window.__dropdownsInitialized) return;
+    window.__dropdownsInitialized = true;
+
     const panels = document.querySelectorAll('[data-dropdown-panel]');
     if (!panels.length) return;
 

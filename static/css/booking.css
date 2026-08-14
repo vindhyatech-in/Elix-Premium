@@ -133,8 +133,10 @@ body.booking-app {
 
 .app-navbar__icon-btn {
   position: relative;
+  background: var(--surface-2);
   color: var(--text-body);
-  border-color: var(--border-hairline);
+  border: 1px solid var(--border-hairline);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   transition: color var(--dur-sm) var(--ease-soft),
               border-color var(--dur-sm) var(--ease-soft),
               box-shadow var(--dur-sm) var(--ease-soft),
@@ -142,8 +144,8 @@ body.booking-app {
 }
 .app-navbar__icon-btn:hover {
   color: var(--accent-gold);
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(201, 161, 90, 0.15);
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
   transform: translateY(-1px);
 }
 
@@ -152,35 +154,36 @@ body.booking-app {
   top: 6px; right: 6px;
   width: 8px; height: 8px;
   border-radius: 50%;
-  background: var(--gold-deep);
+  background: var(--accent-gold);
   border: 2px solid var(--surface-2);
   /* Subtle pulse to attract attention */
   animation: badge-pulse 2.5s ease-in-out infinite;
 }
 @keyframes badge-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(169, 127, 55, 0.4); }
-  50% { box-shadow: 0 0 0 4px rgba(169, 127, 55, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); }
+  50% { box-shadow: 0 0 0 4px rgba(79, 70, 229, 0); }
 }
 @media (prefers-reduced-motion: reduce) { .app-navbar__badge-dot { animation: none; } }
 
 .app-navbar__avatar {
   width: 2.5rem; height: 2.5rem;
   border-radius: 50%;
-  background: var(--gradient-gold);
-  color: var(--ink);
+  background: var(--surface-2);
+  color: var(--text-body);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border: 2px solid transparent;
+  border: 1px solid var(--border-hairline);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   transition: border-color var(--dur-sm) var(--ease-soft),
               box-shadow var(--dur-sm) var(--ease-soft),
               transform var(--dur-sm) var(--ease-soft);
 }
 .app-navbar__avatar:hover {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(201, 161, 90, 0.2);
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
   transform: translateY(-1px);
 }
 
@@ -224,6 +227,7 @@ body.booking-app {
   position: absolute;
   top: calc(100% + 0.75rem);
   right: 0;
+  left: auto;
   min-width: 15rem;
   background: var(--surface-2);
   border: 1px solid var(--border-hairline);
@@ -237,12 +241,20 @@ body.booking-app {
   transition: opacity var(--dur-sm) var(--ease-soft), transform var(--dur-sm) var(--ease-soft), visibility var(--dur-sm);
 }
 
-.app-navbar__dropdown[data-dropdown].is-open .app-navbar__dropdown-panel,
-.app-navbar__dropdown[data-dropdown]:hover .app-navbar__dropdown-panel {
+.app-navbar__dropdown-panel.is-open,
+.app-navbar__dropdown[data-dropdown].is-open .app-navbar__dropdown-panel {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
 }
+/* Deliberately no `.app-navbar__dropdown:hover .app-navbar__dropdown-panel`
+   rule — booking.js/main.js's initDropdowns() already opens on
+   mouseenter via the .is-open class above (same visual effect), and a
+   pure-CSS :hover rule here would keep the panel visually open purely
+   because the mouse is still sitting on the icon right after a click,
+   even once JS removes .is-open to close it — clicking a second time
+   to close the dropdown would silently do nothing until the mouse
+   physically left the icon. */
 
 .app-navbar__dropdown-panel--wide { min-width: 20rem; }
 
@@ -535,18 +547,23 @@ body.booking-app {
   z-index: var(--z-fab);
   width: 3.25rem; height: 3.25rem;
   border-radius: 50%;
-  background: var(--gradient-gold);
-  color: var(--ink);
-  box-shadow: var(--shadow-gold);
+  background: var(--surface-2);
+  color: var(--text-body);
+  border: 1px solid var(--border-hairline);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  animation: chat-fab-pulse 2.8s ease-in-out infinite;
+  transition: transform var(--dur-sm) var(--ease-soft), border-color var(--dur-sm) var(--ease-soft);
+}
+.chat-fab:hover {
+  border-color: var(--accent-gold);
+  transform: scale(1.05);
 }
 
 @keyframes chat-fab-pulse {
-  0%, 100% { box-shadow: var(--shadow-gold); }
-  50% { box-shadow: 0 0 0 10px rgba(169, 127, 55, 0.12), var(--shadow-gold); }
+  0%, 100% { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); }
+  50% { box-shadow: 0 0 0 8px rgba(79, 70, 229, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08); }
 }
 
 @media (prefers-reduced-motion: reduce) { .chat-fab { animation: none; } }
@@ -1167,13 +1184,19 @@ body.booking-app {
 .floating-cart__bubble {
   width: 3.5rem; height: 3.5rem;
   border-radius: 50%;
-  background: var(--gradient-gold);
-  color: var(--ink);
-  box-shadow: var(--shadow-gold);
+  background: var(--surface-2);
+  color: var(--text-body);
+  border: 1px solid var(--border-hairline);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  transition: transform var(--dur-sm) var(--ease-soft), border-color var(--dur-sm) var(--ease-soft);
+}
+.floating-cart__bubble:hover {
+  border-color: var(--accent-gold);
+  transform: scale(1.05);
 }
 
 .floating-cart__count {
@@ -1386,8 +1409,32 @@ body.booking-app {
     position: fixed;
     top: auto;
     right: var(--space-md);
-    bottom: calc(8.5rem + env(safe-area-inset-bottom));
+    bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    z-index: var(--z-cart, 1000);
     transform: translateY(12px);
+  }
+  #profile-panel.is-open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+
+  #notifications-panel {
+    position: fixed;
+    top: 4.25rem;
+    right: var(--space-sm);
+    left: auto;
+    width: min(22rem, calc(100vw - 2 * var(--space-sm)));
+    min-width: 0;
+    max-height: calc(80vh - 4rem);
+    overflow-y: auto;
+    z-index: var(--z-app-dropdown, 1000);
+    transform: translateY(-8px);
+  }
+  #notifications-panel.is-open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
   }
   .app-navbar__back span { display: none; }
 

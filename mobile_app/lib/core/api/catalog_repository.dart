@@ -1,4 +1,5 @@
 import '../../features/catalog/models/catalog_item.dart';
+import '../../features/home/models/home_content.dart';
 import 'api_client.dart';
 
 class Offer {
@@ -37,5 +38,10 @@ class CatalogRepository {
   Future<List<Offer>> fetchOffers() async {
     final body = await _client.get('/api/v1/offers/');
     return ((body['offers'] as List?) ?? []).map((e) => Offer.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<HomeContent> fetchHome() async {
+    final body = await _client.get('/api/v1/home/');
+    return HomeContent.fromJson(body);
   }
 }

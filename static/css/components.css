@@ -78,7 +78,8 @@
   transition: background var(--dur-sm) var(--ease-soft), color var(--dur-sm) var(--ease-soft);
 }
 
-.btn-icon:hover { background: var(--ink); color: var(--cream); }
+.btn-icon:hover { background: var(--surface-3, #f1f5f9); color: var(--text-body); }
+[data-theme="dark"] .btn-icon:hover { background: #334155; color: #f8fafc; }
 
 /* --- Theme toggle --- */
 .theme-toggle__icon { display: none; width: 18px; height: 18px; }
@@ -263,12 +264,18 @@
   color: #f8fafc;
 }
 
-.app-navbar__dropdown[data-dropdown].is-open .app-navbar__dropdown-panel,
-.app-navbar__dropdown[data-dropdown]:hover .app-navbar__dropdown-panel {
+.app-navbar__dropdown[data-dropdown].is-open .app-navbar__dropdown-panel {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
 }
+/* Deliberately no `:hover` rule here — see the matching removal + full
+   explanation in booking.css. This file (components.css, via main.css)
+   loads on booking pages too (booking_base.html pulls in both main.css
+   and booking.css), so this exact same rule existing twice was why
+   fixing only booking.css's copy didn't actually resolve the bug — the
+   surviving copy here kept showing the panel via pure :hover regardless
+   of the JS-driven .is-open class. */
 
 .app-navbar__dropdown-panel--wide { min-width: 22rem; }
 

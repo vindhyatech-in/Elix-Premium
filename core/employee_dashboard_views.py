@@ -137,7 +137,7 @@ def employee_dashboard(request):
         # created) — the decorator above already lets them through
         # since group membership alone doesn't guarantee the link.
         messages.error(request, 'You do not have an assigned Beautician profile.')
-        return redirect('services_booking')
+        return redirect('index')
 
     today_date = timezone.now().date()
 
@@ -434,7 +434,7 @@ def employee_profile_view(request):
 
     if not employee:
         messages.error(request, 'You do not have an assigned Beautician profile.')
-        return redirect('services_booking')
+        return redirect('index')
 
     today_date = timezone.now().date()
 

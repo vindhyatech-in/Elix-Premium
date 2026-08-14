@@ -39,7 +39,7 @@ def owner_required(view_func):
             messages.error(request, "You don't have access to the owner dashboard.")
             return redirect('employee_dashboard')
         messages.error(request, "You don't have access to that page.")
-        return redirect('services_booking')
+        return redirect('index')
     return _wrapped
 
 
@@ -56,5 +56,5 @@ def owner_or_emp_required(view_func):
         if is_owner(request.user) or is_emp(request.user):
             return view_func(request, *args, **kwargs)
         messages.error(request, 'You do not have an assigned Beautician profile.')
-        return redirect('services_booking')
+        return redirect('index')
     return _wrapped

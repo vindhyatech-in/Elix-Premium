@@ -255,6 +255,13 @@
    * open "profile-panel") can point at the same panel.
    * ------------------------------------------------------- */
   function initDropdowns() {
+    // See the matching guard in main.js's initDropdowns() — both files
+    // are loaded together on booking pages and carry this exact same
+    // system, so without this, every click double-fires and cancels
+    // itself out (opens then immediately closes in the same event).
+    if (window.__dropdownsInitialized) return;
+    window.__dropdownsInitialized = true;
+
     const panels = document.querySelectorAll('[data-dropdown-panel]');
     if (!panels.length) return;
 
@@ -304,6 +311,17 @@
 
     document.addEventListener('click', () => closeAll());
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+  }
+
+  function updateBottomNavActiveState() {
+    const path = window.location.pathname;
+    const homeBtn = document.querySelector('[data-bottom-nav-home]');
+    const servicesBtn = document.querySelector('[data-bottom-nav-services]');
+    const profileBtn = document.querySelector('[data-bottom-nav-profile]');
+
+    if (homeBtn) homeBtn.classList.toggle('is-active', path === '/');
+    if (servicesBtn) servicesBtn.classList.toggle('is-active', path.startsWith('/booking/') && path !== '/booking/my-bookings/' && path !== '/booking/profile/');
+    if (profileBtn) profileBtn.classList.toggle('is-active', path === '/booking/profile/' || path === '/booking/my-bookings/');
   }
 
   /* ---------------------------------------------------------
@@ -870,8 +888,15 @@
       if (!card) return;
 
       const alreadyPeeking = card.classList.contains('is-peeking');
-      const onQuickViewBtn = !!e.target.closest('[data-quick-view]');
-      if (onQuickViewBtn && alreadyPeeking) return; // let this tap open the modal normally
+      // Two different escape hatches: [data-quick-view] opens the Quick
+      // View modal; .catalog-card__quickview is the "View Details" link
+      // to the full detail page. Both are hover-only (see booking.css)
+      // so touch needs a peek tap to reveal them first — without this
+      // check, a second tap directly on either one would just toggle
+      // peek state again instead of following through, since it's
+      // inside .catalog-card__media too.
+      const onRevealedLink = !!e.target.closest('[data-quick-view], .catalog-card__quickview');
+      if (onRevealedLink && alreadyPeeking) return; // let this tap act normally
 
       e.preventDefault();
       e.stopPropagation();
@@ -1291,6 +1316,7 @@
     initRipple();
     initSkeletonReveal();
     updateFilterBadge();
+    updateBottomNavActiveState();
   });
 
   window.onCustomerPackageVariantChange = function(selectEl) {
