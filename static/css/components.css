@@ -18,18 +18,17 @@
 }
 
 .btn--primary {
-  background: var(--surface-2);
-  color: var(--blue);
-  border: 1px solid rgba(79, 70, 229, 0.3);
-  box-shadow: var(--shadow-sm);
+  background: var(--blue);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
 }
 
 .btn--primary:hover {
   transform: translateY(-2px);
-  background: rgba(79, 70, 229, 0.08);
-  color: var(--blue);
-  border-color: var(--blue);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+  background: var(--blue-deep);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.45);
 }
 
 .btn--dark {

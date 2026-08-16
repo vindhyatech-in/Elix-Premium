@@ -274,26 +274,36 @@
       });
     }
 
-    document.querySelectorAll('[data-dropdown]').forEach((dropdown) => {
-      dropdown.addEventListener('mouseenter', () => {
-        const panel = dropdown.querySelector('[data-dropdown-panel]');
-        if (!panel) return;
-        closeAll(panel);
-        panel.classList.add('is-open');
-        dropdown.classList.add('is-open');
-        const trigger = dropdown.querySelector('[data-dropdown-trigger]');
-        if (trigger) trigger.setAttribute('aria-expanded', 'true');
-      });
+    // mouseenter/mouseleave open-on-hover only applies to fine-pointer
+    // (mouse/trackpad) devices. On touch, the browser synthesises a
+    // mouseenter *before* the click in the same tap sequence — the hover
+    // handler would add `is-open`, then the click handler reads
+    // `panel.classList.contains('is-open')` as true and sets willOpen=false,
+    // so every first tap silently closes the panel that just opened.
+    // Skipping hover entirely on touch means the click handler is the sole
+    // owner of open/close state on mobile — no race condition.
+    if (isFinePointer) {
+      document.querySelectorAll('[data-dropdown]').forEach((dropdown) => {
+        dropdown.addEventListener('mouseenter', () => {
+          const panel = dropdown.querySelector('[data-dropdown-panel]');
+          if (!panel) return;
+          closeAll(panel);
+          panel.classList.add('is-open');
+          dropdown.classList.add('is-open');
+          const trigger = dropdown.querySelector('[data-dropdown-trigger]');
+          if (trigger) trigger.setAttribute('aria-expanded', 'true');
+        });
 
-      dropdown.addEventListener('mouseleave', () => {
-        const panel = dropdown.querySelector('[data-dropdown-panel]');
-        if (!panel) return;
-        panel.classList.remove('is-open');
-        dropdown.classList.remove('is-open');
-        const trigger = dropdown.querySelector('[data-dropdown-trigger]');
-        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        dropdown.addEventListener('mouseleave', () => {
+          const panel = dropdown.querySelector('[data-dropdown-panel]');
+          if (!panel) return;
+          panel.classList.remove('is-open');
+          dropdown.classList.remove('is-open');
+          const trigger = dropdown.querySelector('[data-dropdown-trigger]');
+          if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        });
       });
-    });
+    }
 
     document.querySelectorAll('[data-dropdown-trigger]').forEach((trigger) => {
       trigger.addEventListener('click', (e) => {

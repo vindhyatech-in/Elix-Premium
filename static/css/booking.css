@@ -547,23 +547,24 @@ body.booking-app {
   z-index: var(--z-fab);
   width: 3.25rem; height: 3.25rem;
   border-radius: 50%;
-  background: var(--surface-2);
-  color: var(--text-body);
-  border: 1px solid var(--border-hairline);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  background: var(--blue);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform var(--dur-sm) var(--ease-soft), border-color var(--dur-sm) var(--ease-soft);
+  transition: transform var(--dur-sm) var(--ease-soft), background var(--dur-sm) var(--ease-soft), box-shadow var(--dur-sm) var(--ease-soft);
 }
 .chat-fab:hover {
-  border-color: var(--accent-gold);
+  background: var(--blue-deep);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.45);
   transform: scale(1.05);
 }
 
 @keyframes chat-fab-pulse {
-  0%, 100% { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08); }
-  50% { box-shadow: 0 0 0 8px rgba(79, 70, 229, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08); }
+  0%, 100% { box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35); }
+  50% { box-shadow: 0 0 0 10px rgba(79, 70, 229, 0.15), 0 4px 20px rgba(79, 70, 229, 0.45); }
 }
 
 @media (prefers-reduced-motion: reduce) { .chat-fab { animation: none; } }
@@ -1184,18 +1185,19 @@ body.booking-app {
 .floating-cart__bubble {
   width: 3.5rem; height: 3.5rem;
   border-radius: 50%;
-  background: var(--surface-2);
-  color: var(--text-body);
-  border: 1px solid var(--border-hairline);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  background: var(--blue);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  transition: transform var(--dur-sm) var(--ease-soft), border-color var(--dur-sm) var(--ease-soft);
+  transition: transform var(--dur-sm) var(--ease-soft), background var(--dur-sm) var(--ease-soft), box-shadow var(--dur-sm) var(--ease-soft);
 }
 .floating-cart__bubble:hover {
-  border-color: var(--accent-gold);
+  background: var(--blue-deep);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.45);
   transform: scale(1.05);
 }
 
@@ -1206,8 +1208,8 @@ body.booking-app {
   height: 1.35rem;
   padding-inline: 0.25rem;
   border-radius: var(--radius-pill);
-  background: var(--ink);
-  color: var(--cream);
+  background: #ffffff;
+  color: var(--blue);
   font-size: 0.7rem;
   font-weight: 700;
   display: inline-flex;
