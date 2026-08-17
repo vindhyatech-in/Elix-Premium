@@ -227,7 +227,14 @@ class Review(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='reviews')
     service = models.ForeignKey('catalog.Service', on_delete=models.CASCADE, null=True, blank=True, related_name='reviews')
     package = models.ForeignKey('catalog.Package', on_delete=models.CASCADE, null=True, blank=True, related_name='reviews')
-    rating = models.PositiveSmallIntegerField()
+    rating = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    beautician_rating = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

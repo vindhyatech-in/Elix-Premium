@@ -207,6 +207,26 @@ def sitemap_xml(request):
     urls = [
         {'loc': request.build_absolute_uri(reverse('index')), 'priority': '1.0', 'changefreq': 'weekly'},
         {'loc': request.build_absolute_uri(reverse('services_booking')), 'priority': '0.9', 'changefreq': 'daily'},
+        {'loc': request.build_absolute_uri(reverse('privacy_policy')), 'priority': '0.3', 'changefreq': 'monthly'},
+        {'loc': request.build_absolute_uri(reverse('terms_and_conditions')), 'priority': '0.3', 'changefreq': 'monthly'},
     ]
     xml = render_to_string('sitemap.xml', {'urls': urls})
     return HttpResponse(xml, content_type='application/xml')
+
+
+def privacy_policy(request):
+    """
+    Privacy Policy static page.
+    """
+    return render(request, 'core/privacy.html', {
+        'page_title': f"Privacy Policy — {settings.SITE_NAME}",
+    })
+
+
+def terms_and_conditions(request):
+    """
+    Terms & Conditions static page.
+    """
+    return render(request, 'core/terms.html', {
+        'page_title': f"Terms of Service — {settings.SITE_NAME}",
+    })

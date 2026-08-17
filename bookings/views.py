@@ -594,49 +594,85 @@ def booking_invoice_pdf(request, booking_number):
 @require_POST
 def submit_review(request, item_id):
     """
-    Rates one completed booking's service — an inline star click on the
-    bookings dashboard, submitted via fetch the instant it's clicked (see
-    static/js/bookings_dashboard.js), not a form with its own Submit
-    button. Updatable: clicking a different star re-rates rather than
-    erroring "already reviewed", matching how every star-rating widget
-    elsewhere behaves. `get_object_or_404(..., booking__user=...)` doubles
-    as the ownership check, same 404-not-403 pattern as cancel_booking
-    above.
+    Rates one completed booking's service or beautician — an inline star click
+    on the bookings dashboard, submitted via fetch the instant it's clicked (see
+    static/js/bookings_dashboard.js), not a form with its own Submit button.
+    Updatable: clicking a different star re-rates rather than erroring.
 
-    Recomputes the Service/Package's aggregate `rating`/`reviews_count`
-    from real Review rows on every submission, replacing whatever mock
-    values it was seeded with — see catalog/models.py.
+    Recomputes Service/Package/Employee aggregate `rating`/`reviews` from real
+    Review rows on every submission.
     """
     item = get_object_or_404(BookingItem, id=item_id, booking__user=request.user, booking__status='completed')
 
     if not item.service_variant and not item.package:
         return JsonResponse({'ok': False, 'error': 'This service is no longer available to rate.'}, status=400)
 
-    try:
-        rating = int(request.POST.get('rating', ''))
-    except ValueError:
-        rating = 0
-    if rating not in range(1, 6):
+    rating_raw = request.POST.get('rating')
+    beautician_rating_raw = request.POST.get('beautician_rating')
+
+    rating = None
+    if rating_raw is not None:
+        try:
+            val = int(rating_raw)
+            if val in range(1, 6):
+                rating = val
+        except (TypeError, ValueError):
+            pass
+
+    beautician_rating = None
+    if beautician_rating_raw is not None:
+        try:
+            val = int(beautician_rating_raw)
+            if val in range(1, 6):
+                beautician_rating = val
+        except (TypeError, ValueError):
+            pass
+
+    if rating is None and beautician_rating is None:
         return JsonResponse({'ok': False, 'error': 'Rating must be between 1 and 5 stars.'}, status=400)
 
     is_package = item.package_id is not None
     reviewed = item.package if is_package else item.service_variant.service
-    Review.objects.update_or_create(
+
+    review, _ = Review.objects.get_or_create(
         booking_item=item,
         defaults={
             'user': request.user,
             'package': reviewed if is_package else None,
             'service': None if is_package else reviewed,
-            'rating': rating,
         },
     )
 
-    agg = reviewed.reviews.aggregate(avg=Avg('rating'), count=Count('id'))
-    reviewed.rating = round(agg['avg'] or 0, 1)
-    reviewed.reviews_count = agg['count'] or 0
-    reviewed.save(update_fields=['rating', 'reviews_count'])
+    if rating is not None:
+        review.rating = rating
+    if beautician_rating is not None:
+        review.beautician_rating = beautician_rating
+    review.save()
 
-    return JsonResponse({'ok': True, 'rating': rating})
+    # Recompute Service / Package rating if service rating was provided
+    if rating is not None and reviewed:
+        agg = reviewed.reviews.filter(rating__isnull=False).aggregate(avg=Avg('rating'), count=Count('id'))
+        reviewed.rating = round(agg['avg'] or 0, 1)
+        reviewed.reviews_count = agg['count'] or 0
+        reviewed.save(update_fields=['rating', 'reviews_count'])
+
+    # Recompute Beautician (Employee) rating if beautician rating was provided
+    beautician = item.booking.assigned_beautician
+    if beautician_rating is not None and beautician:
+        b_agg = Review.objects.filter(
+            booking_item__booking__assigned_beautician=beautician,
+            beautician_rating__isnull=False
+        ).aggregate(avg=Avg('beautician_rating'), count=Count('id'))
+        if b_agg['count']:
+            beautician.rating = round(Decimal(str(b_agg['avg'])), 1)
+            beautician.reviews = b_agg['count']
+            beautician.save(update_fields=['rating', 'reviews'])
+
+    return JsonResponse({
+        'ok': True,
+        'rating': rating if rating is not None else beautician_rating,
+        'field': 'beautician_rating' if beautician_rating is not None else 'rating',
+    })
 
 
 @login_required

@@ -8,6 +8,8 @@ urlpatterns = [
     path('services/<slug:slug>/', views.service_detail, name='service_detail'),
     path('robots.txt', views.robots_txt, name='robots_txt'),
     path('sitemap.xml', views.sitemap_xml, name='sitemap_xml'),
+    path('privacy-policy/', views.privacy_policy, name='privacy_policy'),
+    path('terms-and-conditions/', views.terms_and_conditions, name='terms_and_conditions'),
     # Owner / Admin Dashboard
     path('dashboard/', admin_dashboard_views.dashboard_overview, name='admin_dashboard_overview'),
     path('dashboard/bookings/', admin_dashboard_views.dashboard_bookings, name='admin_dashboard_bookings'),

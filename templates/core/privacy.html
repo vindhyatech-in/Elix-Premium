@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<section class="legal-page section-padding" style="padding: 4rem 0; min-height: 80vh;">
+  <div class="container" style="max-width: 900px; margin: 0 auto; padding: 0 1.5rem;">
+    <div class="legal-page__header" style="margin-bottom: 2.5rem; text-align: center;">
+      <span class="badge" style="display: inline-block; padding: 0.35rem 0.85rem; background: rgba(212, 175, 55, 0.15); color: var(--gold-deep, #d4af37); border-radius: 50px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Legal & Transparency</span>
+      <h1 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; color: var(--text-body, #1a1a1a);">Privacy Policy</h1>
+      <p style="color: var(--ink-muted, #666); font-size: 0.95rem;">Last Updated: August 17, 2026 · Effective Immediately</p>
+    </div>
+
+    <!-- Client Placeholder Notice Banner -->
+    <div style="background: rgba(212, 175, 55, 0.08); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 2.5rem; display: flex; align-items: flex-start; gap: 1rem;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d4af37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 0.2rem;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div>
+        <strong style="color: var(--text-body, #1a1a1a); font-weight: 700; display: block; margin-bottom: 0.25rem;">Notice for Client & App Reviewers</strong>
+        <p style="margin: 0; font-size: 0.9rem; color: var(--ink-muted, #666); line-height: 1.5;">This document outlines the privacy compliance architecture and data handling practices for Elix Premium Salon. Final custom legal text or localized statutory disclaimers may be provided by the client prior to final deployment.</p>
+      </div>
+    </div>
+
+    <div class="legal-page__content" style="background: var(--surface-2, #fff); border: 1px solid var(--border-hairline, rgba(0,0,0,0.08)); border-radius: 16px; padding: 2.5rem 2rem; display: flex; flex-direction: column; gap: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">1. Information We Collect</h2>
+        <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-body, #333);">To deliver luxury at-home beauty treatments, Elix Premium Salon collects specific personal and operational information:</p>
+        <ul style="margin-top: 0.75rem; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.93rem; color: var(--text-body, #444); line-height: 1.6;">
+          <li><strong>Personal Identifiers:</strong> Name, phone number, email address, and profile preferences when creating an account.</li>
+          <li><strong>Location & Address Details:</strong> Street address, landmark, building number, and precise GPS location required to dispatch certified beauticians to your doorstep.</li>
+          <li><strong>Booking & Service History:</strong> Selected services, packages, time slot preferences, beautician ratings, and feedback.</li>
+          <li><strong>Payment Data:</strong> Payment transaction metadata, Razorpay payment reference IDs, and payment method choices (Credit/Debit Card, UPI, NetBanking, COD). We do not store raw card numbers or CVVs on our servers.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">2. How We Use Your Information</h2>
+        <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-body, #333);">Your data is utilized strictly to provide a seamless, secure, and personalized salon experience:</p>
+        <ul style="margin-top: 0.75rem; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.93rem; color: var(--text-body, #444); line-height: 1.6;">
+          <li>Scheduling and dispatching verified female beauticians to your requested location.</li>
+          <li>Generating OTP verification codes for secure service commencement.</li>
+          <li>Processing payments, invoice generation, and managing loyalty reward points.</li>
+          <li>Communicating appointment updates, reschedule confirmations, and customer support assistance via SMS, WhatsApp, and email.</li>
+          <li>Continuous quality improvement of our catalog and beautician assignment algorithms.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">3. Data Sharing & Disclosure</h2>
+        <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-body, #333);">We respect your privacy and never sell or rent your personal data. Limited sharing occurs only under strict operational protocols:</p>
+        <ul style="margin-top: 0.75rem; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.93rem; color: var(--text-body, #444); line-height: 1.6;">
+          <li><strong>Assigned Beauticians:</strong> Your name, phone number, and service address are shared exclusively with the assigned professional for service execution.</li>
+          <li><strong>Payment Partners:</strong> Financial transactions are processed via PCI-DSS compliant payment gateways (Razorpay).</li>
+          <li><strong>Legal Obligations:</strong> We may disclose information if required by law, regulation, court order, or governmental request to safeguard user safety.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">4. Data Security & Retention</h2>
+        <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-body, #333);">We implement industry-standard administrative, technical, and physical security measures, including HTTPS encryption, secure database access tokens, and regular vulnerability audits. Personal data is retained only as long as necessary to fulfill service commitments or comply with tax and statutory regulations.</p>
+      </section>
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">5. Your Rights & Choices</h2>
+        <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-body, #333);">You maintain full control over your personal information:</p>
+        <ul style="margin-top: 0.75rem; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.93rem; color: var(--text-body, #444); line-height: 1.6;">
+          <li>Access, review, or update your account profile and saved addresses anytime via the My Profile dashboard.</li>
+          <li>Request account deactivation or deletion by contacting support.</li>
+          <li>Opt out of promotional communications at any time.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">6. Contact & Grievance Redressal</h2>
+        <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-body, #333);">For any privacy queries, feedback, or data requests, please reach out to our team:</p>
+        <div style="margin-top: 0.75rem; padding: 1rem 1.25rem; background: var(--surface-1, #f9f9f9); border-radius: 8px; font-size: 0.9rem; color: var(--text-body, #333);">
+          <p style="margin: 0 0 0.35rem;"><strong>Email:</strong> <a href="mailto:{{ SITE.email }}" style="color: var(--gold-deep, #d4af37);">{{ SITE.email }}</a></p>
+          <p style="margin: 0 0 0.35rem;"><strong>Phone:</strong> <a href="tel:{{ SITE.phone }}" style="color: var(--gold-deep, #d4af37);">{{ SITE.phone }}</a></p>
+          <p style="margin: 0;"><strong>Address:</strong> {{ SITE.address }}</p>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -53,7 +53,7 @@
 
     <div class="footer-bottom">
       <span>&copy; {% now "Y" %} {{ SITE.name }}. All rights reserved.</span>
-      <span><a href="#">Privacy Policy</a> · <a href="#">Terms of Service</a></span>
+      <span><a href="{% url 'privacy_policy' %}">Privacy Policy</a> · <a href="{% url 'terms_and_conditions' %}">Terms of Service</a></span>
     </div>
   </div>
 </footer>

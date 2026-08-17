@@ -176,6 +176,29 @@
                     </div>
                   {% endfor %}
 
+                  {% if booking.assigned_beautician %}
+                    <div class="booking-card__review-row booking-card__review-row--beautician" style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed rgba(255,255,255,0.15);">
+                      <span class="booking-card__review-service">
+                        Rate Beautician (<strong>{{ booking.assigned_beautician.name }}</strong>)
+                      </span>
+                      {% with first_item=booking.items.first %}
+                        {% if first_item %}
+                          <div
+                            class="booking-card__star-picker"
+                            data-star-picker
+                            data-rating="{{ first_item.review.beautician_rating|default:0 }}"
+                            data-review-url="{% url 'submit_review' first_item.id %}"
+                            data-rating-field="beautician_rating"
+                          >
+                            {% for n in "12345" %}
+                              <button type="button" class="booking-card__star" data-star-value="{{ n }}" aria-label="Rate beautician {{ n }} star{{ n|pluralize }}">★</button>
+                            {% endfor %}
+                          </div>
+                        {% endif %}
+                      {% endwith %}
+                    </div>
+                  {% endif %}
+
                   <div class="booking-card__feedback" data-feedback-block data-feedback-url="{% url 'submit_booking_feedback' booking.booking_number %}">
                     <div class="field">
                       <label for="feedback-{{ booking.id }}">Overall feedback (optional)</label>

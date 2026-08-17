@@ -169,10 +169,11 @@
       const previousRating = Number(picker.dataset.rating || 0);
       paintStars(picker, rating);
 
+      const fieldName = picker.dataset.ratingField || 'rating';
       fetch(picker.dataset.reviewUrl, {
         method: 'POST',
         headers: { 'X-CSRFToken': getCsrfToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `rating=${rating}`,
+        body: `${encodeURIComponent(fieldName)}=${encodeURIComponent(rating)}`,
       })
         .then((resp) => resp.json())
         .then((data) => {

@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<section class="legal-page section-padding" style="padding: 4rem 0; min-height: 80vh;">
+  <div class="container" style="max-width: 900px; margin: 0 auto; padding: 0 1.5rem;">
+    <div class="legal-page__header" style="margin-bottom: 2.5rem; text-align: center;">
+      <span class="badge" style="display: inline-block; padding: 0.35rem 0.85rem; background: rgba(212, 175, 55, 0.15); color: var(--gold-deep, #d4af37); border-radius: 50px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">Legal Terms</span>
+      <h1 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; color: var(--text-body, #1a1a1a);">Terms of Service</h1>
+      <p style="color: var(--ink-muted, #666); font-size: 0.95rem;">Last Updated: August 17, 2026 · Effective Immediately</p>
+    </div>
+
+    <!-- Client Placeholder Notice Banner -->
+    <div style="background: rgba(212, 175, 55, 0.08); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 2.5rem; display: flex; align-items: flex-start; gap: 1rem;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d4af37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 0.2rem;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div>
+        <strong style="color: var(--text-body, #1a1a1a); font-weight: 700; display: block; margin-bottom: 0.25rem;">Notice for Client & App Reviewers</strong>
+        <p style="margin: 0; font-size: 0.9rem; color: var(--ink-muted, #666); line-height: 1.5;">This document outlines the standard Terms of Service framework governing bookings, service fulfillment, cancellations, and user conduct. Final custom terms to be provided by client prior to production release.</p>
+      </div>
+    </div>
+
+    <div class="legal-page__content" style="background: var(--surface-2, #fff); border: 1px solid var(--border-hairline, rgba(0,0,0,0.08)); border-radius: 16px; padding: 2.5rem 2rem; display: flex; flex-direction: column; gap: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">1. Acceptance of Terms</h2>
+        <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-body, #333);">By accessing or using Elix Premium Salon's web app or booking services, you agree to be bound by these Terms of Service and our Privacy Policy. If you do not agree to these terms, please do not use our services.</p>
+      </section>
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">2. Service Description & Home Preparation</h2>
+        <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-body, #333);">Elix Premium Salon provides luxury, doorstep beauty, skincare, hair, and spa services delivered by certified female professionals. To ensure a smooth experience:</p>
+        <ul style="margin-top: 0.75rem; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.93rem; color: var(--text-body, #444); line-height: 1.6;">
+          <li>Customers must provide a clean, safe, well-lit space with access to clean water and power sockets for beauty tools.</li>
+          <li>Services are offered exclusively for female clients at residential or office premises.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">3. Bookings, Rescheduling & Cancellations</h2>
+        <ul style="margin-top: 0.75rem; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.93rem; color: var(--text-body, #444); line-height: 1.6;">
+          <li><strong>Advance & Express Slots:</strong> Appointments can be booked in advance or via Express 50-minute urgent delivery subject to beautician availability.</li>
+          <li><strong>Rescheduling:</strong> Customers can reschedule upcoming bookings up to 50 minutes prior to the scheduled time via the My Bookings dashboard.</li>
+          <li><strong>Cancellation Policy:</strong> Free cancellation is available up to 2 hours before the scheduled time slot. Cancellations requested after beautician dispatch may incur a nominal convenience fee.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">4. Pricing, Coupon Offers & Payments</h2>
+        <ul style="margin-top: 0.75rem; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.93rem; color: var(--text-body, #444); line-height: 1.6;">
+          <li>All prices displayed on the catalog are inclusive of applicable taxes and single-use hygiene kits unless stated otherwise.</li>
+          <li>Valid promotional coupon codes may be applied during checkout. Discounts are non-transferable and subject to offer expiry dates.</li>
+          <li>Payments can be made online via Razorpay (UPI, Credit/Debit Card, NetBanking) or via Cash on Delivery (COD) upon service completion.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">5. Beautician Safety & Code of Conduct</h2>
+        <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-body, #333);">We maintain zero tolerance for harassment, misbehavior, or inappropriate conduct toward our beauty professionals. Customers agree to treat beauticians with dignity and respect. Elix reserves the right to immediately terminate services and report policy violations to law enforcement.</p>
+      </section>
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">6. Ratings & Reviews</h2>
+        <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-body, #333);">Customers may submit ratings and reviews for services and assigned beauticians upon service completion. Reviews must reflect genuine experiences and remain free of abusive or defamatory language.</p>
+      </section>
+
+      <section>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-body, #1a1a1a); margin-bottom: 0.75rem; border-bottom: 2px solid var(--gold-light, #f4e8c1); padding-bottom: 0.4rem;">7. Contact Information</h2>
+        <p style="font-size: 0.95rem; line-height: 1.7; color: var(--text-body, #333);">If you have questions regarding these Terms of Service, please contact us:</p>
+        <div style="margin-top: 0.75rem; padding: 1rem 1.25rem; background: var(--surface-1, #f9f9f9); border-radius: 8px; font-size: 0.9rem; color: var(--text-body, #333);">
+          <p style="margin: 0 0 0.35rem;"><strong>Email:</strong> <a href="mailto:{{ SITE.email }}" style="color: var(--gold-deep, #d4af37);">{{ SITE.email }}</a></p>
+          <p style="margin: 0 0 0.35rem;"><strong>Phone:</strong> <a href="tel:{{ SITE.phone }}" style="color: var(--gold-deep, #d4af37);">{{ SITE.phone }}</a></p>
+          <p style="margin: 0;"><strong>Address:</strong> {{ SITE.address }}</p>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+{% endblock %}
