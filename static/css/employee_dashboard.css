@@ -639,6 +639,44 @@ body.emp-body {
   margin: 0;
 }
 
+.emp-camera-score-badge {
+  margin: 0.5rem 0 0.25rem 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.25s ease;
+}
+
+.emp-camera-score-badge--loading {
+  background: rgba(71, 85, 105, 0.1);
+  color: #475569;
+  border: 1px solid rgba(71, 85, 105, 0.2);
+}
+
+.emp-camera-score-badge--matched {
+  background: rgba(46, 204, 113, 0.12);
+  color: #27ae60;
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.emp-camera-score-badge--mismatch {
+  background: rgba(231, 76, 60, 0.12);
+  color: #c0392b;
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.emp-camera-score-badge--noface {
+  background: rgba(241, 196, 15, 0.15);
+  color: #d35400;
+  border: 1px solid rgba(241, 196, 15, 0.35);
+}
+
 .emp-camera-modal__actions {
   display: flex;
   align-items: center;

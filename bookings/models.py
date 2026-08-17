@@ -99,6 +99,14 @@ class Booking(models.Model):
     # gate that lets the employee move past "On The Way" is the OTP below,
     # not this photo.
     verification_photo = models.ImageField(upload_to='job_verification/%Y/%m/', max_length=255, null=True, blank=True)
+    FACE_MATCH_CHOICES = [
+        ('pending', 'Pending'),
+        ('matched', 'Matched'),
+        ('mismatch', 'Mismatch'),
+        ('no_face_detected', 'No Face Detected'),
+    ]
+    face_match_status = models.CharField(max_length=20, choices=FACE_MATCH_CHOICES, default='pending')
+    face_confidence_score = models.FloatField(null=True, blank=True, help_text="ML face match confidence score percentage (0-100%)")
 
     # OTP the customer reads out to the employee to confirm they're ready
     # to start — shown on the customer's own /booking/my-bookings/ page
@@ -113,6 +121,19 @@ class Booking(models.Model):
     # wrong guesses (see employee_dashboard_views.py::verify_start_otp),
     # reset to 0 whenever a fresh code is generated.
     otp_failed_attempts = models.PositiveSmallIntegerField(default=0)
+
+    def reset_face_verification(self):
+        """
+        Resets arrival verification photo, face match status, and OTP verification
+        state if a booking is reset, rescheduled, or reassigned to a new beautician.
+        """
+        self.verification_photo = None
+        self.face_match_status = 'pending'
+        self.face_confidence_score = None
+        self.start_otp = ''
+        self.otp_generated_at = None
+        self.otp_verified_at = None
+        self.otp_failed_attempts = 0
 
     # One overall write-up for the whole order — separate from each
     # BookingItem's own star `Review` (see Review model below). A

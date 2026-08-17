@@ -423,6 +423,7 @@
       <video id="empCameraVideo" class="emp-camera-modal__video" autoplay playsinline muted></video>
       <canvas id="empCameraCanvas" class="emp-camera-modal__canvas" hidden></canvas>
       <img id="empCameraPreview" class="emp-camera-modal__preview" hidden alt="Captured arrival photo">
+      <div id="empCameraScoreBadge" class="emp-camera-score-badge" hidden></div>
 
       <p class="emp-camera-modal__error" data-camera-error hidden></p>
 
@@ -666,9 +667,10 @@
       var modal = document.getElementById('empCameraModal');
       if (!modal) return;
 
-      var video = document.getElementById('empCameraVideo');
-      var canvas = document.getElementById('empCameraCanvas');
-      var preview = document.getElementById('empCameraPreview');
+      var video = modal.querySelector('#empCameraVideo');
+      var canvas = modal.querySelector('#empCameraCanvas');
+      var preview = modal.querySelector('#empCameraPreview');
+      var scoreBadge = modal.querySelector('#empCameraScoreBadge');
       var errorEl = modal.querySelector('[data-camera-error]');
       var titleEl = modal.querySelector('[data-camera-title]');
       var captureBtn = modal.querySelector('[data-camera-capture]');
@@ -692,7 +694,14 @@
         captureBtn.hidden = false;
         retakeBtn.hidden = true;
         saveBtn.hidden = true;
+        saveBtn.disabled = false;
+        saveBtn.textContent = '✔ Use This Photo';
         errorEl.hidden = true;
+        if (scoreBadge) {
+          scoreBadge.hidden = true;
+          scoreBadge.className = 'emp-camera-score-badge';
+          scoreBadge.innerHTML = '';
+        }
       }
 
       function stopStream() {
@@ -715,6 +724,13 @@
         stopStream();
         modal.hidden = true;
         activeBookingId = null;
+        saveBtn.disabled = false;
+        saveBtn.textContent = '✔ Use This Photo';
+        if (scoreBadge) {
+          scoreBadge.hidden = true;
+          scoreBadge.className = 'emp-camera-score-badge';
+          scoreBadge.innerHTML = '';
+        }
       }
 
       document.addEventListener('click', function (e) {
@@ -748,8 +764,55 @@
           preview.hidden = false;
           captureBtn.hidden = true;
           retakeBtn.hidden = false;
-          saveBtn.hidden = false;
+          saveBtn.hidden = true;
           stopStream();
+
+          // Instant score verification preview
+          if (scoreBadge && activeBookingId) {
+            scoreBadge.className = 'emp-camera-score-badge emp-camera-score-badge--loading';
+            scoreBadge.innerHTML = '⏳ Analyzing face match score…';
+            scoreBadge.hidden = false;
+
+            var fd = new FormData();
+            fd.append('action', 'preview_verification');
+            fd.append('booking_id', activeBookingId);
+            fd.append('verification_photo', capturedBlob, 'preview.jpg');
+
+            fetch('{% url "employee_dashboard" %}', {
+              method: 'POST',
+              headers: { 'X-CSRFToken': getCsrfToken() },
+              body: fd,
+            })
+              .then(function (res) { return res.json(); })
+              .then(function (data) {
+                if (data.status === 'success') {
+                  if (data.is_match) {
+                    scoreBadge.className = 'emp-camera-score-badge emp-camera-score-badge--matched';
+                    scoreBadge.innerHTML = '✨ ' + data.confidence + '% Match — Identity Verified!';
+                    saveBtn.hidden = false;
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '✔ Use This Photo';
+                  } else if (data.match_status === 'no_face_detected') {
+                    scoreBadge.className = 'emp-camera-score-badge emp-camera-score-badge--noface';
+                    scoreBadge.innerHTML = '⚠️ No Face Detected (Position face clearly & tap Retake)';
+                    saveBtn.hidden = true;
+                  } else {
+                    scoreBadge.className = 'emp-camera-score-badge emp-camera-score-badge--mismatch';
+                    scoreBadge.innerHTML = '❌ ' + data.confidence + '% Match — Mismatch! Tap Retake';
+                    saveBtn.hidden = true;
+                  }
+                } else {
+                  scoreBadge.hidden = true;
+                  saveBtn.hidden = false;
+                }
+              })
+              .catch(function () {
+                scoreBadge.hidden = true;
+                saveBtn.hidden = false;
+              });
+          } else {
+            saveBtn.hidden = false;
+          }
         }, 'image/jpeg', 0.9);
       });
 
@@ -766,7 +829,7 @@
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving…';
         var GF = window.GlamourFeedback;
-        if (GF) GF.showLoading('Uploading photo…');
+        if (GF) GF.showLoading('Verifying face photo…');
 
         var formData = new FormData();
         formData.append('action', 'upload_verification');
@@ -778,15 +841,21 @@
           headers: { 'X-CSRFToken': getCsrfToken() },
           body: formData,
         })
-          .then(function (resp) { return resp.text(); })
+          .then(function (resp) {
+            if (!resp.ok) {
+              throw new Error('Server returned HTTP ' + resp.status);
+            }
+            return resp.text();
+          })
           .then(function (html) {
-            if (GF) GF.showSuccess('Photo uploaded', '', 2500);
+            if (GF) GF.hideLoading();
             closeModal();
             applyDashboardHtml(html);
           })
-          .catch(function () {
+          .catch(function (err) {
+            console.error('Camera upload error:', err);
             if (GF) GF.showError('Upload failed', 'Check your connection and try again.');
-            else showError('Upload failed — check your connection and try again.');
+            showError('Upload failed — check your connection and try again.');
             saveBtn.disabled = false;
             saveBtn.textContent = '✔ Use This Photo';
           });

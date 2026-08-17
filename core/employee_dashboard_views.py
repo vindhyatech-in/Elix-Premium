@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Count, Sum
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -288,6 +289,25 @@ def employee_dashboard(request):
                 booking.save()
                 messages.success(request, f'Order #{booking.booking_number} marked On The Way.')
 
+        elif action == 'preview_verification' and employee:
+            booking_id = request.POST.get('booking_id')
+            booking = get_object_or_404_safe(Booking, booking_id, assigned_beautician=employee)
+            photo = request.FILES.get('verification_photo')
+            upload_error = validate_image_upload(photo) if photo else None
+
+            if not photo or upload_error:
+                return JsonResponse({'status': 'error', 'message': upload_error or 'No photo captured.'}, status=400)
+
+            from core.face_verify import verify_beautician_selfie
+            verify_result = verify_beautician_selfie(employee, photo)
+            return JsonResponse({
+                'status': 'success',
+                'is_match': verify_result['is_match'],
+                'confidence': verify_result['confidence'],
+                'match_status': verify_result['status'],
+                'message': verify_result['message'],
+            })
+
         elif action == 'upload_verification' and employee:
             booking_id = request.POST.get('booking_id')
             booking = get_object_or_404_safe(Booking, booking_id, assigned_beautician=employee)
@@ -302,17 +322,40 @@ def employee_dashboard(request):
             elif upload_error:
                 messages.error(request, upload_error)
             else:
+                from core.face_verify import verify_beautician_selfie
+                verify_result = verify_beautician_selfie(employee, photo)
+
                 booking.verification_photo = photo
-                booking.start_otp = _generate_otp()
-                booking.otp_generated_at = timezone.now()
-                booking.otp_verified_at = None
-                booking.otp_failed_attempts = 0
-                booking.save()
-                messages.success(
-                    request,
-                    f'Arrival photo saved for #{booking.booking_number}. Ask the customer for the code '
-                    f'shown on their Bookings page, then enter it below to start the job.',
-                )
+                booking.face_match_status = verify_result['status']
+                booking.face_confidence_score = verify_result['confidence']
+
+                if verify_result['is_match']:
+                    booking.start_otp = _generate_otp()
+                    booking.otp_generated_at = timezone.now()
+                    booking.otp_verified_at = None
+                    booking.otp_failed_attempts = 0
+                    booking.save()
+                    messages.success(
+                        request,
+                        f'✨ Arrival selfie verified ({verify_result["confidence"]}% match)! '
+                        f'Ask customer for the code shown on their Bookings page to start.',
+                    )
+                else:
+                    # BLOCK PROCEEDING: Clear OTP and force retake
+                    booking.start_otp = ''
+                    booking.otp_generated_at = None
+                    booking.otp_verified_at = None
+                    booking.save()
+                    if verify_result['status'] == 'no_face_detected':
+                        messages.error(
+                            request,
+                            '❌ Face detection failed. No clear face was found in the photo. Please retake photo with your face clearly visible.',
+                        )
+                    else:
+                        messages.error(
+                            request,
+                            f'⚠️ Face verification failed ({verify_result["confidence"]}% match). Photo does not match registered beautician profile. Please retake photo.',
+                        )
 
         elif action == 'regenerate_otp' and employee:
             booking_id = request.POST.get('booking_id')
@@ -339,6 +382,8 @@ def employee_dashboard(request):
 
             if booking.status != 'on_the_way':
                 messages.error(request, 'This job is not in the "On The Way" stage.')
+            elif booking.face_match_status != 'matched':
+                messages.error(request, 'Face verification has not passed yet. Please take a clear arrival selfie to proceed.')
             elif not booking.start_otp or not booking.otp_generated_at:
                 messages.error(request, 'No code has been generated yet — save an arrival photo first.')
             elif timezone.now() > booking.otp_generated_at + OTP_VALIDITY:
@@ -474,10 +519,48 @@ def employee_profile_view(request):
             elif upload_error:
                 messages.error(request, upload_error)
             else:
-                for name in uploaded:
-                    setattr(employee, name, request.FILES[name])
-                employee.save()
-                messages.success(request, 'Face photo saved.')
+                from core.face_verify import extract_face_embedding, compare_face_embeddings
+
+                # Determine master front embedding
+                front_file = request.FILES.get('face_photo_front') or employee.face_photo_front
+                front_emb = extract_face_embedding(front_file) if front_file else None
+
+                # Verify each uploaded angle photo against master front photo
+                mismatch_err = None
+                if front_emb:
+                    for name in uploaded:
+                        if name == 'face_photo_front':
+                            continue
+                        f = request.FILES[name]
+                        if hasattr(f, 'seek'):
+                            f.seek(0)
+                        angle_emb = extract_face_embedding(f)
+                        if angle_emb:
+                            comp = compare_face_embeddings(front_emb, angle_emb)
+                            if not comp['is_match']:
+                                label = name.replace('face_photo_', '').capitalize()
+                                mismatch_err = f"The {label} photo does not match your Front reference photo (different person detected). All reference photos must be of the same beautician."
+                                break
+
+                if mismatch_err:
+                    messages.error(request, mismatch_err)
+                else:
+                    for name in uploaded:
+                        f = request.FILES[name]
+                        if hasattr(f, 'seek'):
+                            f.seek(0)
+                        setattr(employee, name, f)
+
+                    if front_emb:
+                        employee.face_embedding = front_emb
+
+                    for name in uploaded:
+                        f = getattr(employee, name)
+                        if hasattr(f, 'seek'):
+                            f.seek(0)
+
+                    employee.save()
+                    messages.success(request, 'Face photo reference & ML embedding saved.')
 
         elif action == 'update_profile':
             phone = request.POST.get('phone', '').strip()[:20]

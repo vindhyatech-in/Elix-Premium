@@ -381,6 +381,8 @@
         captureBtn.hidden = false;
         retakeBtn.hidden = true;
         saveBtn.hidden = true;
+        saveBtn.disabled = false;
+        saveBtn.textContent = '✔ Use This Photo';
         errorEl.hidden = true;
       }
 
@@ -404,6 +406,8 @@
         stopStream();
         modal.hidden = true;
         activeFaceField = null;
+        saveBtn.disabled = false;
+        saveBtn.textContent = '✔ Use This Photo';
       }
 
       document.addEventListener('click', function (e) {
@@ -438,6 +442,8 @@
           captureBtn.hidden = true;
           retakeBtn.hidden = false;
           saveBtn.hidden = false;
+          saveBtn.disabled = false;
+          saveBtn.textContent = '✔ Use This Photo';
           stopStream();
         }, 'image/jpeg', 0.9);
       });
@@ -466,14 +472,18 @@
           headers: { 'X-CSRFToken': getCsrfToken() },
           body: formData,
         })
-          .then(function () {
+          .then(function (resp) {
+            if (!resp.ok) {
+              throw new Error('Server returned status ' + resp.status);
+            }
             if (GF) GF.showSuccess('Photo saved', '', 2000);
             closeModal();
             window.location.reload();
           })
-          .catch(function () {
+          .catch(function (err) {
+            console.error('Photo save error:', err);
             if (GF) GF.showError('Upload failed', 'Check your connection and try again.');
-            else showError('Upload failed — check your connection and try again.');
+            showError('Upload failed — check your connection and try again.');
             saveBtn.disabled = false;
             saveBtn.textContent = '✔ Use This Photo';
           });

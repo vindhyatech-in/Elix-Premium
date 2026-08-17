@@ -92,20 +92,56 @@
         >📷 Take Arrival Photo</button>
       {% else %}
         <div class="emp-otp-block">
-          <p class="emp-otp-hint">Photo saved. Ask the customer for the code on their Bookings page:</p>
-          <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form emp-otp-form">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="verify_start_otp">
-            <input type="hidden" name="booking_id" value="{{ booking.id }}">
-            <input type="text" name="otp" inputmode="numeric" maxlength="6" placeholder="6-digit code" required class="emp-otp-input">
-            <button type="submit" class="emp-btn emp-btn--complete">✅ Start Job</button>
-          </form>
-          <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form emp-otp-regenerate">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="regenerate_otp">
-            <input type="hidden" name="booking_id" value="{{ booking.id }}">
-            <button type="submit" class="emp-btn emp-btn--ghost emp-btn--xs">🔄 Get New Code</button>
-          </form>
+          <!-- Live Arrival Selfie Preview -->
+          <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem; padding:0.5rem 0.75rem; background:var(--emp-bg-secondary, #f8fafc); border-radius:8px; border:1px solid var(--emp-border-color, #e2e8f0);">
+            <img src="{{ booking.verification_photo.url }}" alt="Arrival Selfie" style="width:52px; height:52px; border-radius:8px; object-fit:cover; border:2px solid var(--emp-border-color, #cbd5e1); flex-shrink:0;">
+            <div style="flex:1;">
+              {% if booking.face_match_status == 'matched' %}
+                <div style="background:rgba(34,197,94,0.15); color:#16a34a; padding:0.2rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:600; display:inline-flex; align-items:center; gap:0.3rem; margin-bottom:0.2rem;">
+                  <span>✨ ML Face Verified</span>
+                  <span>({{ booking.face_confidence_score }}% match)</span>
+                </div>
+                <div style="font-size:0.75rem; color:var(--emp-text-muted, #64748b);">Verified arrival selfie</div>
+              {% elif booking.face_match_status == 'no_face_detected' %}
+                <div style="background:rgba(239,68,68,0.15); color:#dc2626; padding:0.2rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:600; display:inline-flex; align-items:center; gap:0.3rem; margin-bottom:0.2rem;">
+                  <span>❓ No Face Detected</span>
+                </div>
+                <div style="font-size:0.75rem; color:#dc2626; font-weight:500;">No face found. Please retake photo.</div>
+              {% else %}
+                <div style="background:rgba(239,68,68,0.15); color:#dc2626; padding:0.2rem 0.5rem; border-radius:4px; font-size:0.75rem; font-weight:600; display:inline-flex; align-items:center; gap:0.3rem; margin-bottom:0.2rem;">
+                  <span>⚠️ Face Mismatch</span>
+                  <span>({{ booking.face_confidence_score }}% match)</span>
+                </div>
+                <div style="font-size:0.75rem; color:#dc2626; font-weight:500;">Face does not match profile. Retake photo.</div>
+              {% endif %}
+            </div>
+          </div>
+
+          {% if booking.face_match_status == 'matched' %}
+            <p class="emp-otp-hint">Photo verified. Ask the customer for the code on their Bookings page:</p>
+            <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form emp-otp-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="verify_start_otp">
+              <input type="hidden" name="booking_id" value="{{ booking.id }}">
+              <input type="text" name="otp" inputmode="numeric" maxlength="6" placeholder="6-digit code" required class="emp-otp-input">
+              <button type="submit" class="emp-btn emp-btn--complete">✅ Start Job</button>
+            </form>
+            <form method="post" action="{% url 'employee_dashboard' %}" class="emp-inline-form emp-otp-regenerate" style="margin-top:0.4rem;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="regenerate_otp">
+              <input type="hidden" name="booking_id" value="{{ booking.id }}">
+              <button type="submit" class="emp-btn emp-btn--ghost emp-btn--xs">🔄 Get New Code</button>
+            </form>
+          {% else %}
+            <button
+              type="button"
+              class="emp-btn emp-btn--progress"
+              data-open-camera
+              data-camera-mode="verification"
+              data-booking-id="{{ booking.id }}"
+              data-booking-number="{{ booking.booking_number }}"
+            >📸 Retake Arrival Photo</button>
+          {% endif %}
         </div>
       {% endif %}
 

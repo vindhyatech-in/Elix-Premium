@@ -90,6 +90,9 @@ class Employee(models.Model):
     face_photo_top = models.ImageField(upload_to='employee_faces/%Y/%m/', max_length=255, null=True, blank=True, help_text="Chin down, eyes looking up toward the camera")
     face_photo_bottom = models.ImageField(upload_to='employee_faces/%Y/%m/', max_length=255, null=True, blank=True, help_text="Chin up, eyes looking down toward the camera")
 
+    # 128-d ML face embedding vector for automated 1:1 face verification
+    face_embedding = models.JSONField(null=True, blank=True, help_text="Pre-calculated 128-d ML face embedding vector for 1:1 facial verification")
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

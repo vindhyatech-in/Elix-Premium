@@ -383,6 +383,8 @@ def dashboard_bookings(request):
                 messages.error(request, f'Mark #{booking.booking_number} as Paid before completing it.')
             else:
                 if new_status in dict(Booking.STATUS_CHOICES):
+                    if new_status in ['upcoming', 'on_the_way'] and booking.status in ['in_progress', 'completed', 'cancelled']:
+                        booking.reset_face_verification()
                     booking.status = new_status
                 if new_payment in dict(Booking.PAYMENT_STATUS_CHOICES):
                     booking.payment_status = new_payment
@@ -393,10 +395,13 @@ def dashboard_bookings(request):
             beautician_id = request.POST.get('beautician_id')
             if beautician_id:
                 beautician = get_object_or_404_safe(Employee, beautician_id)
+                if booking.assigned_beautician != beautician:
+                    booking.reset_face_verification()
                 booking.assigned_beautician = beautician
                 messages.success(request, f'Assigned {beautician.name} to Order #{booking.booking_number}.')
             else:
                 booking.assigned_beautician = None
+                booking.reset_face_verification()
                 messages.info(request, f'Unassigned beautician from Order #{booking.booking_number}.')
             booking.save()
 
