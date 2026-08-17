@@ -43,6 +43,14 @@
                 </td>
                 <td>
                   <div class="admin-btn-group">
+                    <button
+                      type="button"
+                      class="admin-btn admin-btn--ghost admin-btn--xs"
+                      onclick="openEditOfferModal('{{ offer.id }}', '{{ offer.code|escapejs }}', '{{ offer.title|escapejs }}', '{{ offer.discount_pct }}', '{{ offer.description|escapejs }}')"
+                    >
+                      Edit
+                    </button>
+
                     <form method="post" action="{% url 'admin_dashboard_offers' %}" class="admin-inline-form" onsubmit="event.preventDefault(); adminConfirm('{% if offer.is_active %}Deactivate{% else %}Activate{% endif %} offer &quot;{{ offer.code|escapejs }}&quot;?').then(ok => { if (ok) this.submit(); }); return false;">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="toggle_offer">
@@ -111,4 +119,57 @@
       </form>
     </div>
   </div>
+
+  <!-- Edit Offer Modal -->
+  <div id="editOfferModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal">
+      <div class="admin-modal__head">
+        <h2>Edit Offer</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('editOfferModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{% url 'admin_dashboard_offers' %}" class="admin-modal__body">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit_offer">
+        <input type="hidden" name="offer_id" id="editOfferId">
+
+        <div class="admin-form-group">
+          <label>Coupon Code *</label>
+          <input type="text" name="code" id="editOfferCode" required class="admin-input" maxlength="20" style="text-transform: uppercase;">
+        </div>
+
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Title *</label>
+            <input type="text" name="title" id="editOfferTitle" required class="admin-input">
+          </div>
+          <div class="admin-form-group">
+            <label>Discount (%) *</label>
+            <input type="number" name="discount_pct" id="editOfferDiscount" required min="1" max="100" step="1" class="admin-input">
+          </div>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Description</label>
+          <textarea name="description" id="editOfferDescription" class="admin-textarea" rows="2"></textarea>
+        </div>
+
+        <button type="submit" class="admin-btn admin-btn--primary">Save Changes</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_body %}
+  <script>
+    function openEditOfferModal(id, code, title, discountPct, description) {
+      document.getElementById('editOfferId').value = id;
+      document.getElementById('editOfferCode').value = code;
+      document.getElementById('editOfferTitle').value = title;
+      document.getElementById('editOfferDiscount').value = discountPct;
+      document.getElementById('editOfferDescription').value = description;
+
+      document.getElementById('editOfferModal').style.display = 'flex';
+    }
+  </script>
 {% endblock %}

@@ -6,6 +6,7 @@ urlpatterns = [
     path('categories/', views.get_categories, name='api_categories'),
     path('catalog/', views.catalog_view, name='api_catalog'),
     path('offers/', views.offers_view, name='api_offers'),
+    path('validate-coupon/', views.validate_coupon_view, name='api_validate_coupon'),
     path('home/', views.home_view, name='api_home'),
 
     path('auth/login/', views.auth_login, name='api_auth_login'),

@@ -1172,6 +1172,39 @@ def dashboard_offers(request):
                 Offer.objects.create(code=code, title=title, description=description, discount_pct=discount_pct)
                 messages.success(request, f'Offer "{code}" created.')
 
+        elif action == 'edit_offer':
+            offer_id = request.POST.get('offer_id')
+            offer = get_object_or_404_safe(Offer, offer_id)
+
+            code = request.POST.get('code', '').strip().upper()[:20]
+            title = request.POST.get('title', '').strip()[:140]
+            description = request.POST.get('description', '').strip()
+            discount_raw = request.POST.get('discount_pct', '')
+
+            error = None
+            if not code or not title:
+                error = 'Code and title are required.'
+            elif Offer.objects.filter(code=code).exclude(pk=offer.pk).exists():
+                error = f'Another offer with code "{code}" already exists.'
+            else:
+                try:
+                    discount_pct = int(discount_raw)
+                except (TypeError, ValueError):
+                    discount_pct = None
+                    error = 'Discount must be a whole number.'
+                if discount_pct is not None and not (1 <= discount_pct <= 100):
+                    error = 'Discount must be between 1 and 100.'
+
+            if error:
+                messages.error(request, error)
+            else:
+                offer.code = code
+                offer.title = title
+                offer.description = description
+                offer.discount_pct = discount_pct
+                offer.save()
+                messages.success(request, f'Offer "{code}" updated.')
+
         elif action == 'toggle_offer':
             offer_id = request.POST.get('offer_id')
             offer = get_object_or_404_safe(Offer, offer_id)

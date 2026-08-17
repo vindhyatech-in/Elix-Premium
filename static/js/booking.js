@@ -19,10 +19,15 @@
 
   const CART_KEY = 'glamour_cart';
   const RECENT_SEARCH_KEY = 'glamour_recent_searches';
-  const COUPONS = { GLAM10: 0.10, WEEKDAY15: 0.15, BUNDLE20: 0.20 };
+
+  function getCsrfToken() {
+    const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+    return match ? match[1] : '';
+  }
 
   let currentSearchQuery = '';
   let appliedCoupon = null; // module-level so booking_drawer.js's summary total can match the mini-cart's
+  let appliedDiscountPct = 0;
   // Set by initQuickView() once it runs; initFloatingCart()'s Add to Cart
   // handler calls openQuickViewItem() directly for multi-variant items
   // rather than simulating a click on the card's [data-quick-view] button
@@ -1021,7 +1026,7 @@
       emptyEl.hidden = cart.length > 0;
       itemsEl.hidden = cart.length === 0;
 
-      const discountRate = appliedCoupon ? COUPONS[appliedCoupon] : 0;
+      const discountRate = (appliedCoupon && appliedDiscountPct > 0) ? (appliedDiscountPct / 100) : 0;
       const discount = Math.round(subtotal * discountRate);
       const total = subtotal - discount;
       const loyaltyPoints = Math.floor(total / 100);
@@ -1109,16 +1114,33 @@
       if (rem) removeItem(rem.dataset.cartRemove);
     });
 
-    document.querySelector('[data-coupon-apply]')?.addEventListener('click', () => {
+    document.querySelector('[data-coupon-apply]')?.addEventListener('click', async () => {
       const code = (couponInput.value || '').trim().toUpperCase();
       if (!code) return;
-      if (COUPONS[code]) {
-        appliedCoupon = code;
-        couponStatus.textContent = `${code} applied — ${Math.round(COUPONS[code] * 100)}% off`;
-        showToast('Coupon applied');
-      } else {
+      try {
+        const res = await fetch('/api/v1/validate-coupon/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+          },
+          body: JSON.stringify({ code }),
+        });
+        const data = await res.json();
+        if (data.valid) {
+          appliedCoupon = data.code;
+          appliedDiscountPct = data.discount_pct;
+          couponStatus.textContent = `${data.code} applied — ${data.discount_pct}% off`;
+          showToast('Coupon applied');
+        } else {
+          appliedCoupon = null;
+          appliedDiscountPct = 0;
+          couponStatus.textContent = data.message || 'Invalid or expired code.';
+        }
+      } catch (err) {
         appliedCoupon = null;
-        couponStatus.textContent = 'Invalid or expired code.';
+        appliedDiscountPct = 0;
+        couponStatus.textContent = 'Could not validate coupon. Please try again.';
       }
       render();
     });
@@ -1209,7 +1231,7 @@
       addItem,
       computePackagePricing,
       gatherIncludedSelections,
-      getAppliedDiscountRate: () => (appliedCoupon ? COUPONS[appliedCoupon] : 0),
+      getAppliedDiscountRate: () => ((appliedCoupon && appliedDiscountPct > 0) ? (appliedDiscountPct / 100) : 0),
       getAppliedCouponCode: () => appliedCoupon,
       closeCartPanel: () => closeCartPanel?.(),
     };

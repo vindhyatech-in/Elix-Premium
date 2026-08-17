@@ -14,7 +14,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.fields import IndianPhoneField
 from accounts.models import Address, Employee, Profile
-from bookings.models import Booking, BookingItem
+from bookings.models import Booking, BookingItem, Offer
 from bookings.views import PAYMENT_METHOD_MAP, CartError, _resolve_cart_pricing
 from catalog.models import Category
 from core import booking_data
@@ -79,6 +79,47 @@ def catalog_view(request):
 def offers_view(request):
     """Active coupon codes — GET /api/v1/offers/."""
     return JsonResponse({'status': 'success', 'offers': booking_data.get_booking_offers()})
+
+
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
+def validate_coupon_view(request):
+    """
+    GET/POST /api/v1/validate-coupon/
+    Validates a coupon code against active Offer rows in the database.
+    """
+    code = ''
+    if request.method == 'POST':
+        if request.content_type == 'application/json':
+            try:
+                payload = json.loads(request.body.decode('utf-8'))
+                code = payload.get('code', '')
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                pass
+        else:
+            code = request.POST.get('code', '')
+    else:
+        code = request.GET.get('code', '')
+
+    code = (code or '').strip().upper()
+    if not code:
+        return JsonResponse({'valid': False, 'discount_pct': 0, 'message': 'Please enter a coupon code.'})
+
+    offer = Offer.objects.filter(code__iexact=code, is_active=True).first()
+    if offer:
+        return JsonResponse({
+            'valid': True,
+            'code': offer.code,
+            'discount_pct': offer.discount_pct,
+            'message': f'{offer.discount_pct}% discount applied!',
+        })
+
+    return JsonResponse({
+        'valid': False,
+        'discount_pct': 0,
+        'message': 'Invalid or expired coupon code.',
+    })
+
 
 
 def home_view(request):
