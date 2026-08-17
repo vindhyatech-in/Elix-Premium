@@ -67,7 +67,7 @@ def generate_booking_receipt_pdf(booking):
     item_rows = [['Service', 'Qty', 'Price', 'Amount']]
     for item in booking.items.all():
         amount = item.price_snapshot * item.quantity
-        item_rows.append([item.name_snapshot, str(item.quantity), f'₹{item.price_snapshot:.2f}', f'₹{amount:.2f}'])
+        item_rows.append([item.name_snapshot, str(item.quantity), f'Rs. {item.price_snapshot:.2f}', f'Rs. {amount:.2f}'])
 
     items_table = Table(item_rows, colWidths=[90 * mm, 20 * mm, 30 * mm, 30 * mm])
     items_table.setStyle(TableStyle([
@@ -82,11 +82,11 @@ def generate_booking_receipt_pdf(booking):
     elements.append(items_table)
     elements.append(Spacer(1, 6 * mm))
 
-    totals_rows = [['Subtotal', f'₹{booking.subtotal:.2f}']]
+    totals_rows = [['Subtotal', f'Rs. {booking.subtotal:.2f}']]
     if booking.discount_amount:
         label = f'Discount ({booking.coupon_code})' if booking.coupon_code else 'Discount'
-        totals_rows.append([label, f'-₹{booking.discount_amount:.2f}'])
-    totals_rows.append(['Total Paid', f'₹{booking.total_amount:.2f}'])
+        totals_rows.append([label, f'-Rs. {booking.discount_amount:.2f}'])
+    totals_rows.append(['Total Paid', f'Rs. {booking.total_amount:.2f}'])
 
     totals_table = Table(totals_rows, colWidths=[140 * mm, 30 * mm])
     totals_table.setStyle(TableStyle([

@@ -223,12 +223,218 @@
     });
   }
 
+  /* ---------------------------------------------------------
+   * Reschedule Modal — Date, Type & Slot selection, POST to
+   * /booking/my-bookings/<booking_number>/reschedule/.
+   * ------------------------------------------------------- */
+  function initReschedule() {
+    const backdrop = document.querySelector('[data-reschedule-backdrop]');
+    const modal = document.querySelector('[data-reschedule-modal]');
+    const form = document.querySelector('[data-reschedule-form]');
+    const bookingNumEl = document.querySelector('[data-reschedule-booking-num]');
+    const dateInput = document.querySelector('[data-reschedule-date-input]');
+    const typeCards = document.querySelectorAll('[data-reschedule-type]');
+    const regularWrap = document.querySelector('[data-reschedule-regular-slots-wrap]');
+    const slotCards = document.querySelectorAll('[data-reschedule-slot]');
+    const urgentWrap = document.querySelector('[data-reschedule-urgent-wrap]');
+    const urgentSelect = document.querySelector('[data-reschedule-urgent-select]');
+    const closeBtns = document.querySelectorAll('[data-reschedule-close]');
+    const submitBtn = document.querySelector('[data-reschedule-submit]');
+
+    if (!backdrop || !modal || !form) return;
+
+    let activeBookingNumber = null;
+    let selectedType = 'regular';
+    let selectedSlot = null;
+
+    // Set min date to today
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.min = today;
+
+    function closeModal() {
+      backdrop.classList.remove('is-open');
+      modal.classList.remove('is-open');
+      activeBookingNumber = null;
+    }
+
+    closeBtns.forEach((btn) => btn.addEventListener('click', closeModal));
+    backdrop.addEventListener('click', closeModal);
+
+    function populateExpressTimes(dateVal) {
+      urgentSelect.innerHTML = '';
+      const now = new Date();
+      const isToday = dateVal === today;
+
+      let startMins = isToday ? (now.getHours() * 60 + now.getMinutes() + 50) : (8 * 60);
+      const rem = startMins % 15;
+      if (rem > 0) startMins += (15 - rem);
+
+      const endMins = 21 * 60;
+      let count = 0;
+
+      for (let m = startMins; m <= endMins; m += 15) {
+        const hh = Math.floor(m / 60);
+        const mm = m % 60;
+        const val = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+        const ampm = hh >= 12 ? 'PM' : 'AM';
+        const displayH = hh % 12 || 12;
+        const displayM = String(mm).padStart(2, '0');
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = `${displayH}:${displayM} ${ampm}${count === 0 && isToday ? ' (Earliest Express)' : ''}`;
+        urgentSelect.appendChild(opt);
+        count++;
+      }
+      if (count === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'No express slots available today (After 9 PM)';
+        urgentSelect.appendChild(opt);
+      }
+    }
+
+    function updateSlotAvailability() {
+      const dateVal = dateInput.value;
+      const isToday = dateVal === today;
+      const now = new Date();
+      const minMins = now.getHours() * 60 + now.getMinutes() + 50;
+
+      const slotEnds = { morning: 12 * 60, afternoon: 16 * 60, evening: 20 * 60 };
+
+      slotCards.forEach((card) => {
+        const sVal = card.dataset.rescheduleSlot;
+        if (isToday && minMins >= slotEnds[sVal]) {
+          card.classList.add('is-disabled');
+          card.style.opacity = '0.4';
+          card.style.pointerEvents = 'none';
+          if (card.classList.contains('is-selected')) {
+            card.classList.remove('is-selected');
+            if (selectedSlot === sVal) selectedSlot = null;
+          }
+        } else {
+          card.classList.remove('is-disabled');
+          card.style.opacity = '1';
+          card.style.pointerEvents = 'auto';
+        }
+      });
+    }
+
+    typeCards.forEach((card) => card.addEventListener('click', () => {
+      typeCards.forEach((c) => c.classList.remove('is-active'));
+      card.classList.add('is-active');
+      selectedType = card.dataset.rescheduleType;
+
+      if (selectedType === 'urgent') {
+        regularWrap.style.display = 'none';
+        urgentWrap.style.display = '';
+        populateExpressTimes(dateInput.value);
+      } else {
+        regularWrap.style.display = '';
+        urgentWrap.style.display = 'none';
+        updateSlotAvailability();
+      }
+    }));
+
+    slotCards.forEach((card) => card.addEventListener('click', () => {
+      slotCards.forEach((c) => c.classList.remove('is-selected'));
+      card.classList.add('is-selected');
+      selectedSlot = card.dataset.rescheduleSlot;
+    }));
+
+    dateInput.addEventListener('change', () => {
+      if (selectedType === 'urgent') {
+        populateExpressTimes(dateInput.value);
+      } else {
+        updateSlotAvailability();
+      }
+    });
+
+    // Trigger Reschedule Modal Open
+    document.body.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-reschedule-btn]');
+      if (!btn) return;
+
+      activeBookingNumber = btn.dataset.bookingNumber;
+      bookingNumEl.textContent = activeBookingNumber;
+
+      const initialDate = btn.dataset.bookingDate || today;
+      dateInput.value = initialDate < today ? today : initialDate;
+
+      selectedType = btn.dataset.bookingType || 'regular';
+      typeCards.forEach((c) => c.classList.toggle('is-active', c.dataset.rescheduleType === selectedType));
+
+      selectedSlot = btn.dataset.timeSlot || null;
+      slotCards.forEach((c) => c.classList.toggle('is-selected', c.dataset.rescheduleSlot === selectedSlot));
+
+      if (selectedType === 'urgent') {
+        regularWrap.style.display = 'none';
+        urgentWrap.style.display = '';
+        populateExpressTimes(dateInput.value);
+        if (btn.dataset.exactTime) urgentSelect.value = btn.dataset.exactTime;
+      } else {
+        regularWrap.style.display = '';
+        urgentWrap.style.display = 'none';
+        updateSlotAvailability();
+      }
+
+      backdrop.classList.add('is-open');
+      modal.classList.add('is-open');
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!activeBookingNumber) return;
+
+      if (selectedType === 'regular' && !selectedSlot) {
+        window.GlamourBooking?.showToast?.('Please select a time slot.');
+        return;
+      }
+      if (selectedType === 'urgent' && (!urgentSelect.value || urgentSelect.value === '')) {
+        window.GlamourBooking?.showToast?.('Please select an express time slot.');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving…';
+
+      fetch(`/booking/my-bookings/${activeBookingNumber}/reschedule/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({
+          date: dateInput.value,
+          booking_type: selectedType,
+          time_slot: selectedType === 'regular' ? selectedSlot : '',
+          exact_time: selectedType === 'urgent' ? urgentSelect.value : '',
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.ok) throw new Error(data.error || 'Failed to reschedule booking.');
+          closeModal();
+          window.GlamourBooking?.showToast?.(data.message || 'Rescheduled successfully!');
+          setTimeout(() => window.location.reload(), 1000);
+        })
+        .catch((err) => {
+          window.GlamourBooking?.showToast?.(err.message || 'Error rescheduling booking.');
+        })
+        .finally(() => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Save Reschedule';
+        });
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     initBookingFilters();
     initRebook();
     initCancelConfirm();
     initStarRatings();
     initBookingFeedback();
+    initReschedule();
     initDummyActions();
   });
 })();
+

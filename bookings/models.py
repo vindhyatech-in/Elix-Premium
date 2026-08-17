@@ -122,6 +122,7 @@ class Booking(models.Model):
     # a customer to write several near-identical paragraphs.
     feedback_comment = models.TextField(blank=True)
     feedback_submitted_at = models.DateTimeField(null=True, blank=True)
+    rescheduled_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

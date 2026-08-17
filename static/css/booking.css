@@ -1906,7 +1906,7 @@ body.booking-app {
   align-items: center;
   justify-content: center;
   background: var(--surface-1);
-  font-size: 1.1rem;
+  color: var(--ink-muted);
 }
 .booking-card__beautician-info { display: flex; flex-direction: column; gap: 0.1rem; }
 .booking-card__beautician-label { font-size: var(--fs-xs); color: var(--ink-muted); }
@@ -2050,3 +2050,78 @@ body.booking-app {
 @media (max-width: 640px) {
   .profile-page__form-row { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   RESCHEDULE MODAL
+   ============================================================ */
+.reschedule-modal {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -46%);
+  width: min(92vw, 480px);
+  max-height: 88vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: calc(var(--z-app-modal) + 1);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur-md) var(--ease-soft), transform var(--dur-md) var(--ease-soft), visibility var(--dur-md);
+}
+.reschedule-modal.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+}
+
+.reschedule-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--surface-3);
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  z-index: 1;
+}
+.reschedule-modal__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-body);
+  margin: 0;
+}
+.reschedule-modal__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.4rem;
+  color: var(--ink-muted);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-sm);
+}
+.reschedule-modal__close:hover { background: var(--surface-3); }
+
+.reschedule-modal__body {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.reschedule-modal__subtitle {
+  font-size: var(--fs-sm);
+  color: var(--ink-muted);
+  margin: 0;
+}
+.reschedule-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding-top: var(--space-sm);
+}
+

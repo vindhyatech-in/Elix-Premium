@@ -10,3 +10,13 @@ def times(number):
         return range(int(number))
     except (TypeError, ValueError):
         return range(0)
+
+
+@register.filter
+def mul(value, arg):
+    """Usage: {{ price|mul:quantity }} — multiplies value by arg."""
+    try:
+        return float(value) * float(arg)
+    except (TypeError, ValueError):
+        return 0
+

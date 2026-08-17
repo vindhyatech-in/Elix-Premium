@@ -487,12 +487,96 @@ def cancel_booking(request, booking_number):
 
 
 @login_required
-def booking_invoice(request, booking_number):
+@require_POST
+def reschedule_booking(request, booking_number):
+    """
+    Reschedules a booking to a new date and time slot — only allowed while
+    `Booking.status` is 'upcoming'.
+    Validates 50-minute advance scheduling window for today's bookings.
+    """
+    booking = get_object_or_404(Booking, booking_number=booking_number, user=request.user)
+
+    if booking.status != 'upcoming':
+        return JsonResponse({'ok': False, 'error': 'This booking can no longer be rescheduled.'}, status=400)
+
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body.'}, status=400)
+
+    scheduled_date = parse_date(payload.get('date') or '')
+    if not scheduled_date:
+        return JsonResponse({'ok': False, 'error': 'Invalid date.'}, status=400)
+
+    now_dt = timezone.now()
+    if scheduled_date < now_dt.date():
+        return JsonResponse({'ok': False, 'error': 'Scheduled date cannot be in the past.'}, status=400)
+
+    booking_type = payload.get('booking_type', booking.booking_type)
+    if booking_type not in ('regular', 'urgent'):
+        booking_type = 'regular'
+
+    time_slot = payload.get('time_slot') or ''
+    exact_time = parse_time(payload.get('exact_time') or '') if booking_type == 'urgent' else None
+
+    if booking_type == 'regular' and time_slot not in ('morning', 'afternoon', 'evening'):
+        return JsonResponse({'ok': False, 'error': 'Select a valid time slot.'}, status=400)
+    if booking_type == 'urgent' and not exact_time:
+        return JsonResponse({'ok': False, 'error': 'Select a valid time.'}, status=400)
+
+    min_allowed_time = (now_dt + timedelta(minutes=50)).time()
+    if scheduled_date == now_dt.date():
+        if booking_type == 'urgent':
+            if exact_time < min_allowed_time:
+                return JsonResponse({'ok': False, 'error': 'Urgent bookings for today must be scheduled at least 50 minutes in advance.'}, status=400)
+        elif booking_type == 'regular':
+            slot_end_times = {
+                'morning': parse_time('12:00:00'),
+                'afternoon': parse_time('16:00:00'),
+                'evening': parse_time('20:00:00'),
+            }
+            slot_end = slot_end_times.get(time_slot)
+            if slot_end and min_allowed_time >= slot_end:
+                return JsonResponse({'ok': False, 'error': f'The selected {time_slot} slot is no longer available for today. Please select a later slot or date.'}, status=400)
+
+    booking.scheduled_date = scheduled_date
+    booking.booking_type = booking_type
+    booking.time_slot = time_slot if booking_type == 'regular' else ''
+    booking.exact_time = exact_time if booking_type == 'urgent' else None
+    booking.rescheduled_at = timezone.now()
+    booking.save(update_fields=['scheduled_date', 'booking_type', 'time_slot', 'exact_time', 'rescheduled_at', 'updated_at'])
+
+    return JsonResponse({'ok': True, 'message': f'Booking {booking.booking_number} rescheduled successfully.'})
+
+
+
+@login_required
+def invoice_preview(request, booking_number):
+    """
+    HTML preview page for a paid booking's receipt — shows the itemised
+    receipt in-browser with Print and Download PDF action buttons.
+    Only available for bookings where payment_status='paid'.
+    """
+    booking = get_object_or_404(Booking, booking_number=booking_number, user=request.user)
+    if booking.payment_status != 'paid':
+        messages.error(request, 'A receipt is only available once payment is completed for this booking.')
+        return redirect('bookings_dashboard')
+
+    customer_name = booking.user.get_full_name() or booking.user.username if booking.user else 'Guest (account deleted)'
+    context = {
+        'booking': booking,
+        'customer_name': customer_name,
+        'now': timezone.now(),
+    }
+    return render(request, 'booking/pages/invoice_preview.html', context)
+
+
+@login_required
+def booking_invoice_pdf(request, booking_number):
     """
     PDF receipt download for the signed-in user's own booking — gated on
     payment_status='paid' since a receipt only makes sense for money
-    actually collected; there's nothing to hand a customer a receipt for
-    on a still-pending pay_at_home order.
+    actually collected. Linked from invoice_preview's Download PDF button.
     """
     booking = get_object_or_404(Booking, booking_number=booking_number, user=request.user)
     if booking.payment_status != 'paid':
@@ -503,6 +587,7 @@ def booking_invoice(request, booking_number):
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="receipt-{booking.booking_number}.pdf"'
     return response
+
 
 
 @login_required

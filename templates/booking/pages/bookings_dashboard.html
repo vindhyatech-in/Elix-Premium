@@ -73,7 +73,9 @@
                   {% elif booking.assigned_beautician.photo %}
                     <img src="{% static booking.assigned_beautician.photo %}" alt="{{ booking.assigned_beautician.name }}" class="booking-card__beautician-photo">
                   {% else %}
-                    <span class="booking-card__beautician-photo booking-card__beautician-photo--placeholder" aria-hidden="true">💇</span>
+                    <span class="booking-card__beautician-photo booking-card__beautician-photo--placeholder" aria-label="No photo">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </span>
                   {% endif %}
                   <div class="booking-card__beautician-info">
                     <span class="booking-card__beautician-label">Your Beautician</span>
@@ -118,9 +120,16 @@
 
               <div class="booking-card__quick-actions">
                 {% if booking.payment_status == 'paid' %}
-                  <a href="{% url 'booking_invoice' booking.booking_number %}" class="btn btn--ghost btn--sm">🧾 Download Receipt</a>
+                  <a href="{% url 'booking_invoice' booking.booking_number %}" class="btn btn--ghost btn--sm">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    Download Receipt
+                  </a>
                 {% endif %}
                 {% if booking.can_cancel %}
+                  <button type="button" class="btn btn--ghost btn--sm" data-reschedule-btn data-booking-number="{{ booking.booking_number }}" data-booking-date="{{ booking.scheduled_date|date:'Y-m-d' }}" data-booking-type="{{ booking.booking_type }}" data-time-slot="{{ booking.time_slot }}" data-exact-time="{{ booking.exact_time|time:'H:i' }}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    Reschedule
+                  </button>
                   <form method="post" action="{% url 'cancel_booking' booking.booking_number %}" data-cancel-booking-form>
                     {% csrf_token %}
                     <button type="submit" class="btn btn--ghost btn--sm booking-card__cancel" data-cancel-booking>Cancel Booking</button>
@@ -132,9 +141,15 @@
                 {% endif %}
 
                 {% if booking.status == 'completed' or booking.status == 'cancelled' %}
-                  <button type="button" class="btn btn--ghost btn--sm" data-dummy-action="help">🆘 Help</button>
+                  <button type="button" class="btn btn--ghost btn--sm" data-dummy-action="help">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    Help
+                  </button>
                 {% elif booking.assigned_beautician %}
-                  <button type="button" class="btn btn--ghost btn--sm" data-dummy-action="call">📞 Call Beautician</button>
+                  <button type="button" class="btn btn--ghost btn--sm" data-dummy-action="call">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.06 6.06l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    Call Beautician
+                  </button>
                 {% endif %}
               </div>
 
@@ -192,6 +207,58 @@
   {% include 'booking/components/bottom_nav.html' %}
   {% include 'booking/components/chat_panel.html' %}
   {% include 'booking/components/floating_cart.html' %}
+
+  <!-- Reschedule Modal -->
+  <div class="modal-backdrop" data-reschedule-backdrop></div>
+  <div class="reschedule-modal" data-reschedule-modal role="dialog" aria-labelledby="reschedule-modal-title" aria-modal="true">
+    <div class="reschedule-modal__header">
+      <h2 id="reschedule-modal-title" class="reschedule-modal__title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:6px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Reschedule Booking
+      </h2>
+      <button type="button" class="reschedule-modal__close" data-reschedule-close aria-label="Close modal">×</button>
+    </div>
+    <form data-reschedule-form class="reschedule-modal__body">
+      <p class="reschedule-modal__subtitle">Select a new date and time for booking <strong data-reschedule-booking-num></strong>.</p>
+
+      <div class="field">
+        <label for="reschedule-date">Select Date</label>
+        <input type="date" id="reschedule-date" data-reschedule-date-input class="form-input" required>
+      </div>
+
+      <div class="field">
+        <label>Booking Type</label>
+        <div class="booking-drawer__types" style="margin-top:0.25rem;">
+          <button type="button" class="type-card is-active" data-reschedule-type="regular">
+            <strong>Regular</strong>
+            <span>Morning / Afternoon / Evening</span>
+          </button>
+          <button type="button" class="type-card" data-reschedule-type="urgent">
+            <strong>Express</strong>
+            <span>Within 50 mins</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="field" data-reschedule-regular-slots-wrap>
+        <label>Time Slot</label>
+        <div class="booking-drawer__slots" style="grid-template-columns:1fr 1fr 1fr;">
+          <button type="button" class="slot-card" data-reschedule-slot="morning">Morning<br><small>8 AM – 12 PM</small></button>
+          <button type="button" class="slot-card" data-reschedule-slot="afternoon">Afternoon<br><small>12 PM – 4 PM</small></button>
+          <button type="button" class="slot-card" data-reschedule-slot="evening">Evening<br><small>4 PM – 8 PM</small></button>
+        </div>
+      </div>
+
+      <div class="field" data-reschedule-urgent-wrap style="display:none;">
+        <label for="reschedule-urgent-select">Express Time</label>
+        <select id="reschedule-urgent-select" data-reschedule-urgent-select class="form-input"></select>
+      </div>
+
+      <div class="reschedule-modal__footer">
+        <button type="button" class="btn btn--ghost btn--sm" data-reschedule-close>Cancel</button>
+        <button type="submit" class="btn btn--primary btn--sm" data-reschedule-submit>Save Reschedule</button>
+      </div>
+    </form>
+  </div>
 
   <div class="toast-stack" data-toast-stack aria-live="polite" aria-atomic="true"></div>
 {% endblock %}

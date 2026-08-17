@@ -1,0 +1,378 @@
+{% load static glamour_extras %}<!doctype html>
+<html lang="en-IN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Receipt {{ booking.booking_number }} — {{ SITE.name }}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:       #0f172a;
+      --ink-muted: #64748b;
+      --border:    #e2e8f0;
+      --accent:    #4f46e5;
+      --bg:        #f8fafc;
+      --white:     #ffffff;
+      --radius:    10px;
+      --font:      'Inter', system-ui, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    /* ── Action bar ── */
+    .invoice-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 720px;
+      margin: 0 auto 1.5rem;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .invoice-actions__back {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--ink-muted);
+      font-size: 0.875rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .invoice-actions__back:hover { color: var(--ink); }
+    .invoice-actions__btns { display: flex; gap: 0.5rem; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.55rem 1.1rem;
+      border-radius: 7px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      transition: opacity 0.15s, transform 0.12s;
+    }
+    .btn:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn--primary { background: var(--accent); color: #fff; }
+    .btn--ghost   { background: var(--white); color: var(--ink); border: 1px solid var(--border); }
+
+    /* ── Receipt card ── */
+    .invoice-card {
+      max-width: 720px;
+      margin: 0 auto;
+      background: var(--white);
+      border-radius: var(--radius);
+      box-shadow: 0 4px 24px rgba(15,23,42,.09);
+      padding: 2.5rem 2.5rem 2rem;
+    }
+
+    /* Header */
+    .invoice-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid var(--ink);
+      margin-bottom: 1.75rem;
+    }
+    .invoice-brand__name {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .invoice-brand__meta {
+      margin-top: 0.3rem;
+      font-size: 0.8rem;
+      color: var(--ink-muted);
+      line-height: 1.6;
+    }
+    .invoice-badge { text-align: right; flex-shrink: 0; }
+    .invoice-badge__label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--ink-muted);
+    }
+    .invoice-badge__number {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-top: 0.15rem;
+    }
+    .invoice-badge__status {
+      display: inline-block;
+      margin-top: 0.4rem;
+      padding: 0.2rem 0.65rem;
+      background: #dcfce7;
+      color: #15803d;
+      border-radius: 20px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Meta grid */
+    .invoice-meta {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0 2rem;
+      margin-bottom: 2rem;
+    }
+    .invoice-meta__key {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink-muted);
+      padding: 0.32rem 0;
+      white-space: nowrap;
+    }
+    .invoice-meta__val {
+      font-size: 0.9rem;
+      color: var(--ink);
+      padding: 0.32rem 0;
+      word-break: break-word;
+    }
+
+    /* Section title */
+    .invoice-section-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--ink-muted);
+      margin-bottom: 0.55rem;
+    }
+
+    /* Items table */
+    .invoice-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.5rem;
+    }
+    .invoice-table th {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--ink-muted);
+      padding: 0.45rem 0.5rem;
+      border-bottom: 1.5px solid var(--ink);
+      text-align: left;
+    }
+    .invoice-table th:not(:first-child) { text-align: right; }
+    .invoice-table td {
+      padding: 0.65rem 0.5rem;
+      font-size: 0.9rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .invoice-table td:not(:first-child) { text-align: right; }
+    .invoice-table tbody tr:last-child td { border-bottom: none; }
+    .invoice-table__sub {
+      margin-top: 0.3rem;
+      padding-left: 1rem;
+      font-size: 0.78rem;
+      color: var(--ink-muted);
+      line-height: 1.6;
+    }
+
+    /* Totals */
+    .invoice-totals {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      align-items: flex-end;
+      margin-bottom: 2rem;
+    }
+    .invoice-totals__row {
+      display: flex;
+      gap: 3.5rem;
+      font-size: 0.9rem;
+      color: var(--ink-muted);
+    }
+    .invoice-totals__row span:last-child { min-width: 110px; text-align: right; }
+    .invoice-totals__row--total {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--ink);
+      padding-top: 0.55rem;
+      border-top: 2px solid var(--ink);
+      margin-top: 0.2rem;
+    }
+
+    /* Footer */
+    .invoice-footer {
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .invoice-footer__thanks { font-size: 0.85rem; color: var(--ink-muted); }
+    .invoice-footer__note   { font-size: 0.72rem; color: var(--ink-muted); opacity: 0.65; text-align: right; }
+
+    /* ── Print ── */
+    @media print {
+      body { background: #fff; padding: 0; }
+      .invoice-actions { display: none !important; }
+      .invoice-card {
+        box-shadow: none;
+        border-radius: 0;
+        padding: 1rem;
+        max-width: 100%;
+      }
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      .invoice-card { padding: 1.5rem 1rem; }
+      .invoice-header { flex-direction: column; }
+      .invoice-badge { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Action bar (hidden on print) -->
+  <div class="invoice-actions">
+    <a href="{% url 'bookings_dashboard' %}" class="invoice-actions__back">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to My Bookings
+    </a>
+    <div class="invoice-actions__btns">
+      <button type="button" class="btn btn--ghost" onclick="window.print()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print
+      </button>
+      <a href="{% url 'booking_invoice_pdf' booking.booking_number %}" class="btn btn--primary">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- Receipt card -->
+  <div class="invoice-card">
+
+    <div class="invoice-header">
+      <div class="invoice-brand">
+        <div class="invoice-brand__name">{{ SITE.name }}</div>
+        <div class="invoice-brand__meta">
+          {{ SITE.address }}<br>
+          {{ SITE.phone }} &middot; {{ SITE.email }}
+        </div>
+      </div>
+      <div class="invoice-badge">
+        <div class="invoice-badge__label">Receipt No.</div>
+        <div class="invoice-badge__number">{{ booking.booking_number }}</div>
+        <span class="invoice-badge__status">&#10003; Paid</span>
+      </div>
+    </div>
+
+    <!-- Booking meta -->
+    <div class="invoice-meta">
+      <span class="invoice-meta__key">Booking Date</span>
+      <span class="invoice-meta__val">{{ booking.created_at|date:"d M Y, g:i A" }}</span>
+
+      <span class="invoice-meta__key">Service Date</span>
+      <span class="invoice-meta__val">{{ booking.scheduled_date|date:"D, d M Y" }}</span>
+
+      <span class="invoice-meta__key">Time</span>
+      <span class="invoice-meta__val">
+        {% if booking.booking_type == 'urgent' %}{{ booking.exact_time|time:"g:i A" }} (Express)
+        {% else %}{{ booking.get_time_slot_display }}{% endif %}
+      </span>
+
+      <span class="invoice-meta__key">Customer</span>
+      <span class="invoice-meta__val">{{ customer_name }}</span>
+
+      <span class="invoice-meta__key">Address</span>
+      <span class="invoice-meta__val">{{ booking.address_label }} — {{ booking.address_text }}</span>
+
+      <span class="invoice-meta__key">Payment</span>
+      <span class="invoice-meta__val">{{ booking.get_payment_method_display }}</span>
+
+      {% if booking.razorpay_payment_id %}
+        <span class="invoice-meta__key">Ref. ID</span>
+        <span class="invoice-meta__val" style="word-break:break-all;font-size:0.8rem;">{{ booking.razorpay_payment_id }}</span>
+      {% endif %}
+    </div>
+
+    <!-- Line items -->
+    <p class="invoice-section-title">Services</p>
+    <table class="invoice-table">
+      <thead>
+        <tr>
+          <th>Service</th>
+          <th>Qty</th>
+          <th>Unit Price</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in booking.items.all %}
+          <tr>
+            <td>
+              {{ item.name_snapshot }}
+              {% if item.included_snapshot %}
+                <ul class="invoice-table__sub">
+                  {% for inc in item.included_snapshot %}
+                    <li>{{ inc.name }}{% if inc.variant_label %} &mdash; {{ inc.variant_label }}{% endif %}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            </td>
+            <td>{{ item.quantity }}</td>
+            <td>&#8377;{{ item.price_snapshot|floatformat:"2" }}</td>
+            <td>&#8377;{{ item.price_snapshot|mul:item.quantity|floatformat:"2" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Totals -->
+    <div class="invoice-totals">
+      <div class="invoice-totals__row">
+        <span>Subtotal</span>
+        <span>&#8377;{{ booking.subtotal|floatformat:"2" }}</span>
+      </div>
+      {% if booking.discount_amount %}
+        <div class="invoice-totals__row" style="color:#15803d;">
+          <span>Discount{% if booking.coupon_code %} ({{ booking.coupon_code }}){% endif %}</span>
+          <span>-&#8377;{{ booking.discount_amount|floatformat:"2" }}</span>
+        </div>
+      {% endif %}
+      <div class="invoice-totals__row invoice-totals__row--total">
+        <span>Total Paid</span>
+        <span>&#8377;{{ booking.total_amount|floatformat:"2" }}</span>
+      </div>
+    </div>
+
+    <div class="invoice-footer">
+      <p class="invoice-footer__thanks">Thank you for choosing {{ SITE.name }}! We hope you loved your experience.</p>
+      <p class="invoice-footer__note">Generated {{ now|date:"d M Y" }}</p>
+    </div>
+  </div>
+
+</body>
+</html>
