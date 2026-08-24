@@ -51,9 +51,14 @@
       </div>
     </div>
 
-    <div class="footer-bottom">
-      <span>&copy; {% now "Y" %} {{ SITE.name }}. All rights reserved.</span>
-      <span><a href="{% url 'privacy_policy' %}">Privacy Policy</a> · <a href="{% url 'terms_and_conditions' %}">Terms of Service</a></span>
+    <div class="footer-bottom" style="display: flex; flex-direction: column; gap: 0.75rem; border-top: 1px solid rgba(250, 246, 239, 0.12); padding-top: 1.25rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; width: 100%;">
+        <span>&copy; {% now "Y" %} <strong>{{ SITE.legal_name }}</strong>. All rights reserved.</span>
+        <span><a href="{% url 'privacy_policy' %}">Privacy Policy</a> · <a href="{% url 'terms_and_conditions' %}">Terms of Service</a></span>
+      </div>
+      <div style="font-size: 0.78rem; color: rgba(250, 246, 239, 0.55); line-height: 1.5;">
+        <span>MSME Reg. No: <strong>{{ SITE.udyam }}</strong> | Reg. Address: {{ SITE.address }}</span>
+      </div>
     </div>
   </div>
 </footer>

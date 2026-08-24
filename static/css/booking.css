@@ -312,19 +312,47 @@ body.booking-app {
 .offer-item__copy strong { display: block; font-size: var(--fs-sm); color: var(--text-body); }
 .offer-item__copy p { font-size: var(--fs-xs); color: var(--ink-muted); margin-top: 0.15rem; }
 
-.notif-item { display: flex; gap: 0.6rem; padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); }
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--dur-sm) var(--ease-soft);
+  position: relative;
+}
 .notif-item:hover { background: var(--surface-1); }
+.notif-item--unread { background: rgba(201, 161, 90, 0.05); }
+.notif-item--unread:hover { background: rgba(201, 161, 90, 0.1); }
+
+.notif-item__icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 0.1rem;
+}
+.notif-item__copy { flex: 1; min-width: 0; }
+.notif-item__title { display: block; font-size: var(--fs-sm); color: var(--text-body); font-weight: 600; }
+.notif-item__body { font-size: var(--fs-xs); color: var(--ink-muted); margin-top: 0.15rem; line-height: 1.4; }
+.notif-item__time { font-size: 0.7rem; color: var(--ink-muted); opacity: 0.8; display: block; margin-top: 0.25rem; }
+
+/* Unread blue dot — positioned top-right */
 .notif-item__dot {
   flex-shrink: 0;
   width: 8px; height: 8px;
   margin-top: 0.4rem;
   border-radius: 50%;
-  background: var(--border-hairline);
+  background: var(--gold-deep);
+  animation: badge-pulse 2.5s ease-in-out infinite;
 }
-.notif-item--unread .notif-item__dot { background: var(--gold-deep); }
-.notif-item__copy strong { display: block; font-size: var(--fs-sm); color: var(--text-body); }
-.notif-item__copy p { font-size: var(--fs-xs); color: var(--ink-muted); margin-top: 0.1rem; }
-.notif-item__copy time { font-size: 0.7rem; color: var(--ink-muted); opacity: 0.8; }
+@media (prefers-reduced-motion: reduce) { .notif-item__dot { animation: none; } }
+
+/* Type-aware accent colours on unread dot */
+.notif-item--cancelled .notif-item__dot { background: #e74c3c; }
+.notif-item--completed .notif-item__dot { background: #27ae60; }
+.notif-item--rescheduled .notif-item__dot { background: #3498db; }
+.notif-item--assigned .notif-item__dot { background: #9b59b6; }
 
 /* ============================================================
    SEARCH BAR + autosuggest — premium pill with gold glow focus

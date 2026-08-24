@@ -22,7 +22,8 @@ from core.email_service import send_booking_email_all
 
 from . import razorpay_client
 from .invoice import generate_booking_receipt_pdf
-from .models import Booking, BookingItem, Offer, Review
+from .models import Booking, BookingItem, Offer, Review, UserNotification
+from .notifications import notify_user
 
 logger = logging.getLogger(__name__)
 
@@ -413,6 +414,8 @@ def create_booking(request):
         event_beautician=None,
         booking=booking,
     )
+    # In-app notification — shows immediately in the bell dropdown.
+    notify_user(booking, 'booking_confirmed')
 
     return JsonResponse(return_data)
 
@@ -502,6 +505,7 @@ def cancel_booking(request, booking_number):
             event_beautician='beautician_job_cancelled' if booking.assigned_beautician_id else None,
             booking=booking,
         )
+        notify_user(booking, 'booking_cancelled')
     else:
         messages.error(request, 'This booking can no longer be cancelled — the beautician is already on the way or it’s completed/cancelled.')
     return redirect('bookings_dashboard')
@@ -574,6 +578,7 @@ def reschedule_booking(request, booking_number):
         event_beautician='beautician_job_rescheduled' if booking.assigned_beautician_id else None,
         booking=booking,
     )
+    notify_user(booking, 'booking_rescheduled')
 
     return JsonResponse({'ok': True, 'message': f'Booking {booking.booking_number} rescheduled successfully.'})
 
@@ -718,4 +723,76 @@ def submit_booking_feedback(request, booking_number):
     booking.feedback_comment = comment
     booking.feedback_submitted_at = timezone.now()
     booking.save(update_fields=['feedback_comment', 'feedback_submitted_at'])
+    return JsonResponse({'ok': True})
+
+
+# ---------------------------------------------------------------------------
+# In-app notification API — consumed by the notification bell in app_navbar.
+# ---------------------------------------------------------------------------
+
+@login_required
+def notifications_list(request):
+    """
+    GET /booking/notifications/ — returns the signed-in user's 20 most recent
+    notifications as JSON.  Called by JS on bell-open and every 60 s while
+    the page is open (lightweight polling; no WebSockets needed for this
+    use-case).
+
+    Response shape:
+        {
+          "unread_count": <int>,
+          "notifications": [
+            {
+              "id": <int>,
+              "ntype": "<str>",
+              "icon": "<emoji>",
+              "title": "<str>",
+              "body": "<str>",
+              "time_label": "<str>",
+              "read": <bool>,
+              "booking_number": "<str>|null"
+            },
+            ...
+          ]
+        }
+    """
+    qs = (
+        UserNotification.objects
+        .filter(user=request.user)
+        .select_related('booking')
+        [:20]
+    )
+    unread_count = UserNotification.objects.filter(user=request.user, read=False).count()
+    data = [
+        {
+            'id': n.id,
+            'ntype': n.ntype,
+            'icon': n.icon,
+            'title': n.title,
+            'body': n.body,
+            'time_label': n.time_label,
+            'read': n.read,
+            'booking_number': n.booking.booking_number if n.booking_id else None,
+        }
+        for n in qs
+    ]
+    return JsonResponse({'unread_count': unread_count, 'notifications': data})
+
+
+@login_required
+@require_POST
+def notification_mark_read(request, notif_id):
+    """POST /booking/notifications/<id>/read/ — marks one notification read."""
+    notif = get_object_or_404(UserNotification, id=notif_id, user=request.user)
+    if not notif.read:
+        notif.read = True
+        notif.save(update_fields=['read'])
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
+def notifications_mark_all_read(request):
+    """POST /booking/notifications/read-all/ — marks all of the user's notifications read."""
+    UserNotification.objects.filter(user=request.user, read=False).update(read=True)
     return JsonResponse({'ok': True})

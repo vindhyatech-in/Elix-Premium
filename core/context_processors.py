@@ -43,6 +43,8 @@ def site_meta(request):
     return {
         'SITE': {
             'name': settings.SITE_NAME,
+            'legal_name': settings.SITE_LEGAL_NAME,
+            'udyam': settings.SITE_UDYAM,
             'tagline': settings.SITE_TAGLINE,
             'domain': settings.SITE_DOMAIN,
             'description': settings.SITE_DESCRIPTION,

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Booking, BookingItem, Review
+from .models import Booking, BookingItem, Offer, Review, UserNotification
 
 
 class BookingItemInline(admin.TabularInline):
@@ -31,3 +31,13 @@ class ReviewAdmin(admin.ModelAdmin):
     list_display = ('service', 'user', 'rating', 'created_at')
     list_filter = ('rating', 'created_at')
     search_fields = ('service__name', 'user__email', 'comment')
+
+
+@admin.register(UserNotification)
+class UserNotificationAdmin(admin.ModelAdmin):
+    list_display = ('user', 'ntype', 'title', 'read', 'created_at')
+    list_filter = ('ntype', 'read', 'created_at')
+    search_fields = ('user__email', 'title', 'body')
+    readonly_fields = ('created_at',)
+    raw_id_fields = ('user', 'booking')
+

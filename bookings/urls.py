@@ -13,5 +13,8 @@ urlpatterns = [
     path('booking/my-bookings/<str:booking_number>/invoice/pdf/', views.booking_invoice_pdf, name='booking_invoice_pdf'),
     path('booking/my-bookings/reviews/<int:item_id>/', views.submit_review, name='submit_review'),
     path('booking/my-bookings/<str:booking_number>/feedback/', views.submit_booking_feedback, name='submit_booking_feedback'),
+    # In-app notification API
+    path('booking/notifications/', views.notifications_list, name='notifications_list'),
+    path('booking/notifications/<int:notif_id>/read/', views.notification_mark_read, name='notification_mark_read'),
+    path('booking/notifications/read-all/', views.notifications_mark_all_read, name='notifications_mark_all_read'),
 ]
-

@@ -313,16 +313,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Centralised here so brand/contact details are edited in exactly one place.
 # ---------------------------------------------------------------------------
 SITE_NAME = 'Elix'
+SITE_LEGAL_NAME = 'ELIX PREMIUM SALON AT HOME'
+SITE_UDYAM = 'UDYAM-MP-23-0303972'
 SITE_TAGLINE = 'Premium Salon at Home'
-SITE_DOMAIN = config('SITE_DOMAIN', default='elix.com')
+SITE_DOMAIN = config('SITE_DOMAIN', default='elix.in')
 SITE_DESCRIPTION = (
-    'Elix brings verified, professional beauticians and premium products '
+    'Elix Premium Salon at Home brings verified, professional beauticians and premium products '
     'to your doorstep — salon-grade hair, skin, makeup and spa services on '
     'your schedule, in your space.'
 )
-SITE_PHONE = '+91 90000 00000'
-SITE_EMAIL = 'hello@elix.com'
-SITE_ADDRESS = 'Indore, Madhya Pradesh, India'
+SITE_PHONE = '+91 74406 70533'
+SITE_EMAIL = 'gehlotsakshi1296@gmail.com'
+SITE_ADDRESS = '13, Ravidas Nagar, Lasudiya Mori, Indore, Madhya Pradesh 452010'
 SOCIAL_LINKS = {
     'instagram': 'https://instagram.com/elix',
     'facebook': 'https://facebook.com/elix',

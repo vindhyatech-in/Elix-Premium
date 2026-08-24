@@ -306,3 +306,74 @@ class Offer(models.Model):
 
     def __str__(self):
         return f'{self.code} — {self.discount_pct}% off'
+
+
+class UserNotification(models.Model):
+    """
+    Real per-user in-app notification, generated automatically when a booking
+    event fires (confirmed, beautician assigned, rescheduled, cancelled,
+    completed). Shown in the notification bell dropdown in the booking app
+    navbar. Replaces the mock SiteNotification feed for authenticated users.
+
+    `ntype` drives the icon and badge colour in the template.
+    `booking` is nullable so admin-broadcast notifications (if ever needed)
+    don't require a specific booking reference.
+    """
+    NTYPE_CHOICES = [
+        ('booking_confirmed', 'Booking Confirmed'),
+        ('beautician_assigned', 'Beautician Assigned'),
+        ('booking_rescheduled', 'Booking Rescheduled'),
+        ('booking_cancelled', 'Booking Cancelled'),
+        ('booking_completed', 'Booking Completed'),
+        ('general', 'General'),
+    ]
+    NTYPE_ICONS = {
+        'booking_confirmed': '🎉',
+        'beautician_assigned': '💅',
+        'booking_rescheduled': '📅',
+        'booking_cancelled': '❌',
+        'booking_completed': '✅',
+        'general': '🔔',
+    }
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='app_notifications',
+    )
+    booking = models.ForeignKey(
+        'Booking',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notifications',
+    )
+    ntype = models.CharField(max_length=30, choices=NTYPE_CHOICES, default='general')
+    title = models.CharField(max_length=140)
+    body = models.TextField()
+    read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'[{self.ntype}] {self.title} → {self.user}'
+
+    @property
+    def icon(self):
+        return self.NTYPE_ICONS.get(self.ntype, '🔔')
+
+    @property
+    def time_label(self):
+        """Human-readable relative time — e.g. 'Just now', '5m ago', '2h ago', '3 days ago'."""
+        from django.utils import timezone as tz
+        delta = tz.now() - self.created_at
+        seconds = int(delta.total_seconds())
+        if seconds < 60:
+            return 'Just now'
+        if seconds < 3600:
+            return f'{seconds // 60}m ago'
+        if seconds < 86400:
+            return f'{seconds // 3600}h ago'
+        return f'{delta.days} day{"s" if delta.days != 1 else ""} ago'

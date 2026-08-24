@@ -2804,3 +2804,59 @@ Updated header and floating action icon buttons to use clean **Soft Light Surfac
 - **Active Navigation Tracking (`static/js/booking.js`)**: Added `updateBottomNavActiveState()` to dynamically highlight the active bottom nav item (Home, Services, or Profile) based on the current URL path.
 - **Mobile Notifications Dropdown Overflow Fix (`static/css/booking.css` & `static/css/components.css`)**: Updated `#notifications-panel` on mobile (`position: fixed`, `top: 4.25rem`, `right: var(--space-sm)`, `width: min(22rem, calc(100vw - 2 * var(--space-sm)))`, `max-height: calc(80vh - 4rem)`) so the panel pops up directly under the header without spilling off the right edge of the screen. Fixed `.btn-icon:hover` and `.app-navbar__icon-btn:hover` to keep a light surface background (`var(--surface-2)` / `var(--surface-3)`) when clicked/hovered instead of turning dark navy.
 
+## Multi-Language i18n, Reports, MSME Branding & Gallery Toggle (added 2026-08-24)
+
+- **Multi-Language Support (Hindi / English) (BUG-13)**: Added Django i18n infrastructure (`LocaleMiddleware`, `LANGUAGES`, `LOCALE_PATHS`, `i18n` context processor) and mounted `path('i18n/', include('django.conf.urls.i18n'))`. Added language selection pill (`🌐 EN` | `🌐 हिंदी`) to both `navbar.html` and `app_navbar.html`. Enhanced `.lang-switch-select` CSS contrast in `components.css` for transparent hero vs. scrolled navbar states. Created Hindi catalog `locale/hi/LC_MESSAGES/django.po` and compiled binary `django.mo`.
+- **MSME Legal Enterprise Branding Alignment**: Updated `settings.py` (`SITE_LEGAL_NAME = 'ELIX PREMIUM SALON AT HOME'`, `SITE_UDYAM = 'UDYAM-MP-23-0303972'`, registered address, phone, and email), `core/context_processors.py`, and `templates/partials/footer.html` to display the exact legal enterprise details from the official Udyam Certificate. Guarantees 100% compliance during Meta Business Manager & WhatsApp Business API verification.
+- **Homepage Gallery Toggle**: Wrapped the gallery component include in `templates/index.html` with `{% comment %}` tags, hiding the gallery section from the live landing page while preserving `templates/components/gallery.html` and backing data models intact for future re-enablement.
+- **Transactional Multi-threaded Email Engine & Reports Dashboard**: Implemented multi-threaded Brevo email dispatching with HTML templates (customer booking confirmations, beautician assignments, reschedules, cancellations, completion receipts) and built the `/dashboard/reports/` analytics module with date-range filters, Chart.js trends, and CSV exports.
+
+## In-App Notification System (added 2026-08-24)
+
+Real per-user notification system replacing the static `SiteNotification` mock feed. Notifications appear in the bell dropdown in the booking app header and are generated automatically at every booking lifecycle event.
+
+### Model — `bookings.UserNotification`
+- `user` FK (CASCADE) → authenticated customer.
+- `booking` FK (SET_NULL, nullable) → originating `Booking`, preserved as a reference even after deletion.
+- `ntype` — one of `booking_confirmed | beautician_assigned | booking_rescheduled | booking_cancelled | booking_completed | general`.
+- `title`, `body` — pre-formatted human-readable strings, generated from templates in `bookings/notifications.py`.
+- `read` — `BooleanField(default=False)`; flipped via the mark-read API.
+- `created_at` — ordered `['-created_at']`; `time_label` property returns a human-readable relative string ("Just now", "5m ago", "2h ago", "3 days ago").
+- Migration: `bookings/migrations/0021_add_user_notification.py`.
+
+### Helper — `bookings/notifications.py`
+- `notify_user(booking, ntype)` — creates a `UserNotification` row synchronously (fast, DB insert only). Swallows all exceptions so a notification failure never blocks a booking request. Message copy (title + body templates with `{booking_number}`, `{beautician_name}`, `{date}`, `{slot}` placeholders) is defined in the module-level `_MESSAGES` dict — adding a new event type is one dict entry + one call site.
+
+### Notification Triggers (wired alongside emails)
+| Event | File | notify_user call |
+|---|---|---|
+| Booking confirmed | `bookings/views.py::create_booking` | `booking_confirmed` |
+| Customer cancel | `bookings/views.py::cancel_booking` | `booking_cancelled` |
+| Reschedule | `bookings/views.py::reschedule_booking` | `booking_rescheduled` |
+| Beautician assigned (overview AJAX) | `core/admin_dashboard_views.py` (L~172) | `beautician_assigned` |
+| Beautician assigned (detail page) | `core/admin_dashboard_views.py` (L~428) | `beautician_assigned` |
+| Booking completed | `core/admin_dashboard_views.py` (L~413) | `booking_completed` |
+
+### API Endpoints (`bookings/urls.py`)
+| URL | View | Purpose |
+|---|---|---|
+| `GET /booking/notifications/` | `notifications_list` | Returns last 20 notifications + `unread_count` as JSON |
+| `POST /booking/notifications/<id>/read/` | `notification_mark_read` | Marks one notification read |
+| `POST /booking/notifications/read-all/` | `notifications_mark_all_read` | Bulk-marks all unread notifications read |
+
+All three require `@login_required`. The list endpoint returns: `{id, ntype, icon, title, body, time_label, read, booking_number}` per item.
+
+### Frontend (`static/js/booking.js::initNotifications`)
+- Fetches `/booking/notifications/` on **bell open** and polls every **60 seconds** while the tab is visible (pauses on `visibilitychange hidden`).
+- Renders each notification with type-aware emoji icon, unread gold dot (type-coloured: red for cancelled, green for completed, blue for rescheduled, purple for assigned).
+- **Mark read**: clicking any unread item POSTs to `/booking/notifications/<id>/read/` and re-fetches to update the badge count.
+- **Mark all read**: "Mark all read" button (shown only when `unread_count > 0`) POSTs to `/booking/notifications/read-all/`.
+- **Bell badge dot** (`[data-notif-dot]`): toggled `hidden` on every poll based on `unread_count`.
+- In-place DOM update: existing items are updated in place (read-state toggle only) instead of fully re-rendered — avoids flicker on every poll tick.
+
+### CSS (`static/css/booking.css`)
+Updated `.notif-item` with: icon column (`.notif-item__icon`), body text and time elements, unread gold background tint (`rgba(201,161,90,0.05)`), type-aware dot colours (`.notif-item--cancelled/completed/rescheduled/assigned`).
+
+### Admin
+`UserNotification` registered in `bookings/admin.py` with `list_display`, `list_filter`, `search_fields`, and `raw_id_fields` for easy debugging.
+

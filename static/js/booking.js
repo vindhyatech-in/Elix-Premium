@@ -1331,6 +1331,154 @@
     });
   }
 
+  /* ---------------------------------------------------------
+   * In-app Notification Bell — polls /booking/notifications/ on open
+   * and every 60 seconds. Marks individual or all notifications read
+   * via the API and updates the bell badge in real time.
+   * ------------------------------------------------------- */
+  function initNotifications() {
+    const bellTrigger = document.querySelector('[aria-controls="notifications-panel"]');
+    const panel = document.getElementById('notifications-panel');
+    const listBody = document.getElementById('notif-list-body');
+    const emptyState = document.getElementById('notif-empty-state');
+    const markAllBtn = document.getElementById('notif-mark-all-btn');
+    const badgeDot = document.querySelector('[data-notif-dot]');
+
+    if (!panel || !listBody) return;
+
+    // Only run for authenticated users — the API requires login.
+    if (!window.__isAuthenticated) return;
+
+    const CSRF = getCsrfToken();
+    const POLL_MS = 60_000;
+    let pollTimer = null;
+
+    function updateBadge(unreadCount) {
+      if (!badgeDot) return;
+      badgeDot.hidden = unreadCount === 0;
+    }
+
+    function nTypeClass(ntype) {
+      const map = {
+        booking_confirmed: 'notif-item--confirmed',
+        beautician_assigned: 'notif-item--assigned',
+        booking_rescheduled: 'notif-item--rescheduled',
+        booking_cancelled: 'notif-item--cancelled',
+        booking_completed: 'notif-item--completed',
+      };
+      return map[ntype] || '';
+    }
+
+    function renderNotifications(data) {
+      const { unread_count, notifications } = data;
+      updateBadge(unread_count);
+
+      if (markAllBtn) markAllBtn.style.display = unread_count > 0 ? '' : 'none';
+
+      // Keep existing items for in-place read-state update (avoids flicker)
+      const existingItems = {};
+      listBody.querySelectorAll('.notif-item[data-notif-id]').forEach((el) => {
+        existingItems[el.dataset.notifId] = el;
+      });
+
+      if (!notifications.length) {
+        listBody.innerHTML = '';
+        if (emptyState) { emptyState.style.display = ''; }
+        return;
+      }
+      if (emptyState) emptyState.style.display = 'none';
+
+      const fragment = document.createDocumentFragment();
+      notifications.forEach((n) => {
+        let el = existingItems[n.id];
+        if (el) {
+          // Just update read state in place
+          el.classList.toggle('notif-item--unread', !n.read);
+          delete existingItems[n.id];
+          fragment.appendChild(el);
+          return;
+        }
+
+        el = document.createElement('div');
+        el.className = `notif-item ${n.read ? '' : 'notif-item--unread'} ${nTypeClass(n.ntype)}`.trim();
+        el.dataset.notifId = n.id;
+        el.innerHTML = `
+          <span class="notif-item__icon" aria-hidden="true">${escapeHtml(n.icon)}</span>
+          <div class="notif-item__copy">
+            <strong class="notif-item__title">${escapeHtml(n.title)}</strong>
+            <p class="notif-item__body">${escapeHtml(n.body)}</p>
+            <time class="notif-item__time">${escapeHtml(n.time_label)}</time>
+          </div>
+          ${!n.read ? '<span class="notif-item__dot" aria-label="Unread"></span>' : ''}
+        `;
+
+        el.addEventListener('click', () => markRead(n.id, el));
+        fragment.appendChild(el);
+      });
+
+      listBody.innerHTML = '';
+      listBody.appendChild(fragment);
+    }
+
+    async function fetchNotifications() {
+      try {
+        const res = await fetch('/booking/notifications/', { credentials: 'same-origin' });
+        if (!res.ok) return;
+        const data = await res.json();
+        renderNotifications(data);
+      } catch (_) { /* silently swallow network failures */ }
+    }
+
+    async function markRead(notifId, el) {
+      if (!el.classList.contains('notif-item--unread')) return;
+      try {
+        await fetch(`/booking/notifications/${notifId}/read/`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'X-CSRFToken': CSRF },
+        });
+        el.classList.remove('notif-item--unread');
+        el.querySelector('.notif-item__dot')?.remove();
+        // Re-fetch to update badge count
+        fetchNotifications();
+      } catch (_) {}
+    }
+
+    markAllBtn?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await fetch('/booking/notifications/read-all/', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'X-CSRFToken': CSRF },
+        });
+        fetchNotifications();
+      } catch (_) {}
+    });
+
+    // Load on bell open
+    bellTrigger?.addEventListener('click', () => {
+      const isOpening = !panel.closest('[data-dropdown]')?.classList.contains('is-open');
+      if (isOpening) fetchNotifications();
+    });
+
+    // Background polling — updates badge dot even when panel is closed
+    function startPolling() {
+      fetchNotifications();
+      pollTimer = setInterval(fetchNotifications, POLL_MS);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        clearInterval(pollTimer);
+      } else {
+        startPolling();
+      }
+    });
+
+    startPolling();
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     initDropdowns();
     initMobileFilters();
@@ -1349,6 +1497,7 @@
     initSkeletonReveal();
     updateFilterBadge();
     updateBottomNavActiveState();
+    initNotifications();
   });
 
   window.onCustomerPackageVariantChange = function(selectEl) {

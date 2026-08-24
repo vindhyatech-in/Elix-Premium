@@ -23,6 +23,7 @@ from django.views.decorators.http import require_GET
 from accounts.models import Employee, EmployeeLeave
 from accounts.utils import generate_username_from_name
 from bookings.models import Booking, Offer
+from bookings.notifications import notify_user
 from catalog.models import Category, Package, Service, ServiceVariant
 from core.decorators import owner_required
 from core.email_service import send_booking_email_all
@@ -173,6 +174,7 @@ def dashboard_overview(request):
                     event_beautician='beautician_assigned_job',
                     booking=booking,
                 )
+                notify_user(booking, 'beautician_assigned')
             else:
                 booking.assigned_beautician = None
                 booking.save(update_fields=['assigned_beautician'])
@@ -410,6 +412,7 @@ def dashboard_bookings(request):
                         event_beautician='beautician_job_completed',
                         booking=booking,
                     )
+                    notify_user(booking, 'booking_completed')
 
         elif action == 'assign_beautician':
             beautician_id = request.POST.get('beautician_id')
@@ -426,6 +429,7 @@ def dashboard_bookings(request):
                     event_beautician='beautician_assigned_job',
                     booking=booking,
                 )
+                notify_user(booking, 'beautician_assigned')
             else:
                 booking.assigned_beautician = None
                 booking.reset_face_verification()
