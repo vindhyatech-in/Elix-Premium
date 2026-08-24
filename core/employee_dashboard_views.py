@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from core.decorators import is_owner, owner_or_emp_required
+from core.email_service import send_booking_email_all
 from core.utils import get_object_or_404_safe, looks_like_phone, validate_image_upload
 
 # How long a generated start OTP stays valid — long enough that a slow
@@ -273,6 +274,13 @@ def employee_dashboard(request):
                 booking.status = new_status
                 booking.save()
                 messages.success(request, f'Order #{booking.booking_number} updated to {booking.get_status_display()}.')
+                # Notify all three parties that the job is done
+                send_booking_email_all(
+                    event_customer='booking_completed',
+                    event_admin='admin_booking_completed',
+                    event_beautician='beautician_job_completed',
+                    booking=booking,
+                )
 
         elif action == 'mark_paid' and employee:
             booking_id = request.POST.get('booking_id')

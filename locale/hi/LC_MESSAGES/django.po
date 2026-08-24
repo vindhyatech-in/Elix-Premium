@@ -1,0 +1,55 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: GlamourAtHome 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-19 19:43+0530\n"
+"PO-Revision-Date: 2026-08-19 19:43+0530\n"
+"Last-Translator: Elix Team <admin@elix.in>\n"
+"Language-Team: Hindi <hi@li.org>\n"
+"Language: hi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Categories"
+msgstr "श्रेणियाँ"
+
+msgid "Offers"
+msgstr "ऑफ़र"
+
+msgid "Packages"
+msgstr "पैकेजेस"
+
+msgid "All Services"
+msgstr "सभी सेवाएं"
+
+msgid "View All Packages"
+msgstr "सभी पैकेजेस देखें"
+
+msgid "Download App"
+msgstr "ऐप डाउनलोड करें"
+
+msgid "Book Now"
+msgstr "अभी बुक करें"
+
+msgid "Services"
+msgstr "सेवाएं"
+
+msgid "Bookings"
+msgstr "बुकिंग्स"
+
+msgid "Employees"
+msgstr "कर्मचारी"
+
+msgid "Reports"
+msgstr "रिपोर्ट्स"
+
+msgid "Logout"
+msgstr "लॉगआउट"
+
+msgid "Overview"
+msgstr "अवलोकन"
+
+msgid "Luxury Beauty at Home"
+msgstr "घर पर लक्जरी ब्यूटी सेवाएं"

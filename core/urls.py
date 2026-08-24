@@ -10,6 +10,7 @@ urlpatterns = [
     path('sitemap.xml', views.sitemap_xml, name='sitemap_xml'),
     path('privacy-policy/', views.privacy_policy, name='privacy_policy'),
     path('terms-and-conditions/', views.terms_and_conditions, name='terms_and_conditions'),
+    path('contact/', views.contact_submit, name='contact_submit'),
     # Owner / Admin Dashboard
     path('dashboard/', admin_dashboard_views.dashboard_overview, name='admin_dashboard_overview'),
     path('dashboard/bookings/', admin_dashboard_views.dashboard_bookings, name='admin_dashboard_bookings'),
@@ -19,6 +20,8 @@ urlpatterns = [
     path('dashboard/schedule/', admin_dashboard_views.dashboard_schedule, name='admin_dashboard_schedule'),
     path('dashboard/categories/', admin_dashboard_views.dashboard_categories, name='admin_dashboard_categories'),
     path('dashboard/offers/', admin_dashboard_views.dashboard_offers, name='admin_dashboard_offers'),
+    path('dashboard/reports/', admin_dashboard_views.dashboard_reports, name='admin_dashboard_reports'),
+    path('dashboard/reports/export/', admin_dashboard_views.dashboard_reports_export, name='admin_dashboard_reports_export'),
     # Employee / Beautician Dashboard
     path('employee/', employee_dashboard_views.employee_dashboard, name='employee_dashboard'),
     path('employee/profile/', employee_dashboard_views.employee_profile_view, name='employee_profile'),

@@ -1,4 +1,6 @@
 import calendar as calendar_module
+import csv
+import json
 import secrets
 from datetime import datetime, timedelta
 from datetime import time as dt_time
@@ -11,16 +13,19 @@ MONTH_NAMES = [
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
 from django.db import transaction
-from django.db.models import Count, F, Min, Prefetch, ProtectedError, Q, Sum
+from django.db.models import Avg, Count, F, Min, Prefetch, ProtectedError, Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_GET
 
 from accounts.models import Employee, EmployeeLeave
 from accounts.utils import generate_username_from_name
 from bookings.models import Booking, Offer
 from catalog.models import Category, Package, Service, ServiceVariant
 from core.decorators import owner_required
+from core.email_service import send_booking_email_all
 from core.utils import (
     generate_unique_slug, get_object_or_404_safe, looks_like_phone,
     paginate_queryset, parse_duration, parse_money, validate_image_upload, validate_url,
@@ -161,6 +166,13 @@ def dashboard_overview(request):
                 booking.assigned_beautician = beautician
                 booking.save(update_fields=['assigned_beautician'])
                 messages.success(request, f'Order #{booking.booking_number} assigned to {beautician.name}.')
+                # Notify customer and the newly assigned beautician
+                send_booking_email_all(
+                    event_customer='beautician_assigned',
+                    event_admin=None,
+                    event_beautician='beautician_assigned_job',
+                    booking=booking,
+                )
             else:
                 booking.assigned_beautician = None
                 booking.save(update_fields=['assigned_beautician'])
@@ -390,6 +402,14 @@ def dashboard_bookings(request):
                     booking.payment_status = new_payment
                 booking.save()
                 messages.success(request, f'Order #{booking.booking_number} status updated to {booking.get_status_display()}.')
+                # Email on completion
+                if new_status == 'completed':
+                    send_booking_email_all(
+                        event_customer='booking_completed',
+                        event_admin='admin_booking_completed',
+                        event_beautician='beautician_job_completed',
+                        booking=booking,
+                    )
 
         elif action == 'assign_beautician':
             beautician_id = request.POST.get('beautician_id')
@@ -399,6 +419,13 @@ def dashboard_bookings(request):
                     booking.reset_face_verification()
                 booking.assigned_beautician = beautician
                 messages.success(request, f'Assigned {beautician.name} to Order #{booking.booking_number}.')
+                # Notify customer and beautician of the (re)assignment
+                send_booking_email_all(
+                    event_customer='beautician_assigned',
+                    event_admin=None,
+                    event_beautician='beautician_assigned_job',
+                    booking=booking,
+                )
             else:
                 booking.assigned_beautician = None
                 booking.reset_face_verification()
@@ -1246,3 +1273,278 @@ def dashboard_schedule(request):
     Schedule & Calendar is now combined into the main Dashboard Overview.
     """
     return dashboard_overview(request)
+
+
+@owner_required
+@require_GET
+def dashboard_reports(request):
+    """
+    Reports & Analytics page (BUG-10 / Section 17).
+
+    Supports:
+      - Date range via ?from_date=YYYY-MM-DD&to_date=YYYY-MM-DD
+        (defaults: last 30 days)
+      - Five report sections:
+        1. Revenue trend — daily completed-booking totals (JSON for Chart.js)
+        2. Bookings by status — counts per status (JSON for Chart.js doughnut)
+        3. Top 10 services by bookings (revenue + count)
+        4. Beautician performance (jobs done, total revenue, avg rating)
+        5. Customer overview (total customers, repeat rate, top spenders)
+    """
+    today = timezone.now().date()
+
+    # --- Date range ---
+    raw_from = request.GET.get('from_date', '').strip()
+    raw_to   = request.GET.get('to_date', '').strip()
+    from_date = parse_date(raw_from) if raw_from else today - timedelta(days=29)
+    to_date   = parse_date(raw_to)   if raw_to   else today
+    if not from_date or not to_date or from_date > to_date:
+        from_date = today - timedelta(days=29)
+        to_date   = today
+
+    # --- Baseline QS filtered by date range ---
+    completed_qs = (
+        Booking.objects.filter(
+            status='completed',
+            scheduled_date__gte=from_date,
+            scheduled_date__lte=to_date,
+        )
+    )
+    all_qs = (
+        Booking.objects.filter(
+            scheduled_date__gte=from_date,
+            scheduled_date__lte=to_date,
+        )
+    )
+
+    # --- 1. Revenue trend (daily) ---
+    from django.db.models.functions import TruncDate
+    revenue_by_day = (
+        completed_qs
+        .annotate(day=TruncDate('scheduled_date'))
+        .values('day')
+        .annotate(revenue=Sum('total_amount'), count=Count('id'))
+        .order_by('day')
+    )
+    # Build a complete day-by-day series (fill gaps with 0)
+    day_map = {row['day']: {'revenue': float(row['revenue']), 'count': row['count']}
+               for row in revenue_by_day}
+    trend_labels, trend_revenue, trend_count = [], [], []
+    cursor = from_date
+    while cursor <= to_date:
+        trend_labels.append(cursor.strftime('%-d %b'))
+        d = day_map.get(cursor, {})
+        trend_revenue.append(d.get('revenue', 0))
+        trend_count.append(d.get('count', 0))
+        cursor += timedelta(days=1)
+
+    # --- 2. Bookings by status ---
+    status_counts = {
+        row['status']: row['cnt']
+        for row in all_qs.values('status').annotate(cnt=Count('id'))
+    }
+    status_order = ['upcoming', 'on_the_way', 'in_progress', 'completed', 'cancelled']
+    status_labels = ['Upcoming', 'On The Way', 'In Progress', 'Completed', 'Cancelled']
+    status_data   = [status_counts.get(s, 0) for s in status_order]
+
+    # --- 3. Top services by booking items ---
+    from bookings.models import BookingItem
+    top_services = (
+        BookingItem.objects
+        .filter(
+            booking__status='completed',
+            booking__scheduled_date__gte=from_date,
+            booking__scheduled_date__lte=to_date,
+        )
+        .values('name_snapshot')
+        .annotate(
+            bookings=Count('id'),
+            revenue=Sum(F('price_snapshot') * F('quantity')),
+        )
+        .order_by('-bookings')[:10]
+    )
+
+    # --- 4. Beautician performance ---
+    beautician_perf = (
+        completed_qs
+        .filter(assigned_beautician__isnull=False)
+        .values('assigned_beautician__name', 'assigned_beautician__id')
+        .annotate(
+            jobs=Count('id'),
+            revenue=Sum('total_amount'),
+        )
+        .order_by('-jobs')[:15]
+    )
+
+    # Avg rating per beautician
+    from bookings.models import Review
+    rating_map = {
+        row['booking__assigned_beautician_id']: row['avg']
+        for row in Review.objects
+        .filter(
+            booking__status='completed',
+            booking__scheduled_date__gte=from_date,
+            booking__scheduled_date__lte=to_date,
+            booking__assigned_beautician__isnull=False,
+        )
+        .values('booking__assigned_beautician_id')
+        .annotate(avg=Avg('rating'))
+    }
+    beautician_rows = []
+    for b in beautician_perf:
+        bid = b['assigned_beautician__id']
+        avg_r = rating_map.get(bid)
+        beautician_rows.append({
+            'name':    b['assigned_beautician__name'],
+            'jobs':    b['jobs'],
+            'revenue': b['revenue'] or 0,
+            'rating':  round(avg_r, 1) if avg_r else None,
+        })
+
+    # --- 5. Customer overview ---
+    from django.contrib.auth.models import User as AuthUser
+    total_customers = AuthUser.objects.filter(
+        bookings__scheduled_date__gte=from_date,
+        bookings__scheduled_date__lte=to_date,
+    ).distinct().count()
+
+    repeat_customers = (
+        AuthUser.objects
+        .filter(
+            bookings__scheduled_date__gte=from_date,
+            bookings__scheduled_date__lte=to_date,
+            bookings__status='completed',
+        )
+        .annotate(cnt=Count('bookings'))
+        .filter(cnt__gte=2)
+        .count()
+    )
+
+    top_customers = (
+        completed_qs
+        .values('user__id', 'user__first_name', 'user__last_name', 'user__email')
+        .annotate(bookings=Count('id'), spent=Sum('total_amount'))
+        .order_by('-spent')[:10]
+    )
+
+    # --- Summary KPIs ---
+    total_revenue    = completed_qs.aggregate(s=Sum('total_amount'))['s'] or 0
+    total_bookings   = all_qs.count()
+    completed_count  = completed_qs.count()
+    cancelled_count  = all_qs.filter(status='cancelled').count()
+    completion_rate  = round(completed_count / total_bookings * 100, 1) if total_bookings else 0
+
+    context = {
+        'page_title': 'Reports & Analytics',
+        'active_nav': 'reports',
+        'from_date':  from_date,
+        'to_date':    to_date,
+        # KPIs
+        'total_revenue':   total_revenue,
+        'total_bookings':  total_bookings,
+        'completed_count': completed_count,
+        'cancelled_count': cancelled_count,
+        'completion_rate': completion_rate,
+        'total_customers': total_customers,
+        # Chart data (JSON-safe)
+        'trend_labels_json':  json.dumps(trend_labels),
+        'trend_revenue_json': json.dumps(trend_revenue),
+        'trend_count_json':   json.dumps(trend_count),
+        'status_labels_json': json.dumps(status_labels),
+        'status_data_json':   json.dumps(status_data),
+        # Table data
+        'top_services':     list(top_services),
+        'beautician_rows':  beautician_rows,
+        'top_customers':    list(top_customers),
+    }
+    return render(request, 'admin_dashboard/reports.html', context)
+
+
+@owner_required
+@require_GET
+def dashboard_reports_export(request):
+    """
+    CSV export endpoint: GET /dashboard/reports/export/?type=bookings|services|beauticians&from_date=&to_date=
+    Streams the CSV directly — no temp files, no memory accumulation.
+    """
+    today = timezone.now().date()
+    raw_from = request.GET.get('from_date', '').strip()
+    raw_to   = request.GET.get('to_date', '').strip()
+    from_date = parse_date(raw_from) if raw_from else today - timedelta(days=29)
+    to_date   = parse_date(raw_to)   if raw_to   else today
+    if not from_date or not to_date or from_date > to_date:
+        from_date = today - timedelta(days=29)
+        to_date   = today
+
+    export_type = request.GET.get('type', 'bookings')
+    filename = f'elix_{export_type}_{from_date}_{to_date}.csv'
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+
+    if export_type == 'bookings':
+        writer.writerow(['Booking #', 'Date', 'Customer', 'Email', 'Status',
+                         'Payment Method', 'Payment Status', 'Subtotal',
+                         'Discount', 'Total', 'Beautician', 'Address'])
+        qs = (
+            Booking.objects
+            .filter(scheduled_date__gte=from_date, scheduled_date__lte=to_date)
+            .select_related('user', 'assigned_beautician')
+            .order_by('-scheduled_date')
+        )
+        for b in qs:
+            writer.writerow([
+                b.booking_number,
+                b.scheduled_date.strftime('%Y-%m-%d'),
+                b.user.get_full_name() or b.user.username,
+                b.user.email,
+                b.get_status_display(),
+                b.get_payment_method_display(),
+                b.get_payment_status_display(),
+                b.subtotal,
+                b.discount_amount,
+                b.total_amount,
+                b.assigned_beautician.name if b.assigned_beautician else '',
+                b.address_text,
+            ])
+
+    elif export_type == 'services':
+        from bookings.models import BookingItem
+        writer.writerow(['Service / Package', 'Bookings', 'Total Revenue (₹)'])
+        rows = (
+            BookingItem.objects
+            .filter(
+                booking__scheduled_date__gte=from_date,
+                booking__scheduled_date__lte=to_date,
+                booking__status='completed',
+            )
+            .values('name_snapshot')
+            .annotate(bookings=Count('id'), revenue=Sum(F('price_snapshot') * F('quantity')))
+            .order_by('-bookings')
+        )
+        for r in rows:
+            writer.writerow([r['name_snapshot'], r['bookings'], r['revenue'] or 0])
+
+    elif export_type == 'beauticians':
+        writer.writerow(['Beautician', 'Jobs Completed', 'Total Revenue (₹)'])
+        rows = (
+            Booking.objects
+            .filter(
+                status='completed',
+                scheduled_date__gte=from_date,
+                scheduled_date__lte=to_date,
+                assigned_beautician__isnull=False,
+            )
+            .values('assigned_beautician__name')
+            .annotate(jobs=Count('id'), revenue=Sum('total_amount'))
+            .order_by('-jobs')
+        )
+        for r in rows:
+            writer.writerow([
+                r['assigned_beautician__name'],
+                r['jobs'],
+                r['revenue'] or 0,
+            ])
+
+    return response

@@ -297,21 +297,56 @@
 
   /* ---------------------------------------------------------
    * Lead-gen forms (contact + newsletter)
-   * No backend yet — simulated success state.
-   * Future: POST /api/v1/leads/ and /api/v1/newsletter/
+   * Contact: real POST to /contact/ (JSON) — core/views.py::contact_submit
+   * Newsletter: still client-side only (no newsletter backend yet)
    * ------------------------------------------------------- */
+  function getCsrfToken() {
+    const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : '';
+  }
+
   function initLeadForms() {
     const contactForm = document.querySelector('[data-contact-form]');
     if (contactForm) {
       const status = contactForm.querySelector('[data-contact-status]');
-      contactForm.addEventListener('submit', (e) => {
+      const submitBtn = contactForm.querySelector('[type="submit"]');
+
+      contactForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!contactForm.checkValidity()) { contactForm.reportValidity(); return; }
-        status.textContent = 'Sending...';
-        setTimeout(() => {
-          status.textContent = "Thank you! Our concierge team will call you within the hour.";
+
+        const name    = (contactForm.querySelector('[name="name"]')?.value    || '').trim();
+        const phone   = (contactForm.querySelector('[name="phone"]')?.value   || '').trim();
+        const message = (contactForm.querySelector('[name="message"]')?.value || '').trim();
+
+        submitBtn.disabled = true;
+        status.textContent = 'Sending\u2026';
+        status.style.color = '';
+
+        let data;
+        try {
+          const response = await fetch('/contact/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({ name, phone, message }),
+          });
+          data = await response.json();
+        } catch (err) {
+          status.textContent = 'Network error \u2014 please try again or call us directly.';
+          status.style.color = 'var(--color-error, #e53935)';
+          submitBtn.disabled = false;
+          return;
+        }
+
+        if (data.ok) {
+          status.textContent = 'Thank you! Our concierge team will call you within the hour.';
+          status.style.color = 'var(--color-success, #2e7d32)';
           contactForm.reset();
-        }, 900);
+        } else {
+          status.textContent = data.error || 'Something went wrong \u2014 please try again.';
+          status.style.color = 'var(--color-error, #e53935)';
+        }
+        submitBtn.disabled = false;
       });
     }
 

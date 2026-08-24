@@ -1,0 +1,16 @@
+{% extends "emails/base_email.html" %}
+{% block body %}
+<span class="status-badge status-cancelled">✕ Booking Cancelled</span>
+<h1>Booking cancelled by customer</h1>
+<p class="subtitle">A customer has cancelled their booking. Please review if any re-assignment is needed.</p>
+
+<div class="info-card">
+  <div class="info-row"><span class="info-label">Booking No.</span><span class="info-value"><strong>{{ booking.booking_number }}</strong></span></div>
+  <div class="info-row"><span class="info-label">Customer</span><span class="info-value">{{ booking.user.get_full_name|default:booking.user.email }}</span></div>
+  <div class="info-row"><span class="info-label">Date</span><span class="info-value">{{ booking.scheduled_date|date:"D, d M Y" }}</span></div>
+  <div class="info-row"><span class="info-label">Slot</span><span class="info-value">{{ time_display }}</span></div>
+  {% if beautician %}<div class="info-row"><span class="info-label">Was Assigned To</span><span class="info-value">{{ beautician.name }}</span></div>{% endif %}
+  <div class="info-row"><span class="info-label">Payment Status</span><span class="info-value">{{ booking.get_payment_status_display }}</span></div>
+  <div class="info-row"><span class="info-label">Total</span><span class="info-value">₹{{ booking.total_amount }}</span></div>
+</div>
+{% endblock %}

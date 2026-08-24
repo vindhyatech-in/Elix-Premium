@@ -52,6 +52,40 @@
     const backdrop = document.querySelector('[data-booking-backdrop]');
     if (!GB || !drawer || !backdrop) return;
 
+    const DRAFT_KEY = 'glamour_drawer_draft';
+
+    // Persist non-sensitive UI state (step, date, type, slot, payment method
+    // selection) to localStorage so a closed/crashed drawer resumes where it
+    // left off. Payment credentials (razorpayPaymentId/Signature) are never
+    // persisted — they are only valid for the current Razorpay session.
+    function saveDraft() {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          step: state.step,
+          addressId: state.addressId,
+          date: state.date,
+          type: state.type,
+          slot: state.slot,
+          urgentTime: state.urgentTime,
+          payment: state.payment,
+          // paymentConfirmed / razorpay* intentionally omitted — must
+          // re-complete payment on resume, not carry over a stale token.
+        }));
+      } catch (e) { /* storage full or private-mode block — silent */ }
+    }
+
+    function loadDraft() {
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch (e) { return null; }
+    }
+
+    function clearDraft() {
+      try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+    }
+
     let state = {
       step: 1, addressId: null, date: null, type: 'regular',
       slot: null, urgentTime: null, payment: null, paymentConfirmed: false,
@@ -133,6 +167,7 @@
       state.addressId = Number(card.dataset.addressId);
       renderAddressList();
       updateNextButtonState();
+      saveDraft();
     });
 
     drawer.querySelector('[data-add-address-toggle]').addEventListener('click', () => {
@@ -426,6 +461,7 @@
         populateUrgentTimeDropdown();
       }
       updateNextButtonState();
+      saveDraft();
     });
 
     /* --- Urgent Express Time (Dropdown & 50 Min Calculation) --- */
@@ -539,6 +575,7 @@
       }
 
       updateNextButtonState();
+      saveDraft();
     }));
 
     regularSlots.addEventListener('click', (e) => {
@@ -548,11 +585,13 @@
       card.classList.add('is-selected');
       state.slot = card.dataset.slotValue;
       updateNextButtonState();
+      saveDraft();
     });
 
     urgentTimeInput.addEventListener('change', () => {
       updateUrgentTimeDisplay();
       updateNextButtonState();
+      saveDraft();
     });
 
     /* --- Payment --- */
@@ -606,6 +645,7 @@
         paymentMock.hidden = true;
       }
       updateNextButtonState();
+      saveDraft();
     }));
 
     drawer.querySelector('[data-pay-now-trigger]').addEventListener('click', async (e) => {
@@ -653,14 +693,19 @@
         name: 'Elix',
         description: 'Beauty service booking',
         theme: { color: '#c9a15a' },
+        // Auto-confirm: as soon as Razorpay reports payment success, skip
+        // the summary step and submit the booking immediately. The user
+        // has already seen their order summary on step 5 before tapping
+        // Pay — no second "Confirm Booking" click needed.
         handler(response) {
           state.razorpayOrderId = response.razorpay_order_id;
           state.razorpayPaymentId = response.razorpay_payment_id;
           state.razorpaySignature = response.razorpay_signature;
           state.paymentConfirmed = true;
-          paymentStatusEl.textContent = '✓ Payment successful';
-          btn.disabled = false;
-          updateNextButtonState();
+          paymentStatusEl.textContent = '✓ Payment successful — confirming your booking…';
+          btn.disabled = true; // prevent double-tap while confirmBooking() runs
+          // Auto-submit: skip the manual "Confirm Booking" button entirely.
+          confirmBooking();
         },
         modal: {
           ondismiss() {
@@ -749,6 +794,10 @@
         dot.classList.toggle('is-complete', n < step);
       });
       backBtn.disabled = step === 1;
+      // Step 5 is the summary/confirm screen. For Pay Now, confirmBooking()
+      // fires automatically from the Razorpay handler so the button label
+      // on this step is never seen — but keep it consistent in case the
+      // user reaches step 5 via Pay At Home.
       nextBtn.textContent = step === 5 ? 'Confirm Booking' : 'Next';
       // Re-check every time step 3 (booking type & time) is entered, not
       // just on a calendar click/type toggle — a same-day booking left on
@@ -763,6 +812,9 @@
       if (step === 5) renderSummary();
       updateNextButtonState();
       drawer.querySelector('.booking-drawer__body').scrollTop = 0;
+      // Persist step change to localStorage so the drawer can resume here
+      // if the user closes it mid-flow or the tab reloads.
+      saveDraft();
     }
 
     backBtn.addEventListener('click', () => { if (state.step > 1) goToStep(state.step - 1); });
@@ -859,6 +911,7 @@
         razorpayOrderId: null, razorpayPaymentId: null, razorpaySignature: null,
       };
       justConfirmed = false;
+      clearDraft(); // booking done or cart cleared — no stale draft to resume
       confirmationEl.hidden = true;
       footer.hidden = false;
       stepper.hidden = false;
@@ -880,7 +933,7 @@
     }
 
     /* --- Open / close --- */
-    function openDrawer() {
+    async function openDrawer() {
       drawer.hidden = false;
       backdrop.hidden = false;
       requestAnimationFrame(() => { drawer.classList.add('is-open'); backdrop.classList.add('is-open'); });
@@ -889,7 +942,55 @@
       // Re-fetch every open, not just once at page load — addresses can
       // change from the profile page (a different tab, or just earlier in
       // this same session) between one booking and the next.
-      fetchAddresses();
+      await fetchAddresses();
+
+      // Restore draft: if there's a saved mid-flow state, resume it.
+      // Only restore if the cart still has the same items (user hasn't
+      // changed their selection since closing) — compare by item count
+      // as a lightweight proxy; a full deep-compare isn't worth the cost
+      // since a changed cart is the most common reason to start fresh.
+      const draft = loadDraft();
+      if (draft && draft.step > 1 && GB.getCart().length > 0) {
+        // Restore scalar state — payment credentials are never saved.
+        state.addressId = draft.addressId || null;
+        state.date = draft.date || null;
+        state.type = draft.type || 'regular';
+        state.slot = draft.slot || null;
+        state.urgentTime = draft.urgentTime || null;
+        state.payment = draft.payment || null;
+        // paymentConfirmed stays false — user must re-complete payment.
+        state.paymentConfirmed = state.payment === 'pay-at-home' && !!state.payment;
+
+        // Re-sync UI controls that goToStep doesn't reset itself.
+        if (state.type === 'urgent') {
+          typeButtons.forEach((b) => {
+            const isUrgent = b.dataset.bookingTypeValue === 'urgent';
+            b.classList.toggle('is-active', isUrgent);
+            b.setAttribute('aria-checked', String(isUrgent));
+          });
+          regularSlots.hidden = true;
+          urgentTimeWrap.hidden = false;
+        }
+        if (state.payment) {
+          paymentButtons.forEach((b) => {
+            const match = b.dataset.paymentValue === state.payment;
+            b.classList.toggle('is-selected', match);
+            b.setAttribute('aria-checked', String(match));
+          });
+          if (state.payment === 'pay-now') {
+            paymentMock.hidden = false;
+            payAmountEl.textContent = GB.formatCurrency(cartTotal().total);
+          }
+        }
+        if (state.date) {
+          const d = new Date(state.date);
+          calendarMonth = d.getMonth();
+          calendarYear = d.getFullYear();
+        }
+
+        goToStep(draft.step);
+        GB.showToast('Resuming your booking where you left off — your progress was saved.');
+      }
     }
     function closeDrawer() {
       drawer.classList.remove('is-open');

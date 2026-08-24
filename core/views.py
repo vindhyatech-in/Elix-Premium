@@ -7,12 +7,17 @@ for marketing content (hero, testimonials, gallery, etc.) and `catalog`/
 used anywhere in this view (see developed.md "Marketing content moved off
 mock_data.py").
 """
+import json
+import logging
+
 from django.conf import settings
-from django.http import HttpResponse
+from django.core.mail import send_mail
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import reverse
-from django.views.decorators.http import require_GET
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
 
 from accounts.models import Employee
 
@@ -21,6 +26,8 @@ from .models import (
     FAQ, BeautyTip, GalleryBeforeAfter, GalleryPortfolioItem,
     Hero, HowItWorksStep, Testimonial, TrustBadge, TrustPoint, ValuePillar,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def index(request):
@@ -230,3 +237,64 @@ def terms_and_conditions(request):
     return render(request, 'core/terms.html', {
         'page_title': f"Terms of Service — {settings.SITE_NAME}",
     })
+
+
+@csrf_exempt
+@require_POST
+def contact_submit(request):
+    """
+    POST /contact/ — AJAX JSON endpoint for the homepage contact/callback
+    request form. Accepts application/json or multipart/form-data (the form
+    submits JSON via fetch in main.js::initLeadForms).
+
+    Fields: name, phone, message (all strings, all required).
+    Returns: {ok: true} on success, {ok: false, error: "..."} on validation
+    failure or send error — no redirect, since the form is an inline section
+    on the homepage and should stay on the page after submission.
+
+    Email delivery uses whatever backend EMAIL_BACKEND is set to in settings:
+    - Dev: console backend (prints to terminal, no config needed)
+    - Prod: Brevo via anymail (same backend allauth uses for auth emails)
+    """
+    try:
+        if request.content_type and 'application/json' in request.content_type:
+            payload = json.loads(request.body.decode('utf-8'))
+        else:
+            payload = request.POST
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request.'}, status=400)
+
+    name = (payload.get('name') or '').strip()[:200]
+    phone = (payload.get('phone') or '').strip()[:20]
+    message = (payload.get('message') or '').strip()[:2000]
+
+    if not name:
+        return JsonResponse({'ok': False, 'error': 'Please enter your name.'}, status=400)
+    if not phone:
+        return JsonResponse({'ok': False, 'error': 'Please enter your phone number.'}, status=400)
+
+    subject = f'[Elix] Callback Request — {name}'
+    body = (
+        f'Name:    {name}\n'
+        f'Phone:   {phone}\n'
+        f'Message: {message or "(none)"}\n'
+    )
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[settings.SITE_EMAIL],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception(
+            'Contact form email failed — name=%r phone=%r', name, phone
+        )
+        return JsonResponse(
+            {'ok': False, 'error': 'Something went wrong sending your request — please call us directly.'},
+            status=502,
+        )
+
+    return JsonResponse({'ok': True})

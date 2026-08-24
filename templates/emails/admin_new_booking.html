@@ -1,0 +1,18 @@
+{% extends "emails/base_email.html" %}
+{% block body %}
+<span class="status-badge status-confirmed">🔔 New Booking</span>
+<h1>New booking received</h1>
+<p class="subtitle">A new booking has been placed on {{ site_name }}. Please assign a beautician.</p>
+
+<div class="info-card">
+  <div class="info-row"><span class="info-label">Booking No.</span><span class="info-value"><strong>{{ booking.booking_number }}</strong></span></div>
+  <div class="info-row"><span class="info-label">Customer</span><span class="info-value">{{ booking.user.get_full_name|default:booking.user.email }}</span></div>
+  <div class="info-row"><span class="info-label">Email</span><span class="info-value">{{ booking.user.email }}</span></div>
+  <div class="info-row"><span class="info-label">Date</span><span class="info-value">{{ booking.scheduled_date|date:"D, d M Y" }}</span></div>
+  <div class="info-row"><span class="info-label">Slot</span><span class="info-value">{{ time_display }}</span></div>
+  <div class="info-row"><span class="info-label">Address</span><span class="info-value">{{ booking.address_text }}{% if booking.address_pincode %}, {{ booking.address_pincode }}{% endif %}</span></div>
+  <div class="info-row"><span class="info-label">Services</span><span class="info-value">{% for item in items %}{{ item.name_snapshot }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
+  <div class="info-row"><span class="info-label">Total</span><span class="info-value">₹{{ booking.total_amount }}</span></div>
+  <div class="info-row"><span class="info-label">Payment</span><span class="info-value">{% if booking.payment_method == 'pay_now' %}Paid Online{% else %}Pay at Home{% endif %}</span></div>
+</div>
+{% endblock %}

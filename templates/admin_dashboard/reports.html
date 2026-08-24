@@ -1,0 +1,330 @@
+{% extends "admin_dashboard/layouts/admin_base.html" %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
+<style>
+  /* ── Reports page styles ─────────────────────────────────────────── */
+  .rpt-filter-bar {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;
+    background: var(--admin-card-bg, #fff); border: 1px solid var(--admin-border, #e8e8e8);
+    border-radius: 10px; padding: 16px 20px; margin-bottom: 24px;
+  }
+  .rpt-filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .rpt-filter-group label { font-size: 11px; font-weight: 600; color: var(--admin-muted, #888); text-transform: uppercase; letter-spacing: .5px; }
+  .rpt-filter-group input[type="date"] { padding: 8px 12px; border: 1px solid var(--admin-border, #e0e0e0); border-radius: 6px; font-size: 14px; background: var(--admin-bg, #fff); color: var(--admin-text, #1a1a2e); }
+  .rpt-filter-actions { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+
+  .rpt-kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .rpt-kpi { background: var(--admin-card-bg, #fff); border: 1px solid var(--admin-border, #e8e8e8); border-radius: 10px; padding: 18px 20px; }
+  .rpt-kpi__label { font-size: 11px; font-weight: 600; color: var(--admin-muted, #888); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .rpt-kpi__value { font-size: 26px; font-weight: 700; color: var(--admin-text, #1a1a2e); line-height: 1; }
+  .rpt-kpi__sub { font-size: 12px; color: var(--admin-muted, #888); margin-top: 4px; }
+  .rpt-kpi--gold .rpt-kpi__value { color: #c9a15a; }
+  .rpt-kpi--green .rpt-kpi__value { color: #2e7d32; }
+
+  .rpt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+  @media (max-width: 900px) { .rpt-grid { grid-template-columns: 1fr; } }
+
+  .rpt-card { background: var(--admin-card-bg, #fff); border: 1px solid var(--admin-border, #e8e8e8); border-radius: 10px; padding: 20px 24px; }
+  .rpt-card--wide { grid-column: 1 / -1; }
+  .rpt-card__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .rpt-card__title { font-size: 14px; font-weight: 600; color: var(--admin-text, #1a1a2e); }
+  .rpt-card__action { font-size: 12px; color: #c9a15a; text-decoration: none; }
+  .rpt-card__action:hover { text-decoration: underline; }
+  .chart-wrap { position: relative; height: 220px; }
+
+  .rpt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .rpt-table th { font-size: 11px; font-weight: 600; color: var(--admin-muted, #888); text-transform: uppercase; letter-spacing: .5px; padding: 6px 10px; border-bottom: 2px solid var(--admin-border, #e8e8e8); text-align: left; white-space: nowrap; }
+  .rpt-table th.right, .rpt-table td.right { text-align: right; }
+  .rpt-table td { padding: 9px 10px; border-bottom: 1px solid var(--admin-border, #f0f0f0); color: var(--admin-text, #1a1a2e); vertical-align: middle; }
+  .rpt-table tr:last-child td { border-bottom: none; }
+  .rpt-table tr:hover td { background: var(--admin-row-hover, rgba(0,0,0,.02)); }
+
+  .rpt-rank { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--admin-border, #e8e8e8); font-size: 11px; font-weight: 700; color: var(--admin-muted, #888); margin-right: 6px; }
+  .rpt-rank--1 { background: #c9a15a; color: #fff; }
+  .rpt-rank--2 { background: #a8a8a8; color: #fff; }
+  .rpt-rank--3 { background: #cd7f32; color: #fff; }
+
+  .rpt-stars { color: #f5a623; font-size: 13px; }
+  .rpt-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .rpt-badge--none { background: #f0f0f0; color: #888; }
+
+  .export-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+  .export-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; border: 1.5px solid var(--admin-border, #e0e0e0); color: var(--admin-text, #1a1a2e); transition: background .15s; }
+  .export-btn:hover { background: var(--admin-border, #f0f0f0); }
+  .export-btn svg { flex-shrink: 0; }
+
+  .rpt-empty { font-size: 13px; color: var(--admin-muted, #888); padding: 20px 0; text-align: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="get" action="{% url 'admin_dashboard_reports' %}">
+  <div class="rpt-filter-bar">
+    <div class="rpt-filter-group">
+      <label for="rpt-from">From</label>
+      <input type="date" id="rpt-from" name="from_date" value="{{ from_date|date:'Y-m-d' }}" max="{{ to_date|date:'Y-m-d' }}">
+    </div>
+    <div class="rpt-filter-group">
+      <label for="rpt-to">To</label>
+      <input type="date" id="rpt-to" name="to_date" value="{{ to_date|date:'Y-m-d' }}" min="{{ from_date|date:'Y-m-d' }}">
+    </div>
+    <div class="rpt-filter-actions">
+      <button type="submit" class="admin-btn admin-btn--primary admin-btn--sm">Apply</button>
+      <a href="{% url 'admin_dashboard_reports' %}" class="admin-btn admin-btn--ghost admin-btn--sm">Reset</a>
+    </div>
+    <div style="margin-left:auto;font-size:13px;color:var(--admin-muted);align-self:center;">
+      {{ from_date|date:"d M Y" }} → {{ to_date|date:"d M Y" }}
+    </div>
+  </div>
+</form>
+
+<!-- KPI Row -->
+<div class="rpt-kpi-grid">
+  <div class="rpt-kpi rpt-kpi--gold">
+    <div class="rpt-kpi__label">Total Revenue</div>
+    <div class="rpt-kpi__value">₹{{ total_revenue|floatformat:0 }}</div>
+    <div class="rpt-kpi__sub">Completed bookings</div>
+  </div>
+  <div class="rpt-kpi">
+    <div class="rpt-kpi__label">Total Bookings</div>
+    <div class="rpt-kpi__value">{{ total_bookings }}</div>
+    <div class="rpt-kpi__sub">All statuses</div>
+  </div>
+  <div class="rpt-kpi rpt-kpi--green">
+    <div class="rpt-kpi__label">Completed</div>
+    <div class="rpt-kpi__value">{{ completed_count }}</div>
+    <div class="rpt-kpi__sub">{{ completion_rate }}% completion rate</div>
+  </div>
+  <div class="rpt-kpi">
+    <div class="rpt-kpi__label">Cancelled</div>
+    <div class="rpt-kpi__value">{{ cancelled_count }}</div>
+    <div class="rpt-kpi__sub">In period</div>
+  </div>
+  <div class="rpt-kpi">
+    <div class="rpt-kpi__label">Customers</div>
+    <div class="rpt-kpi__value">{{ total_customers }}</div>
+    <div class="rpt-kpi__sub">With bookings in period</div>
+  </div>
+</div>
+
+<!-- CSV Export -->
+<div class="export-row">
+  <a class="export-btn" href="{% url 'admin_dashboard_reports_export' %}?type=bookings&from_date={{ from_date|date:'Y-m-d' }}&to_date={{ to_date|date:'Y-m-d' }}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export Bookings CSV
+  </a>
+  <a class="export-btn" href="{% url 'admin_dashboard_reports_export' %}?type=services&from_date={{ from_date|date:'Y-m-d' }}&to_date={{ to_date|date:'Y-m-d' }}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export Services CSV
+  </a>
+  <a class="export-btn" href="{% url 'admin_dashboard_reports_export' %}?type=beauticians&from_date={{ from_date|date:'Y-m-d' }}&to_date={{ to_date|date:'Y-m-d' }}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export Beauticians CSV
+  </a>
+</div>
+
+<!-- Charts Row -->
+<div class="rpt-grid">
+  <!-- Revenue Trend -->
+  <div class="rpt-card rpt-card--wide">
+    <div class="rpt-card__head">
+      <span class="rpt-card__title">Revenue Trend &amp; Bookings</span>
+    </div>
+    <div class="chart-wrap" style="height:260px;">
+      <canvas id="chartRevenue"></canvas>
+    </div>
+  </div>
+
+  <!-- Bookings by Status -->
+  <div class="rpt-card">
+    <div class="rpt-card__head">
+      <span class="rpt-card__title">Bookings by Status</span>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chartStatus"></canvas>
+    </div>
+  </div>
+
+  <!-- Top Services -->
+  <div class="rpt-card">
+    <div class="rpt-card__head">
+      <span class="rpt-card__title">Top Services</span>
+      <a class="rpt-card__action" href="{% url 'admin_dashboard_reports_export' %}?type=services&from_date={{ from_date|date:'Y-m-d' }}&to_date={{ to_date|date:'Y-m-d' }}">↓ CSV</a>
+    </div>
+    {% if top_services %}
+    <table class="rpt-table">
+      <thead><tr><th>#</th><th>Service</th><th class="right">Bookings</th><th class="right">Revenue</th></tr></thead>
+      <tbody>
+        {% for svc in top_services %}
+        <tr>
+          <td><span class="rpt-rank rpt-rank--{{ forloop.counter }}">{{ forloop.counter }}</span></td>
+          <td>{{ svc.name_snapshot }}</td>
+          <td class="right">{{ svc.bookings }}</td>
+          <td class="right">₹{{ svc.revenue|default:0|floatformat:0 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="rpt-empty">No completed bookings in this period.</p>{% endif %}
+  </div>
+</div>
+
+<!-- Beautician Performance -->
+<div class="rpt-card" style="margin-bottom:20px;">
+  <div class="rpt-card__head">
+    <span class="rpt-card__title">Beautician Performance</span>
+    <a class="rpt-card__action" href="{% url 'admin_dashboard_reports_export' %}?type=beauticians&from_date={{ from_date|date:'Y-m-d' }}&to_date={{ to_date|date:'Y-m-d' }}">↓ CSV</a>
+  </div>
+  {% if beautician_rows %}
+  <table class="rpt-table">
+    <thead><tr><th>#</th><th>Beautician</th><th class="right">Jobs</th><th class="right">Revenue</th><th class="right">Avg Rating</th></tr></thead>
+    <tbody>
+      {% for row in beautician_rows %}
+      <tr>
+        <td><span class="rpt-rank rpt-rank--{{ forloop.counter }}">{{ forloop.counter }}</span></td>
+        <td>{{ row.name }}</td>
+        <td class="right">{{ row.jobs }}</td>
+        <td class="right">₹{{ row.revenue|floatformat:0 }}</td>
+        <td class="right">
+          {% if row.rating %}
+            <span class="rpt-stars">★</span> {{ row.rating }}
+          {% else %}
+            <span class="rpt-badge rpt-badge--none">No reviews</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="rpt-empty">No completed bookings with assigned beauticians in this period.</p>{% endif %}
+</div>
+
+<!-- Top Customers -->
+<div class="rpt-card">
+  <div class="rpt-card__head">
+    <span class="rpt-card__title">Top Customers by Spend</span>
+  </div>
+  {% if top_customers %}
+  <table class="rpt-table">
+    <thead><tr><th>#</th><th>Customer</th><th>Email</th><th class="right">Bookings</th><th class="right">Total Spent</th></tr></thead>
+    <tbody>
+      {% for c in top_customers %}
+      <tr>
+        <td><span class="rpt-rank rpt-rank--{{ forloop.counter }}">{{ forloop.counter }}</span></td>
+        <td>{% if c.user__first_name or c.user__last_name %}{{ c.user__first_name }} {{ c.user__last_name }}{% else %}—{% endif %}</td>
+        <td style="font-size:12px;color:var(--admin-muted);">{{ c.user__email }}</td>
+        <td class="right">{{ c.bookings }}</td>
+        <td class="right">₹{{ c.spent|floatformat:0 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="rpt-empty">No completed bookings in this period.</p>{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script>
+(function () {
+  // Detect light/dark theme for chart colours
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  var gridColor  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+  var labelColor = isDark ? '#aaa' : '#666';
+  var gold = '#c9a15a';
+
+  // 1 — Revenue + Bookings trend (dual y-axis)
+  var trendLabels  = {{ trend_labels_json|safe }};
+  var trendRevenue = {{ trend_revenue_json|safe }};
+  var trendCount   = {{ trend_count_json|safe }};
+
+  new Chart(document.getElementById('chartRevenue'), {
+    type: 'line',
+    data: {
+      labels: trendLabels,
+      datasets: [
+        {
+          label: 'Revenue (₹)',
+          data: trendRevenue,
+          borderColor: gold,
+          backgroundColor: 'rgba(201,161,90,.12)',
+          fill: true,
+          tension: 0.38,
+          pointRadius: trendLabels.length > 60 ? 0 : 3,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Bookings',
+          data: trendCount,
+          borderColor: '#5c8df6',
+          backgroundColor: 'transparent',
+          fill: false,
+          tension: 0.38,
+          pointRadius: trendLabels.length > 60 ? 0 : 3,
+          borderDash: [4, 3],
+          yAxisID: 'y2',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: labelColor, boxWidth: 12, font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ctx.datasetIndex === 0
+              ? ' ₹' + ctx.parsed.y.toLocaleString('en-IN')
+              : ' ' + ctx.parsed.y + ' bookings',
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: labelColor, maxTicksLimit: 12, font: { size: 11 } }, grid: { color: gridColor } },
+        y: {
+          position: 'left',
+          ticks: { color: labelColor, font: { size: 11 }, callback: (v) => '₹' + v.toLocaleString('en-IN') },
+          grid: { color: gridColor },
+        },
+        y2: {
+          position: 'right',
+          ticks: { color: '#5c8df6', font: { size: 11 }, stepSize: 1 },
+          grid: { drawOnChartArea: false },
+        },
+      },
+    },
+  });
+
+  // 2 — Bookings by Status doughnut
+  var statusLabels = {{ status_labels_json|safe }};
+  var statusData   = {{ status_data_json|safe }};
+  var statusColors = ['#5c8df6', '#f5a623', '#9b59b6', '#2ecc71', '#e74c3c'];
+
+  new Chart(document.getElementById('chartStatus'), {
+    type: 'doughnut',
+    data: {
+      labels: statusLabels,
+      datasets: [{
+        data: statusData,
+        backgroundColor: statusColors,
+        borderWidth: 2,
+        borderColor: isDark ? '#1a1a2e' : '#fff',
+        hoverOffset: 8,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: labelColor, boxWidth: 12, padding: 14, font: { size: 12 } },
+        },
+      },
+    },
+  });
+})();
+</script>
+{% endblock %}

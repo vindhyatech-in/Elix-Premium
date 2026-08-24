@@ -1,0 +1,31 @@
+{% extends "emails/base_email.html" %}
+{% block body %}
+<span class="status-badge status-cancelled">✕ Cancelled</span>
+<h1>Your booking has been cancelled</h1>
+<p class="subtitle">Booking <strong>{{ booking.booking_number }}</strong> has been cancelled{% if booking.payment_status == 'refunded' %} and your payment has been refunded{% endif %}.</p>
+
+<div class="info-card">
+  <div class="info-row">
+    <span class="info-label">Booking No.</span>
+    <span class="info-value"><strong>{{ booking.booking_number }}</strong></span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Date</span>
+    <span class="info-value">{{ booking.scheduled_date|date:"D, d M Y" }}</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Amount</span>
+    <span class="info-value">₹{{ booking.total_amount }}</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Refund Status</span>
+    <span class="info-value">{% if booking.payment_status == 'refunded' %}Refunded{% elif booking.payment_method == 'pay_at_home' %}N/A (Pay at Home){% else %}Processing{% endif %}</span>
+  </div>
+</div>
+
+{% if booking.payment_status == 'refunded' %}
+<p style="font-size:14px;color:#2e7d32;">Your refund has been initiated. It typically reflects within 5–7 business days depending on your bank.</p>
+{% endif %}
+
+<p style="font-size:14px;color:#555;">We're sorry to see you go! If you'd like to rebook, we'd love to have you back.</p>
+{% endblock %}

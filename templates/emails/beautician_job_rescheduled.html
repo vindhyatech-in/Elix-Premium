@@ -1,0 +1,15 @@
+{% extends "emails/base_email.html" %}
+{% block body %}
+<span class="status-badge status-rescheduled">📅 Job Rescheduled</span>
+<h1>Your job has been rescheduled</h1>
+<p class="subtitle">Hi {{ beautician.name }}, booking <strong>{{ booking.booking_number }}</strong> has been moved to a new date/time.</p>
+
+<div class="info-card">
+  <div class="info-row"><span class="info-label">Booking No.</span><span class="info-value"><strong>{{ booking.booking_number }}</strong></span></div>
+  <div class="info-row"><span class="info-label">New Date</span><span class="info-value"><strong>{{ booking.scheduled_date|date:"D, d M Y" }}</strong></span></div>
+  <div class="info-row"><span class="info-label">New Slot</span><span class="info-value"><strong>{{ time_display }}</strong></span></div>
+  <div class="info-row"><span class="info-label">Address</span><span class="info-value">{{ booking.address_text }}</span></div>
+</div>
+
+<p style="font-size:14px;color:#555;">Please check your dashboard for updated job details. If this creates a conflict, contact the admin team immediately.</p>
+{% endblock %}

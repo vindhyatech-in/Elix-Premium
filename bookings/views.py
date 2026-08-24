@@ -18,6 +18,7 @@ from django.views.decorators.http import require_POST
 
 from catalog.models import Package, Service
 from core import booking_data
+from core.email_service import send_booking_email_all
 
 from . import razorpay_client
 from .invoice import generate_booking_receipt_pdf
@@ -400,7 +401,20 @@ def create_booking(request):
             logger.exception('Booking creation failed for user=%s.', request.user.id)
         return JsonResponse({'ok': False, 'error': "Something went wrong completing your booking — please contact support before trying again."}, status=500)
 
-    return JsonResponse({'ok': True, 'booking_number': booking.booking_number})
+    return_data = {'ok': True, 'booking_number': booking.booking_number}
+
+    # Fire-and-forget emails in daemon threads — never blocks the HTTP response.
+    # Beautician email is skipped here because the beautician hasn't been
+    # assigned yet at creation time; that fires from admin_dashboard_views
+    # when 'assign_beautician' is actioned.
+    send_booking_email_all(
+        event_customer='booking_confirmed',
+        event_admin='admin_new_booking',
+        event_beautician=None,
+        booking=booking,
+    )
+
+    return JsonResponse(return_data)
 
 
 @login_required
@@ -481,6 +495,13 @@ def cancel_booking(request, booking_number):
         booking.status = 'cancelled'
         booking.save(update_fields=['status', 'updated_at'])
         messages.success(request, f'Booking {booking.booking_number} has been cancelled.')
+        # Notify customer + admin + beautician (if assigned) — daemon threads
+        send_booking_email_all(
+            event_customer='booking_cancelled',
+            event_admin='admin_booking_cancelled',
+            event_beautician='beautician_job_cancelled' if booking.assigned_beautician_id else None,
+            booking=booking,
+        )
     else:
         messages.error(request, 'This booking can no longer be cancelled — the beautician is already on the way or it’s completed/cancelled.')
     return redirect('bookings_dashboard')
@@ -545,6 +566,14 @@ def reschedule_booking(request, booking_number):
     booking.exact_time = exact_time if booking_type == 'urgent' else None
     booking.rescheduled_at = timezone.now()
     booking.save(update_fields=['scheduled_date', 'booking_type', 'time_slot', 'exact_time', 'rescheduled_at', 'updated_at'])
+
+    # Notify all three parties in daemon threads
+    send_booking_email_all(
+        event_customer='booking_rescheduled',
+        event_admin='admin_booking_rescheduled',
+        event_beautician='beautician_job_rescheduled' if booking.assigned_beautician_id else None,
+        booking=booking,
+    )
 
     return JsonResponse({'ok': True, 'message': f'Booking {booking.booking_number} rescheduled successfully.'})
 

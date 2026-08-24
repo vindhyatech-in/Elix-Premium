@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block subject %}Elix{% endblock %}</title>
+  <style>
+    /* Reset */
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+
+    body { margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+
+    .email-wrapper { width: 100%; background-color: #f5f5f5; padding: 32px 16px; box-sizing: border-box; }
+    .email-card { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 16px rgba(0,0,0,0.08); }
+
+    /* Header */
+    .email-header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 32px 40px; text-align: center; }
+    .email-header .brand { color: #c9a15a; font-size: 28px; font-weight: 700; letter-spacing: 3px; text-decoration: none; }
+    .email-header .tagline { color: rgba(255,255,255,0.5); font-size: 12px; letter-spacing: 1.5px; margin-top: 4px; text-transform: uppercase; }
+
+    /* Body */
+    .email-body { padding: 40px 40px 32px; color: #1a1a2e; }
+    .email-body h1 { font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #1a1a2e; }
+    .email-body .subtitle { font-size: 15px; color: #666; margin: 0 0 28px; }
+
+    /* Status badge */
+    .status-badge { display: inline-block; padding: 6px 16px; border-radius: 50px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 28px; }
+    .status-confirmed  { background: #e8f5e9; color: #2e7d32; }
+    .status-cancelled  { background: #fce4ec; color: #c62828; }
+    .status-rescheduled{ background: #fff8e1; color: #f57f17; }
+    .status-assigned   { background: #e3f2fd; color: #1565c0; }
+    .status-completed  { background: #e8f5e9; color: #2e7d32; }
+
+    /* Info card */
+    .info-card { background: #f8f8f8; border-radius: 8px; padding: 20px 24px; margin-bottom: 24px; }
+    .info-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #ececec; }
+    .info-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .info-label { font-size: 12px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.5px; min-width: 110px; }
+    .info-value { font-size: 14px; color: #1a1a2e; text-align: right; }
+
+    /* Items table */
+    .items-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    .items-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #999; font-weight: 600; padding: 6px 0; border-bottom: 2px solid #ececec; text-align: left; }
+    .items-table th.right, .items-table td.right { text-align: right; }
+    .items-table td { font-size: 14px; color: #333; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+    .items-table tr:last-child td { border-bottom: none; }
+
+    /* Totals */
+    .totals { border-top: 2px solid #1a1a2e; margin-top: 8px; }
+    .total-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; color: #333; }
+    .total-row.grand { font-size: 16px; font-weight: 700; color: #1a1a2e; padding-top: 10px; }
+    .total-row.discount { color: #2e7d32; }
+
+    /* OTP / highlight box */
+    .highlight-box { border: 2px dashed #c9a15a; border-radius: 8px; padding: 18px 24px; text-align: center; margin-bottom: 24px; }
+    .highlight-box .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #999; }
+    .highlight-box .value { font-size: 32px; font-weight: 800; color: #1a1a2e; letter-spacing: 8px; margin-top: 6px; }
+
+    /* CTA button */
+    .btn-cta { display: inline-block; background: linear-gradient(135deg, #c9a15a, #a8813a); color: #fff !important; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 14px; font-weight: 600; margin: 8px 0 24px; }
+
+    /* Footer */
+    .email-footer { background: #f8f8f8; padding: 24px 40px; border-top: 1px solid #ececec; }
+    .email-footer p { margin: 0 0 6px; font-size: 12px; color: #aaa; }
+    .email-footer a { color: #c9a15a; text-decoration: none; }
+
+    @media (max-width: 480px) {
+      .email-body { padding: 24px 20px 20px; }
+      .email-header { padding: 24px 20px; }
+      .email-footer { padding: 18px 20px; }
+      .info-row { flex-direction: column; gap: 4px; }
+      .info-value { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+<div class="email-wrapper">
+  <div class="email-card">
+
+    <!-- Header -->
+    <div class="email-header">
+      <div class="brand">ELIX</div>
+      <div class="tagline">Premium Beauty at Home</div>
+    </div>
+
+    <!-- Body -->
+    <div class="email-body">
+      {% block body %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <div class="email-footer">
+      <p>Questions? Reply to this email or call us at <a href="tel:{{ site_phone }}">{{ site_phone }}</a></p>
+      <p>© {% now "Y" %} {{ site_name }}. All rights reserved.</p>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

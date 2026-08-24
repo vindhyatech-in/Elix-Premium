@@ -1,0 +1,15 @@
+{% extends "emails/base_email.html" %}
+{% block body %}
+<span class="status-badge status-completed">✓ Job Completed</span>
+<h1>Job completed — great work!</h1>
+<p class="subtitle">Hi {{ beautician.name }}, booking <strong>{{ booking.booking_number }}</strong> has been marked as completed.</p>
+
+<div class="info-card">
+  <div class="info-row"><span class="info-label">Booking No.</span><span class="info-value"><strong>{{ booking.booking_number }}</strong></span></div>
+  <div class="info-row"><span class="info-label">Date</span><span class="info-value">{{ booking.scheduled_date|date:"D, d M Y" }}</span></div>
+  <div class="info-row"><span class="info-label">Services</span><span class="info-value">{% for item in items %}{{ item.name_snapshot }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
+  <div class="info-row"><span class="info-label">Job Total</span><span class="info-value">₹{{ booking.total_amount }}</span></div>
+</div>
+
+<p style="font-size:14px;color:#555;">Thank you for delivering an excellent experience. Your earnings for this job will be updated in your dashboard.</p>
+{% endblock %}

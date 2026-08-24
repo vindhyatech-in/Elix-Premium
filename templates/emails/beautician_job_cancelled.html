@@ -1,0 +1,14 @@
+{% extends "emails/base_email.html" %}
+{% block body %}
+<span class="status-badge status-cancelled">✕ Job Cancelled</span>
+<h1>Job cancelled</h1>
+<p class="subtitle">Hi {{ beautician.name }}, booking <strong>{{ booking.booking_number }}</strong> has been cancelled by the customer.</p>
+
+<div class="info-card">
+  <div class="info-row"><span class="info-label">Booking No.</span><span class="info-value"><strong>{{ booking.booking_number }}</strong></span></div>
+  <div class="info-row"><span class="info-label">Was Scheduled</span><span class="info-value">{{ booking.scheduled_date|date:"D, d M Y" }}</span></div>
+  <div class="info-row"><span class="info-label">Slot</span><span class="info-value">{{ time_display }}</span></div>
+</div>
+
+<p style="font-size:14px;color:#555;">This slot is now free. Your dashboard has been updated automatically.</p>
+{% endblock %}

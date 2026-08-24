@@ -1,0 +1,17 @@
+{% extends "emails/base_email.html" %}
+{% block body %}
+<span class="status-badge status-assigned">💆 New Job Assigned</span>
+<h1>You have a new job!</h1>
+<p class="subtitle">Hi {{ beautician.name }}, a new booking has been assigned to you on {{ site_name }}.</p>
+
+<div class="info-card">
+  <div class="info-row"><span class="info-label">Booking No.</span><span class="info-value"><strong>{{ booking.booking_number }}</strong></span></div>
+  <div class="info-row"><span class="info-label">Date</span><span class="info-value"><strong>{{ booking.scheduled_date|date:"D, d M Y" }}</strong></span></div>
+  <div class="info-row"><span class="info-label">Time Slot</span><span class="info-value">{{ time_display }}</span></div>
+  <div class="info-row"><span class="info-label">Address</span><span class="info-value">{{ booking.address_label }} — {{ booking.address_text }}{% if booking.address_pincode %}, {{ booking.address_pincode }}{% endif %}</span></div>
+  <div class="info-row"><span class="info-label">Services</span><span class="info-value">{% for item in items %}{{ item.name_snapshot }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
+  <div class="info-row"><span class="info-label">Payment</span><span class="info-value">{% if booking.payment_method == 'pay_now' %}Already Paid Online{% else %}Collect ₹{{ booking.total_amount }} at Home{% endif %}</span></div>
+</div>
+
+<p style="font-size:14px;color:#555;">Please log into your dashboard to view full details. When heading to the customer, mark yourself <strong>On The Way</strong> in the app.</p>
+{% endblock %}

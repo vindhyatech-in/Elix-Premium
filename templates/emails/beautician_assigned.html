@@ -1,0 +1,37 @@
+{% extends "emails/base_email.html" %}
+{% block body %}
+<span class="status-badge status-assigned">💆 Beautician Assigned</span>
+<h1>Your beautician has been assigned</h1>
+<p class="subtitle">Great news — we've matched you with a {{ site_name }} beautician for your upcoming appointment.</p>
+
+<div class="info-card">
+  <div class="info-row">
+    <span class="info-label">Booking No.</span>
+    <span class="info-value"><strong>{{ booking.booking_number }}</strong></span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Beautician</span>
+    <span class="info-value"><strong>{{ beautician.name }}</strong></span>
+  </div>
+  {% if beautician.experience_years %}
+  <div class="info-row">
+    <span class="info-label">Experience</span>
+    <span class="info-value">{{ beautician.experience_years }} year{{ beautician.experience_years|pluralize }}</span>
+  </div>
+  {% endif %}
+  <div class="info-row">
+    <span class="info-label">Date</span>
+    <span class="info-value">{{ booking.scheduled_date|date:"D, d M Y" }}</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Time Slot</span>
+    <span class="info-value">{{ time_display }}</span>
+  </div>
+  <div class="info-row">
+    <span class="info-label">Address</span>
+    <span class="info-value">{{ booking.address_label }} — {{ booking.address_text }}</span>
+  </div>
+</div>
+
+<p style="font-size:14px;color:#555;">Your beautician will mark <em>On The Way</em> when they're heading to you. You'll see a 6-digit arrival code on your Bookings page — keep it ready to share with them at the door.</p>
+{% endblock %}
