@@ -4,7 +4,7 @@ Read this first. It's written so an agent (or a new dev) can get full context
 in one pass without re-reading every file. Update it whenever architecture,
 data flow, or scope changes.
 
-## Current state (as of 2026-08-11)
+## Current state (as of 2026-09-14)
 
 Everything below "What this is" is a **chronological changelog** — dated
 sections, oldest first, each explaining a *why* at the time it was
@@ -26,6 +26,11 @@ the same way you'd update a README.
   Cloudinary for all user-uploaded images, hand-authored CSS (no
   Tailwind/build step — see "Why no Tailwind" below), GSAP/AOS/Swiper/
   Lenis via CDN on the marketing page.
+- **Timezone**: `USE_TZ = True` with `TIME_ZONE = 'Asia/Kolkata'`. All
+  model `DateTimeField` records store timezone-aware UTC timestamps
+  (`timezone.now()`). Calendar queries, business logic, and advance booking
+  slot validation use `timezone.localdate()` and `timezone.localtime()` to
+  evaluate against IST local calendar days and times.
 - **Database**: Postgres when `.env` has real server DB creds (`DB_HOST`
   set — see `GlamourAtHome/settings.py`), SQLite otherwise. No mock data
   anywhere in the codebase — every dynamic-looking section, including
@@ -2859,4 +2864,16 @@ Updated `.notif-item` with: icon column (`.notif-item__icon`), body text and tim
 
 ### Admin
 `UserNotification` registered in `bookings/admin.py` with `list_display`, `list_filter`, `search_fields`, and `raw_id_fields` for easy debugging.
+
+## Timezone Awareness & BUG-19 Fix (2026-09-14)
+
+### Context & Fix
+- **`USE_TZ = True`**: Activated in `GlamourAtHome/settings.py` with `TIME_ZONE = 'Asia/Kolkata'`.
+- **Local Date & Time Conventions**:
+  - `bookings/views.py`: `create_booking` and `reschedule_booking` updated to use `timezone.localdate()` for past-date checks and `timezone.localtime()` for today's 50-minute advance notice window and regular slot cutoffs.
+  - `api/views.py`: `create_booking` updated to use `timezone.localdate()` and `timezone.localtime()`.
+  - `core/admin_dashboard_views.py`: `dashboard_overview`, `dashboard_employees`, `dashboard_reports`, and `dashboard_reports_export` updated to use `timezone.localdate()` for today's counts, leave queries, and default report bounds.
+  - `core/employee_dashboard_views.py`: `employee_dashboard_view` and `employee_profile_view` updated to use `timezone.localdate()` for today's job card filtering, month calendar rendering, and upcoming leave queries.
+- **Testing**: Added unit test suite in `bookings/tests.py` covering timezone configuration, aware `DateTimeField` timestamps, delta calculations on `UserNotification`, past-date booking validation, and 50-minute urgent slot window enforcement. All tests pass cleanly.
+
 

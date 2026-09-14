@@ -1,6 +1,6 @@
 import calendar as calendar_module
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -141,7 +141,7 @@ def employee_dashboard(request):
         messages.error(request, 'You do not have an assigned Beautician profile.')
         return redirect('index')
 
-    today_date = timezone.now().date()
+    today_date = timezone.localdate()
 
     # Handle POST Actions
     if request.method == 'POST':
@@ -489,7 +489,7 @@ def employee_profile_view(request):
         messages.error(request, 'You do not have an assigned Beautician profile.')
         return redirect('index')
 
-    today_date = timezone.now().date()
+    today_date = timezone.localdate()
 
     if request.method == 'POST':
         action = request.POST.get('action')

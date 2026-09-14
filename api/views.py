@@ -433,7 +433,7 @@ def checkout_view(request):
     scheduled_date = parse_date(payload.get('date') or '')
     if not scheduled_date:
         return JsonResponse({'ok': False, 'error': 'Invalid date.'}, status=400)
-    if scheduled_date < timezone.now().date():
+    if scheduled_date < timezone.localdate():
         return JsonResponse({'ok': False, 'error': 'Scheduled date cannot be in the past.'}, status=400)
 
     time_slot = payload.get('time_slot') or ''
@@ -443,7 +443,7 @@ def checkout_view(request):
     if booking_type == 'urgent' and not exact_time:
         return JsonResponse({'ok': False, 'error': 'Select a time.'}, status=400)
 
-    now_dt = timezone.now()
+    now_dt = timezone.localtime()
     today_date = now_dt.date()
     min_allowed_time = (now_dt + timedelta(minutes=50)).time()
     if scheduled_date == today_date:

@@ -152,7 +152,7 @@ def dashboard_overview(request):
     KPI metrics, Order Lifecycle breakdown, Master Staff Schedule & Calendar,
     1-click work assignment/reassignment, and Recent Orders.
     """
-    today_date = timezone.now().date()
+    today_date = timezone.localdate()
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -1051,7 +1051,7 @@ def dashboard_employees(request):
         'assigned_bookings',
         Prefetch(
             'leaves',
-            queryset=EmployeeLeave.objects.filter(end_date__gte=timezone.now().date()),
+            queryset=EmployeeLeave.objects.filter(end_date__gte=timezone.localdate()),
             to_attr='upcoming_leaves',
         ),
     ).all()
@@ -1295,7 +1295,7 @@ def dashboard_reports(request):
         4. Beautician performance (jobs done, total revenue, avg rating)
         5. Customer overview (total customers, repeat rate, top spenders)
     """
-    today = timezone.now().date()
+    today = timezone.localdate()
 
     # --- Date range ---
     raw_from = request.GET.get('from_date', '').strip()
@@ -1471,7 +1471,7 @@ def dashboard_reports_export(request):
     CSV export endpoint: GET /dashboard/reports/export/?type=bookings|services|beauticians&from_date=&to_date=
     Streams the CSV directly — no temp files, no memory accumulation.
     """
-    today = timezone.now().date()
+    today = timezone.localdate()
     raw_from = request.GET.get('from_date', '').strip()
     raw_to   = request.GET.get('to_date', '').strip()
     from_date = parse_date(raw_from) if raw_from else today - timedelta(days=29)
