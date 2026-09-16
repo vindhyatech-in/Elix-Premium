@@ -91,6 +91,15 @@
                 ✏ Edit Service
               </button>
 
+              <!-- Manage Steps Button -->
+              <button
+                type="button"
+                class="admin-btn admin-btn--ghost admin-btn--xs"
+                onclick="openManageStepsModal('{{ service.id }}', '{{ service.name|escapejs }}')"
+              >
+                🪜 Steps ({{ service.steps.count }})
+              </button>
+
               <!-- Add Variant Button -->
               <button
                 type="button"
@@ -174,6 +183,24 @@
               </tbody>
             </table>
           </div>
+
+          <!-- Hidden step data for this service — read by JS when modal opens -->
+          <script type="application/json" id="steps-data-{{ service.id }}">
+            [
+              {% for step in service.steps.all %}
+              {
+                "id": {{ step.id }},
+                "sort_order": {{ step.sort_order }},
+                "title": "{{ step.title|escapejs }}",
+                "badge": "{{ step.badge|escapejs }}",
+                "description": "{{ step.description|escapejs }}",
+                "image_url": "{{ step.image_url|escapejs }}",
+                "display_image_url": "{{ step.display_image_url|default:''|escapejs }}"
+              }{% if not forloop.last %},{% endif %}
+              {% endfor %}
+            ]
+          </script>
+
         </div>
       {% endfor %}
     {% else %}
@@ -433,9 +460,218 @@
     </div>
   </div>
 
+  <!-- Manage Steps Modal -->
+  <div id="manageStepsModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal admin-modal--large">
+      <div class="admin-modal__head">
+        <h2 id="manageStepsModalTitle">Manage Treatment Steps</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('manageStepsModal').style.display='none'">×</button>
+      </div>
+
+      <div class="admin-modal__body" style="gap: 1.5rem;">
+
+        <!-- Existing Steps List (rendered by JS from hidden JSON) -->
+        <div id="stepsListSection">
+          <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0 0 0.75rem 0;">📋 Current Steps</h3>
+          <div id="stepsListContainer" style="overflow-x: auto;">
+            <p id="stepsEmptyMsg" style="color: var(--admin-text-muted); font-size: 0.875rem;">No steps added yet.</p>
+            <table id="stepsListTable" class="admin-table admin-table--compact" style="display: none;">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Title</th>
+                  <th>Badge</th>
+                  <th>Image</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="stepsListBody"></tbody>
+            </table>
+          </div>
+          <hr style="border: none; border-top: 1px solid var(--admin-border); margin: 1.25rem 0;">
+        </div>
+
+        <!-- Add Step Form -->
+        <div style="background: var(--admin-surface-2, #f8f9fa); border: 1px solid var(--admin-border); border-radius: 8px; padding: 1.15rem;">
+          <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0 0 1rem 0;">➕ Add New Step</h3>
+          <form method="post" action="{{ request.path }}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_step">
+            <input type="hidden" name="service_id" id="stepsServiceId">
+
+            <div class="admin-form-row" style="align-items: flex-end;">
+              <div class="admin-form-group" style="flex: 2;">
+                <label>Step Title *</label>
+                <input type="text" name="title" required class="admin-input" placeholder="e.g. Cleansing">
+              </div>
+              <div class="admin-form-group" style="flex: 1;">
+                <label>Order #</label>
+                <input type="number" name="sort_order" value="1" min="0" class="admin-input" placeholder="1">
+              </div>
+              <div class="admin-form-group" style="flex: 1;">
+                <label>Badge (Optional)</label>
+                <input type="text" name="badge" class="admin-input" placeholder="KEY STEP / 5 mins">
+              </div>
+            </div>
+
+            <div class="admin-form-group">
+              <label>Description</label>
+              <textarea name="description" class="admin-textarea" rows="2" placeholder="Describe this step..."></textarea>
+            </div>
+
+            <div class="admin-form-row">
+              <div class="admin-form-group">
+                <label>Step Image — Upload</label>
+                <input type="file" name="step_image" accept="image/*" class="admin-input">
+              </div>
+              <div class="admin-form-group">
+                <label>Step Image — or URL</label>
+                <input type="url" name="image_url" class="admin-input" placeholder="https://example.com/step.jpg">
+              </div>
+            </div>
+            <small class="admin-text-muted" style="display: block; margin-top: -0.5rem; margin-bottom: 0.75rem;">Upload takes priority if both are given. Leave blank for text-only step.</small>
+
+            <div style="text-align: right;">
+              <button type="submit" class="admin-btn admin-btn--primary">Add Step</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Edit Step Form (hidden until Edit is clicked) -->
+        <div id="editStepPanel" style="display: none; background: var(--admin-surface-2, #f8f9fa); border: 1px solid var(--admin-blue, #4f46e5); border-radius: 8px; padding: 1.15rem;">
+          <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0 0 1rem 0;">✏️ Edit Step</h3>
+          <form method="post" action="{{ request.path }}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="edit_step">
+            <input type="hidden" name="step_id" id="editStepId">
+
+            <div class="admin-form-row" style="align-items: flex-end;">
+              <div class="admin-form-group" style="flex: 2;">
+                <label>Step Title *</label>
+                <input type="text" name="title" id="editStepTitle" required class="admin-input">
+              </div>
+              <div class="admin-form-group" style="flex: 1;">
+                <label>Order #</label>
+                <input type="number" name="sort_order" id="editStepOrder" min="0" class="admin-input">
+              </div>
+              <div class="admin-form-group" style="flex: 1;">
+                <label>Badge (Optional)</label>
+                <input type="text" name="badge" id="editStepBadge" class="admin-input" placeholder="KEY STEP / 5 mins">
+              </div>
+            </div>
+
+            <div class="admin-form-group">
+              <label>Description</label>
+              <textarea name="description" id="editStepDesc" class="admin-textarea" rows="2"></textarea>
+            </div>
+
+            <div class="admin-form-row">
+              <div class="admin-form-group">
+                <label>Replace Image — Upload</label>
+                <input type="file" name="step_image" accept="image/*" class="admin-input">
+              </div>
+              <div class="admin-form-group">
+                <label>Replace Image — or URL</label>
+                <input type="url" name="image_url" id="editStepImageUrl" class="admin-input" placeholder="https://example.com/step.jpg">
+              </div>
+            </div>
+            <small class="admin-text-muted" style="display: block; margin-top: -0.5rem; margin-bottom: 0.75rem;">Leave blank to keep existing image. Upload takes priority if both are given.</small>
+
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+              <button type="button" class="admin-btn admin-btn--ghost" onclick="document.getElementById('editStepPanel').style.display='none'">Cancel Edit</button>
+              <button type="submit" class="admin-btn admin-btn--primary">Save Step Changes</button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <script>
     function openAddServiceModal() {
       document.getElementById('addServiceModal').style.display = 'flex';
+    }
+
+    function openManageStepsModal(serviceId, serviceName) {
+      document.getElementById('stepsServiceId').value = serviceId;
+      document.getElementById('manageStepsModalTitle').innerText = 'Manage Steps \u2014 ' + serviceName;
+      document.getElementById('editStepPanel').style.display = 'none';
+
+      // Populate steps list from the hidden JSON block embedded per service card
+      const dataEl = document.getElementById('steps-data-' + serviceId);
+      const steps = dataEl ? JSON.parse(dataEl.textContent) : [];
+      const tbody = document.getElementById('stepsListBody');
+      const table = document.getElementById('stepsListTable');
+      const emptyMsg = document.getElementById('stepsEmptyMsg');
+      tbody.innerHTML = '';
+
+      if (steps.length === 0) {
+        table.style.display = 'none';
+        emptyMsg.style.display = 'block';
+      } else {
+        emptyMsg.style.display = 'none';
+        table.style.display = 'table';
+        steps.forEach(function(s) {
+          const img = s.display_image_url
+            ? `<img src="${s.display_image_url}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">`
+            : '<span style="color:var(--admin-text-muted)">No image</span>';
+          const badge = s.badge
+            ? `<span class="admin-badge admin-badge--category">${s.badge}</span>`
+            : '<span style="color:var(--admin-text-muted)">&mdash;</span>';
+          const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+          // Encode args that will land in an onclick HTML attribute to avoid quote/GT issues
+          const editArgs = [s.id, s.title, s.description, s.badge, s.sort_order, s.image_url]
+            .map(v => String(v).replace(/\\/g,'\\\\').replace(/'/g,"\\'"))
+            .join("','");
+          tbody.insertAdjacentHTML('beforeend', `
+            <tr>
+              <td><strong>${s.sort_order}</strong></td>
+              <td>${s.title}</td>
+              <td>${badge}</td>
+              <td>${img}</td>
+              <td>
+                <div class="admin-btn-group">
+                  <button type="button" class="admin-btn admin-btn--ghost admin-btn--xs"
+                    onclick="openEditStepModal('${editArgs}')">
+                    Edit
+                  </button>
+                  <form method="post" action="${window.location.pathname}${window.location.search}" class="admin-inline-form">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+                    <input type="hidden" name="action" value="delete_step">
+                    <input type="hidden" name="step_id" value="${s.id}">
+                    <button type="submit" class="admin-btn admin-btn--danger admin-btn--xs"
+                      onclick="return confirmDeleteStep(this, ${JSON.stringify(s.title)})">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          `);
+        });
+      }
+
+      document.getElementById('manageStepsModal').style.display = 'flex';
+    }
+
+    function confirmDeleteStep(btn, stepTitle) {
+      adminConfirm('Delete step "' + stepTitle + '"?').then(function(ok) {
+        if (ok) {
+          btn.closest('form').submit();
+        }
+      });
+      return false;
+    }
+
+    function openEditStepModal(stepId, title, description, badge, order, imageUrl) {
+      document.getElementById('editStepId').value = stepId;
+      document.getElementById('editStepTitle').value = title;
+      document.getElementById('editStepDesc').value = description;
+      document.getElementById('editStepBadge').value = badge;
+      document.getElementById('editStepOrder').value = order;
+      document.getElementById('editStepImageUrl').value = imageUrl;
+      const panel = document.getElementById('editStepPanel');
+      panel.style.display = 'block';
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function openEditServiceModal(id, name, categoryId, description, badges, currentPhotoUrl) {

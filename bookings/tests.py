@@ -123,3 +123,42 @@ class BookingSlotValidationTimezoneTests(TestCase):
         data = res.json()
         self.assertFalse(data.get('ok'))
         self.assertIn('50 minutes in advance', data.get('error', ''))
+
+
+class ServiceDetailPageTests(TestCase):
+    def setUp(self):
+        self.category, _ = Category.objects.get_or_create(slug='test-threading', defaults={'name': 'Test Threading'})
+        self.service, _ = Service.objects.get_or_create(
+            slug='test-eyebrows',
+            defaults={
+                'name': 'Test Eyebrows',
+                'category': self.category,
+                'description': 'Professional eyebrow threading.',
+                'rating': 4.9,
+                'reviews_count': 120,
+                'is_active': True,
+            }
+        )
+        self.variant, _ = ServiceVariant.objects.get_or_create(
+            service=self.service,
+            defaults={
+                'label': 'Standard',
+                'price': 39,
+                'duration_mins': 10,
+                'is_active': True,
+                'is_default': True,
+            }
+        )
+
+    def test_service_detail_page_renders_uc_elements(self):
+        """Ensure service detail page renders 200 and includes Urban Company detail layout."""
+        res = self.client.get(f'/services/{self.service.slug}/')
+        self.assertEqual(res.status_code, 200)
+        content = res.content.decode('utf-8')
+        self.assertIn('uc-detail', content)
+        self.assertIn('uc-detail__sticky-bar', content)
+        self.assertIn('Back to Services', content)
+        self.assertIn('catalog-data', content)
+        self.assertIn('Test Eyebrows', content)
+        self.assertIn('39', content)
+

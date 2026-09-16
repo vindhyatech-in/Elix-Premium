@@ -3,364 +3,1346 @@
 
 {% block title %}{{ service.name }} — {{ SITE.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* ============================================================
+     URBAN COMPANY STYLE SERVICE DETAIL PAGE
+     ============================================================ */
+  .uc-detail {
+    padding-top: 0.75rem;
+    padding-bottom: 7.5rem; /* Room for mobile sticky bar + bottom nav */
+  }
+
+  @media (min-width: 992px) {
+    .uc-detail {
+      padding-top: 1.5rem;
+      padding-bottom: 5rem;
+    }
+  }
+
+  .uc-detail__container {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 0 1rem;
+    box-sizing: border-box;
+  }
+
+  /* Top Back / Breadcrumb Navigation */
+  .uc-detail__nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    gap: 0.5rem;
+  }
+
+  .uc-detail__back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-body);
+    text-decoration: none;
+    padding: 0.45rem 0.85rem;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    border: 1px solid var(--border-hairline);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+  }
+
+  .uc-detail__back-btn:hover {
+    background: var(--surface-3);
+    transform: translateX(-2px);
+    color: var(--text-body);
+  }
+
+  .uc-detail__cat-chip {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--blue);
+    background: var(--blue-light);
+    padding: 0.35rem 0.85rem;
+    border-radius: var(--radius-pill);
+    white-space: nowrap;
+  }
+
+  /* Main Grid Layout */
+  .uc-detail__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  @media (min-width: 992px) {
+    .uc-detail__grid {
+      grid-template-columns: 460px 1fr;
+      gap: 2rem;
+    }
+  }
+
+  /* Media Gallery Card — Relative on mobile, Sticky ONLY on Desktop */
+  .uc-detail__media-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    z-index: 1;
+  }
+
+  @media (min-width: 992px) {
+    .uc-detail__media-card {
+      position: sticky;
+      top: 90px;
+      z-index: 10;
+    }
+  }
+
+  .uc-detail__photo-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: #0f172a;
+  }
+
+  .uc-detail__photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .uc-detail__badges-overlay {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    z-index: 2;
+  }
+
+  .uc-detail__badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.65rem;
+    border-radius: var(--radius-pill);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    letter-spacing: 0.02em;
+  }
+
+  .uc-detail__badge--discount {
+    background: var(--green);
+    color: #ffffff;
+  }
+
+  .uc-detail__badge--kind {
+    background: var(--ink);
+    color: #ffffff;
+  }
+
+  .uc-detail__badge--feature {
+    background: var(--blue);
+    color: #ffffff;
+  }
+
+  /* Media Footer: Rating & Sealed Product Guarantee */
+  .uc-detail__media-footer {
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid var(--border-hairline);
+    background: var(--surface-1);
+  }
+
+  .uc-detail__rating-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .uc-detail__rating-stars {
+    color: #f59e0b;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .uc-detail__rating-count {
+    color: var(--ink-muted);
+    font-size: 0.85rem;
+  }
+
+  .uc-detail__sealed-badge {
+    color: var(--green);
+    font-size: 0.8rem;
+    font-weight: 700;
+    background: var(--green-light);
+    padding: 0.25rem 0.65rem;
+    border-radius: var(--radius-pill);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  /* Right Content Card / Purchasing Box */
+  .uc-detail__info-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  @media (min-width: 768px) {
+    .uc-detail__info-card {
+      padding: 1.85rem;
+    }
+  }
+
+  .uc-detail__title {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-body);
+    line-height: 1.25;
+    margin: 0.25rem 0 0.5rem 0;
+    letter-spacing: -0.02em;
+  }
+
+  @media (min-width: 768px) {
+    .uc-detail__title {
+      font-size: 2.1rem;
+    }
+  }
+
+  .uc-detail__desc {
+    color: var(--ink-muted);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  /* Pricing Header */
+  .uc-detail__price-box {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--border-hairline);
+    border-bottom: 1px solid var(--border-hairline);
+    flex-wrap: wrap;
+  }
+
+  .uc-detail__price-now {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text-body);
+    letter-spacing: -0.03em;
+  }
+
+  .uc-detail__price-mrp {
+    font-size: 1.15rem;
+    color: var(--ink-muted);
+    text-decoration: line-through;
+  }
+
+  .uc-detail__duration {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    margin-left: auto;
+    background: var(--surface-1);
+    border: 1px solid var(--border-hairline);
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--radius-pill);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  /* Variant Selector — Urban Company Style Option Cards */
+  .uc-detail__variants-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .uc-detail__section-label {
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: var(--text-body);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .uc-detail__variants-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.65rem;
+  }
+
+  .uc-detail__variant-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.8rem 0.95rem;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-hairline);
+    background: var(--surface-1);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    text-align: left;
+    user-select: none;
+  }
+
+  .uc-detail__variant-card:hover {
+    border-color: var(--blue);
+    background: var(--surface-2);
+  }
+
+  .uc-detail__variant-card.is-active {
+    border-color: var(--blue);
+    background: var(--blue-light);
+    box-shadow: 0 0 0 1px var(--blue);
+  }
+
+  .uc-detail__variant-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-body);
+    margin-bottom: 0.25rem;
+    line-height: 1.3;
+  }
+
+  .uc-detail__variant-card.is-active .uc-detail__variant-title {
+    color: var(--blue);
+  }
+
+  .uc-detail__variant-price {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--text-body);
+  }
+
+  .uc-detail__variant-time {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    margin-top: 0.2rem;
+  }
+
+  /* Package Inclusions Breakdown */
+  .uc-detail__pkg-box {
+    background: var(--surface-1);
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    padding: 1.15rem;
+  }
+
+  .uc-detail__pkg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+  }
+
+  .uc-detail__pkg-title {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--text-body);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .uc-detail__pkg-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    padding: 0.65rem 0.75rem;
+    background: var(--surface-2);
+    border-radius: 8px;
+    border: 1px solid var(--border-hairline);
+    margin-bottom: 0.6rem;
+  }
+
+  .uc-detail__pkg-row:last-child {
+    margin-bottom: 0;
+  }
+
+  /* CTA Buttons (In Page) */
+  .uc-detail__actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .uc-detail__btn-add {
+    flex: 1;
+    padding: 0.95rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: var(--radius-pill);
+    background: var(--blue);
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .uc-detail__btn-add:hover {
+    background: var(--blue-deep);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.45);
+  }
+
+  .uc-detail__btn-catalog {
+    padding: 0.95rem 1.35rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: var(--radius-pill);
+    background: var(--ink);
+    color: #ffffff;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.2s ease;
+  }
+
+  .uc-detail__btn-catalog:hover {
+    background: var(--ink-soft);
+    color: #ffffff;
+  }
+
+  /* Quality Promise Grid (Urban Company 4 Pillars) */
+  .uc-detail__promise-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.85rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border-hairline);
+  }
+
+  .uc-detail__promise-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    font-size: 0.825rem;
+    color: var(--text-soft);
+    line-height: 1.35;
+  }
+
+  .uc-detail__promise-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+    color: var(--blue);
+    margin-top: 1px;
+  }
+
+  /* Section Cards (How It Works, Reviews, FAQs, Related) */
+  .uc-detail__section-card {
+    margin-top: 2rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  @media (min-width: 768px) {
+    .uc-detail__section-card {
+      padding: 2rem;
+      margin-top: 2.5rem;
+    }
+  }
+
+  .uc-detail__section-title {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin: 0 0 1.25rem 0;
+    color: var(--text-body);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* How It Works Steps */
+  .uc-detail__steps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+  }
+
+  .uc-detail__step-item {
+    background: var(--surface-1);
+    padding: 1.25rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-hairline);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .uc-detail__step-number {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--blue);
+    letter-spacing: -0.03em;
+  }
+
+  .uc-detail__step-heading {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-body);
+    margin: 0;
+  }
+
+  .uc-detail__step-desc {
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+    margin: 0;
+    line-height: 1.45;
+  }
+
+  /* Customer Reviews Breakdown */
+  .uc-detail__reviews-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .uc-detail__score-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--surface-1);
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border-hairline);
+  }
+
+  .uc-detail__reviews-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+  }
+
+  .uc-detail__review-card {
+    background: var(--surface-1);
+    padding: 1.15rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-hairline);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /* FAQs Accordion */
+  .uc-detail__faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .uc-detail__faq-item {
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    overflow: hidden;
+    transition: all 0.2s ease;
+  }
+
+  .uc-detail__faq-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-body);
+  }
+
+  .uc-detail__faq-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    transition: transform 0.2s ease;
+    color: var(--ink-muted);
+    flex-shrink: 0;
+  }
+
+  .uc-detail__faq-item.is-open .uc-detail__faq-icon {
+    transform: rotate(180deg);
+    color: var(--blue);
+  }
+
+  .uc-detail__faq-content {
+    padding: 0 1.25rem 1rem 1.25rem;
+    font-size: 0.875rem;
+    color: var(--ink-muted);
+    line-height: 1.5;
+    display: none;
+  }
+
+  .uc-detail__faq-item.is-open .uc-detail__faq-content {
+    display: block;
+  }
+
+  /* Related Services Cards */
+  .uc-detail__related-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+
+  .uc-detail__related-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.2s ease;
+  }
+
+  .uc-detail__related-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+    border-color: var(--blue);
+  }
+
+  .uc-detail__related-img {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+    background: #0f172a;
+  }
+
+  .uc-detail__related-body {
+    padding: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1;
+  }
+
+  .uc-detail__related-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-body);
+    margin: 0;
+  }
+
+  .uc-detail__related-price {
+    font-size: 0.875rem;
+    font-weight: 800;
+    color: var(--text-body);
+    margin-top: auto;
+  }
+
+  /* Urban Company Mobile Sticky Bottom Action Bar */
+  .uc-detail__sticky-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(52px + env(safe-area-inset-bottom)); /* Sits directly above bottom-nav */
+    z-index: calc(var(--z-bottom-nav) - 1);
+    background: var(--surface-2);
+    border-top: 1px solid var(--border-hairline);
+    padding: 0.65rem 1rem;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+  }
+
+  @media (min-width: 992px) {
+    .uc-detail__sticky-bar {
+      display: none;
+    }
+  }
+
+  .uc-detail__sticky-price-wrap {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .uc-detail__sticky-price {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--text-body);
+    line-height: 1.1;
+  }
+
+  .uc-detail__sticky-meta {
+    font-size: 0.725rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .uc-detail__sticky-btn {
+    padding: 0.75rem 1.4rem;
+    font-size: 0.925rem;
+    font-weight: 700;
+    border-radius: var(--radius-pill);
+    background: var(--blue);
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    transition: transform 0.15s ease;
+  }
+
+  .uc-detail__sticky-btn:active {
+    transform: scale(0.97);
+  }
+
+  /* Reposition Chat FAB slightly up when on detail page so it doesn't collide with sticky bar */
+  @media (max-width: 991px) {
+    .booking-app:has(.uc-detail__sticky-bar) .chat-fab {
+      bottom: calc(8.5rem + env(safe-area-inset-bottom));
+    }
+  }
+  /* ============================================================
+     TREATMENT STEP-BY-STEP VERTICAL TIMELINE
+     ============================================================ */
+  .uc-steps {
+    margin-top: 2rem;
+  }
+
+  @media (min-width: 768px) {
+    .uc-steps {
+      margin-top: 2.5rem;
+    }
+  }
+
+  .uc-steps__header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .uc-steps__icon {
+    width: 2rem;
+    height: 2rem;
+    background: var(--blue-light);
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .uc-steps__title {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-body);
+  }
+
+  .uc-steps__list {
+    position: relative;
+    padding-left: 0;
+    list-style: none;
+    margin: 0;
+  }
+
+  /* The single continuous vertical line running through all steps */
+  .uc-steps__list::before {
+    content: '';
+    position: absolute;
+    left: 1.1rem; /* half of circle width (2.2rem) */
+    top: 2.2rem;  /* start below the first circle */
+    bottom: 2.2rem;
+    width: 2px;
+    background: linear-gradient(
+      to bottom,
+      var(--blue) 0%,
+      color-mix(in srgb, var(--blue) 30%, transparent) 100%
+    );
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  .uc-steps__item {
+    position: relative;
+    display: flex;
+    gap: 1.1rem;
+    padding-bottom: 2rem;
+  }
+
+  .uc-steps__item:last-child {
+    padding-bottom: 0;
+  }
+
+  /* Numbered circle */
+  .uc-steps__circle {
+    width: 2.2rem;
+    height: 2.2rem;
+    min-width: 2.2rem;
+    border-radius: 50%;
+    background: var(--blue);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 4px var(--blue-light);
+    position: relative;
+    z-index: 1;
+    transition: transform 0.2s ease;
+  }
+
+  .uc-steps__item:hover .uc-steps__circle {
+    transform: scale(1.1);
+  }
+
+  /* Content area to the right of the circle */
+  .uc-steps__body {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    padding: 1rem 1.15rem;
+    box-shadow: var(--shadow-sm);
+    transition: border-color 0.2s ease;
+  }
+
+  .uc-steps__item:hover .uc-steps__body {
+    border-color: color-mix(in srgb, var(--blue) 40%, transparent);
+  }
+
+  .uc-steps__row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .uc-steps__name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-body);
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  .uc-steps__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .uc-steps__badge--key {
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+    color: #fff;
+  }
+
+  .uc-steps__badge--time {
+    background: var(--green-light);
+    color: var(--green);
+    border: 1px solid color-mix(in srgb, var(--green) 30%, transparent);
+  }
+
+  .uc-steps__badge--default {
+    background: var(--blue-light);
+    color: var(--blue);
+    border: 1px solid color-mix(in srgb, var(--blue) 20%, transparent);
+  }
+
+  .uc-steps__desc {
+    font-size: 0.875rem;
+    color: var(--ink-muted);
+    line-height: 1.55;
+    margin: 0.45rem 0 0 0;
+  }
+
+  /* Step image */
+  .uc-steps__img-wrap {
+    margin-top: 0.85rem;
+    border-radius: calc(var(--radius-md) - 4px);
+    overflow: hidden;
+    border: 1px solid var(--border-hairline);
+    max-height: 220px;
+  }
+
+  .uc-steps__img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
+    display: block;
+  }
+
+</style>
+{% endblock %}
+
 {% block content %}
+  {{ booking_catalog|json_script:"catalog-data" }}
+  {{ booking_categories|json_script:"categories-data" }}
+
   {% include 'booking/components/app_navbar.html' %}
 
-  <main id="main-content" class="booking-main" style="padding-top: 1rem; padding-bottom: 5rem;">
-    <div class="container" style="max-width: 1140px; margin: 0 auto; padding: 1rem;">
+  <main id="main-content" class="booking-main uc-detail">
+    <div class="uc-detail__container">
 
-    <!-- Main Detail Grid -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; align-items: start;">
+      <!-- Urban Company Navigation: Back Button & Category -->
+      <div class="uc-detail__nav">
+        <a href="{% url 'services_booking' %}" class="uc-detail__back-btn" aria-label="Back to Services Catalog">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          <span>Back to Services</span>
+        </a>
+        <span class="uc-detail__cat-chip">{{ service.category.name }}</span>
+      </div>
 
-      <!-- Left Media Gallery Card -->
-      <div style="background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); position: sticky; top: 110px;">
-        <div style="position: relative; width: 100%; aspect-ratio: 4/3; overflow: hidden; background: #0f172a;">
-          <img
-            src="{{ service.display_photo_url }}"
-            alt="{{ service.name }}"
-            style="width: 100%; height: 100%; object-fit: cover;"
-            id="detailMainPhoto"
-          >
-          <div style="position: absolute; top: 12px; left: 12px; display: flex; gap: 6px; flex-wrap: wrap;">
-            {% if default_variant.discount_pct %}
-              <span style="background: var(--green); color: #fff; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px;" id="detailDiscountBadge">
-                {{ default_variant.discount_pct }}% OFF
+      <!-- Main Detail Grid -->
+      <div class="uc-detail__grid">
+
+        <!-- Left Media Gallery Card (Sticky on Desktop ONLY, Natural Scroll on Mobile) -->
+        <div class="uc-detail__media-card">
+          <div class="uc-detail__photo-wrap">
+            <img
+              src="{{ service.display_photo_url }}"
+              alt="{{ service.name }}"
+              class="uc-detail__photo"
+              id="detailMainPhoto"
+            >
+            <div class="uc-detail__badges-overlay">
+              {% if default_variant.discount_pct %}
+                <span class="uc-detail__badge uc-detail__badge--discount" id="detailDiscountBadge">
+                  {{ default_variant.discount_pct }}% OFF
+                </span>
+              {% endif %}
+              <span class="uc-detail__badge uc-detail__badge--kind">
+                {{ kind_display }}
+              </span>
+              {% for b in service.badges %}
+                <span class="uc-detail__badge uc-detail__badge--feature">
+                  {{ b }}
+                </span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Rating & Sealed Products Guarantee -->
+          <div class="uc-detail__media-footer">
+            <div class="uc-detail__rating-badge">
+              <span class="uc-detail__rating-stars">★ {{ service.rating|default:"4.9" }}</span>
+              <span class="uc-detail__rating-count">({{ service.reviews_count|default:"128" }} verified reviews)</span>
+            </div>
+            <span class="uc-detail__sealed-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Sealed Products</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Right Overview & Purchasing Card -->
+        <div class="uc-detail__info-card">
+          
+          <div>
+            <span style="text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; font-weight: 700; color: var(--blue);">
+              {{ service.category.name }}
+            </span>
+            <h1 class="uc-detail__title">
+              {{ service.name }}
+            </h1>
+            <p class="uc-detail__desc">
+              {{ service.description }}
+            </p>
+          </div>
+
+          <!-- Pricing Header -->
+          <div class="uc-detail__price-box" id="detailPricingBox" data-pkg-discount="{{ default_variant.discount_pct|default:0 }}">
+            <span class="uc-detail__price-now" id="detailPriceNow">
+              ₹{{ default_variant.price|floatformat:"-2" }}
+            </span>
+            {% if default_variant.mrp %}
+              <span class="uc-detail__price-mrp" id="detailPriceMrp">
+                ₹{{ default_variant.mrp|floatformat:"-2" }}
               </span>
             {% endif %}
-            <span style="background: var(--ink); color: #fff; font-weight: 600; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px;">
-              {{ kind_display }}
+            <span class="uc-detail__duration" id="detailDurationLabel">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>{{ default_variant.duration_label }}</span>
             </span>
-            {% for b in service.badges %}
-              <span style="background: var(--blue); color: #fff; font-weight: 600; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 9999px;">
-                {{ b }}
-              </span>
+          </div>
+
+          <!-- Service Variant Selector (Urban Company Style Choice Cards) -->
+          {% if kind == 'service' and variants|length > 1 %}
+            <div class="uc-detail__variants-section">
+              <label class="uc-detail__section-label">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <span>Select Option / Variant:</span>
+              </label>
+              <div class="uc-detail__variants-grid">
+                {% for v in variants %}
+                  <button
+                    type="button"
+                    class="uc-detail__variant-card {% if v.id == default_variant.id %}is-active{% endif %}"
+                    data-variant-id="{{ v.id }}"
+                    data-price="{{ v.price }}"
+                    data-mrp="{{ v.mrp|default:'' }}"
+                    data-duration="{{ v.duration_label }}"
+                    data-discount="{{ v.discount_pct|default:'' }}"
+                    onclick="selectDetailVariant(this)"
+                  >
+                    <span class="uc-detail__variant-title">{{ v.label|default:v.duration_label }}</span>
+                    <span class="uc-detail__variant-price">₹{{ v.price|floatformat:0 }}</span>
+                    {% if v.duration_label %}
+                      <span class="uc-detail__variant-time">{{ v.duration_label }}</span>
+                    {% endif %}
+                  </button>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+          <!-- Package Included Services Breakdown -->
+          {% if kind == 'package' and included_services %}
+            <div class="uc-detail__pkg-box">
+              <div class="uc-detail__pkg-header">
+                <span class="uc-detail__pkg-title">
+                  Included Services in Package ({{ included_services|length }}):
+                </span>
+                <small style="font-size: 0.75rem; color: var(--blue); font-weight: 700;">
+                  Customizable
+                </small>
+              </div>
+
+              <div>
+                {% for inc in included_services %}
+                  <div class="uc-detail__pkg-row">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1 1 160px; min-width: 150px;">
+                      <img
+                        src="{{ inc.photo }}"
+                        alt="{{ inc.name }}"
+                        style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--surface-1);"
+                      >
+                      <div style="display: flex; flex-direction: column; gap: 0.15rem; min-width: 0;">
+                        <span style="font-weight: 700; color: var(--text-body); font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ inc.name }}</span>
+                      </div>
+                    </div>
+
+                    {% if inc.variants|length > 1 %}
+                      <select
+                        class="detail-pkg-variant-select"
+                        data-inc-id="{{ inc.id }}"
+                        style="font-size: 0.8rem; padding: 0.35rem 0.55rem; border-radius: 6px; border: 1px solid var(--border-hairline); background: var(--surface-1); color: var(--text-body); cursor: pointer; font-weight: 600; max-width: 180px; flex-shrink: 0;"
+                        onchange="recalculateDetailPackageTotal()"
+                      >
+                        {% for v in inc.variants %}
+                          <option value="{{ v.id }}" data-price="{{ v.price }}" data-duration="{{ v.duration_mins }}" {% if v.id == inc.selected_variant_id %}selected{% endif %}>
+                            {{ v.label }} (₹{{ v.price|floatformat:0 }})
+                          </option>
+                        {% endfor %}
+                      </select>
+                    {% else %}
+                      <span style="font-size: 0.8rem; color: var(--ink-muted); font-weight: 700; white-space: nowrap; background: var(--surface-1); padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid var(--border-hairline);">
+                        ₹{{ inc.price|floatformat:0 }} · {{ inc.duration_label }}
+                      </span>
+                      <input type="hidden" class="detail-pkg-single-val" data-inc-id="{{ inc.id }}" value="{{ inc.selected_variant_id }}" data-price="{{ inc.price }}" data-duration="{{ inc.duration_mins }}">
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+          <!-- In-Page CTAs (Visible on desktop & mobile within content) -->
+          <div class="uc-detail__actions">
+            <button
+              type="button"
+              class="uc-detail__btn-add"
+              id="detailAddToCartBtn"
+              onclick="addDetailItemToCart()"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+              <span>Add</span>
+            </button>
+            <a
+              href="{% url 'services_booking' %}"
+              class="uc-detail__btn-catalog"
+            >
+              View Catalog
+            </a>
+          </div>
+
+          <!-- Urban Company Quality Promise (4 Pillars) -->
+          <div class="uc-detail__promise-grid">
+            <div class="uc-detail__promise-item">
+              <svg class="uc-detail__promise-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="m9 12 2 2 4-4"/>
+              </svg>
+              <div>
+                <strong style="display: block; color: var(--text-body);">100% Certified</strong>
+                <span>Background-verified beauticians</span>
+              </div>
+            </div>
+            <div class="uc-detail__promise-item">
+              <svg class="uc-detail__promise-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="m9 12 2 2 4-4"/>
+              </svg>
+              <div>
+                <strong style="display: block; color: var(--text-body);">Mono-Dose Kits</strong>
+                <span>Sealed single-use sachets opened in front of you</span>
+              </div>
+            </div>
+            <div class="uc-detail__promise-item">
+              <svg class="uc-detail__promise-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <div>
+                <strong style="display: block; color: var(--text-body);">Free Rescheduling</strong>
+                <span>Instant reschedule or cancellation anytime</span>
+              </div>
+            </div>
+            <div class="uc-detail__promise-item">
+              <svg class="uc-detail__promise-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/>
+              </svg>
+              <div>
+                <strong style="display: block; color: var(--text-body);">Mess-Free Clean-up</strong>
+                <span>Spotless post-service home clean-up</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {% if service.steps.exists %}
+      <!-- ================================================
+           TREATMENT STEP-BY-STEP TIMELINE (per-service)
+           Only rendered when the service has steps defined.
+           Managed via Django admin → Service → ServiceStep inline.
+           ================================================ -->
+      <section class="uc-detail__section-card uc-steps" aria-label="How this treatment works">
+        <div class="uc-steps__header">
+          <span class="uc-steps__icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 11l3 3L22 4"/>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+            </svg>
+          </span>
+          <h2 class="uc-steps__title">How It Works — Step by Step</h2>
+        </div>
+
+        <ol class="uc-steps__list">
+          {% for step in service.steps.all %}
+            <li class="uc-steps__item">
+              <div class="uc-steps__circle" aria-hidden="true">{{ forloop.counter }}</div>
+              <div class="uc-steps__body">
+                <div class="uc-steps__row">
+                  <h3 class="uc-steps__name">{{ step.title }}</h3>
+                  {% if step.badge %}
+                    {% if 'KEY' in step.badge %}
+                      <span class="uc-steps__badge uc-steps__badge--key">{{ step.badge }}</span>
+                    {% elif 'min' in step.badge %}
+                      <span class="uc-steps__badge uc-steps__badge--time">{{ step.badge }}</span>
+                    {% else %}
+                      <span class="uc-steps__badge uc-steps__badge--default">{{ step.badge }}</span>
+                    {% endif %}
+                  {% endif %}
+                </div>
+                {% if step.description %}
+                  <p class="uc-steps__desc">{{ step.description }}</p>
+                {% endif %}
+                {% with img=step.display_image_url %}
+                  {% if img %}
+                    <div class="uc-steps__img-wrap">
+                      <img src="{{ img }}" alt="{{ step.title }} step" class="uc-steps__img" loading="lazy">
+                    </div>
+                  {% endif %}
+                {% endwith %}
+              </div>
+            </li>
+          {% endfor %}
+        </ol>
+      </section>
+      {% endif %}
+
+      <!-- How At-Home Salon Works Section (Urban Company Style) -->
+      <div class="uc-detail__section-card">
+        <h2 class="uc-detail__section-title">
+          How At-Home Salon Works
+        </h2>
+        <div class="uc-detail__steps-grid">
+          {% for hw in how_it_works %}
+            <div class="uc-detail__step-item">
+              <div class="uc-detail__step-number">{{ hw.step }}</div>
+              <h3 class="uc-detail__step-heading">{{ hw.title }}</h3>
+              <p class="uc-detail__step-desc">{{ hw.desc }}</p>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Customer Reviews & Ratings Section -->
+      <div class="uc-detail__section-card">
+        <div class="uc-detail__reviews-header">
+          <div>
+            <h2 class="uc-detail__section-title" style="margin: 0;">
+              Customer Reviews & Ratings
+            </h2>
+            <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0.25rem 0 0 0;">
+              Based on {{ service.reviews_count|default:"128" }} verified completed bookings
+            </p>
+          </div>
+          <div class="uc-detail__score-pill">
+            <span style="font-size: 1.25rem; font-weight: 800; color: #f59e0b;">★ {{ service.rating|default:"4.9" }}</span>
+            <span style="font-size: 0.85rem; color: var(--text-body); font-weight: 600;">Overall Rating</span>
+          </div>
+        </div>
+
+        <div class="uc-detail__reviews-grid">
+          {% for rev in reviews %}
+            <div class="uc-detail__review-card">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-body);">{{ rev.display_name }}</span>
+                <span style="font-size: 0.75rem; color: var(--ink-muted);">{{ rev.created_at|timesince }} ago</span>
+              </div>
+              <div style="color: #f59e0b; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
+                <span>{% for _ in rev.rating|times %}★{% endfor %}</span>
+                <span style="color: var(--green); font-size: 0.75rem; font-weight: 600;">✓ Verified Booking</span>
+              </div>
+              {% if rev.comment %}
+                <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0; line-height: 1.45;">
+                  "{{ rev.comment }}"
+                </p>
+              {% endif %}
+            </div>
+          {% empty %}
+            <div style="background: var(--surface-1); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-hairline); grid-column: 1 / -1;">
+              <p style="color: var(--ink-muted); font-size: 0.9rem; margin: 0;">No reviews yet — be the first to book this service and share your experience!</p>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Frequently Asked Questions Accordion (Urban Company Style) -->
+      <div class="uc-detail__section-card">
+        <h2 class="uc-detail__section-title">
+          Frequently Asked Questions
+        </h2>
+        <div class="uc-detail__faq-list">
+          {% for faq in faqs %}
+            <div class="uc-detail__faq-item {% if forloop.first %}is-open{% endif %}">
+              <button
+                type="button"
+                class="uc-detail__faq-trigger"
+                onclick="toggleFaq(this)"
+                aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+              >
+                <span>{{ faq.question }}</span>
+                <svg class="uc-detail__faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="uc-detail__faq-content">
+                <p style="margin: 0;">{{ faq.answer }}</p>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- You Might Also Like / Related Services -->
+      {% if related_services %}
+        <div class="uc-detail__section-card">
+          <h2 class="uc-detail__section-title">
+            Similar Services You May Like
+          </h2>
+          <div class="uc-detail__related-grid">
+            {% for rel in related_services %}
+              <a href="{% url 'service_detail' rel.slug %}" class="uc-detail__related-card">
+                <img src="{{ rel.display_photo_url }}" alt="{{ rel.name }}" class="uc-detail__related-img">
+                <div class="uc-detail__related-body">
+                  <h3 class="uc-detail__related-title">{{ rel.name }}</h3>
+                  <div style="font-size: 0.75rem; color: var(--ink-muted); display: flex; align-items: center; gap: 0.3rem;">
+                    <span style="color: #f59e0b; font-weight: 700;">★ {{ rel.rating|default:"4.8" }}</span>
+                    <span>·</span>
+                    <span>{% if rel.default_variant %}{{ rel.default_variant.duration_label }}{% else %}{{ rel.duration_label }}{% endif %}</span>
+                  </div>
+                  <div class="uc-detail__related-price">
+                    ₹{% if rel.default_variant %}{{ rel.default_variant.price|floatformat:0 }}{% else %}{{ rel.price|floatformat:0 }}{% endif %}
+                  </div>
+                </div>
+              </a>
             {% endfor %}
           </div>
         </div>
+      {% endif %}
 
-        <div style="padding: 1.25rem; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-hairline); background: var(--surface-1);">
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <span style="color: #f59e0b; font-size: 1.1rem; font-weight: 700;">★ {{ service.rating|default:"4.9" }}</span>
-            <span style="color: var(--ink-muted); font-size: 0.85rem;">({{ service.reviews_count|default:"128" }} verified reviews)</span>
-          </div>
-          <span style="color: var(--green); font-size: 0.8rem; font-weight: 700; background: var(--green-light); padding: 0.25rem 0.5rem; border-radius: 4px;">
-            ✓ Sealed Products
-          </span>
-        </div>
-      </div>
-
-      <!-- Right Overview & Purchasing Box -->
-      <div style="background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); padding: 1.75rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1.25rem;">
-        
-        <div>
-          <span style="text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; font-weight: 700; color: var(--blue);">
-            {{ service.category.name }}
-          </span>
-          <h1 style="font-family: var(--font-display); font-size: 1.85rem; font-weight: 600; margin: 0.25rem 0 0.5rem 0; color: var(--text-body);">
-            {{ service.name }}
-          </h1>
-          <p style="color: var(--ink-muted); font-size: 0.95rem; line-height: 1.5; margin: 0;">
-            {{ service.description }}
-          </p>
-        </div>
-
-        <!-- Pricing Header -->
-        <div style="display: flex; align-items: baseline; gap: 0.75rem; border-y: 1px solid var(--border-hairline); padding: 1rem 0; border-top: 1px solid var(--border-hairline); border-bottom: 1px solid var(--border-hairline);" id="detailPricingBox" data-pkg-discount="{{ default_variant.discount_pct|default:0 }}">
-          <span style="font-size: 2rem; font-weight: 700; color: var(--text-body);" id="detailPriceNow">
-            ₹{{ default_variant.price|floatformat:"-2" }}
-          </span>
-          {% if default_variant.mrp %}
-            <span style="font-size: 1.1rem; color: var(--ink-muted); text-decoration: line-through;" id="detailPriceMrp">
-              ₹{{ default_variant.mrp|floatformat:"-2" }}
-            </span>
-          {% endif %}
-          <span style="font-size: 0.85rem; font-weight: 600; color: var(--ink-muted); margin-left: auto;" id="detailDurationLabel">
-            ⏱ {{ default_variant.duration_label }}
-          </span>
-        </div>
-
-        <!-- Single Service Variant Selector -->
-        {% if kind == 'service' and variants|length > 1 %}
-          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-            <label style="font-weight: 700; font-size: 0.85rem; color: var(--text-body);">Choose Service Option / Variant:</label>
-            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-              {% for v in variants %}
-                <button
-                  type="button"
-                  class="detail-variant-pill {% if v.id == default_variant.id %}is-active{% endif %}"
-                  data-variant-id="{{ v.id }}"
-                  data-price="{{ v.price }}"
-                  data-mrp="{{ v.mrp|default:'' }}"
-                  data-duration="{{ v.duration_label }}"
-                  data-discount="{{ v.discount_pct|default:'' }}"
-                  onclick="selectDetailVariant(this)"
-                  style="padding: 0.5rem 0.85rem; border-radius: var(--radius-pill); border: 1px solid var(--border-hairline); background: var(--surface-1); font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-body); transition: all 0.2s ease;"
-                >
-                  {{ v.label|default:v.duration_label }} — ₹{{ v.price|floatformat:0 }}
-                </button>
-              {% endfor %}
-            </div>
-          </div>
-        {% endif %}
-
-        <!-- Package Included Services Breakdown (Small Cards with Images) -->
-        {% if kind == 'package' and included_services %}
-          <div style="background: var(--surface-1); border: 1px solid var(--border-hairline); border-radius: var(--radius-md); padding: 1rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-              <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-body); text-transform: uppercase; letter-spacing: 0.04em;">
-                Included Services in Package:
-              </span>
-              <small style="font-size: 0.75rem; color: var(--blue); font-weight: 600;">
-                Select preferred variants below
-              </small>
-            </div>
-
-            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-              {% for inc in included_services %}
-                <div class="detail-pkg-inc-row" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem 0.75rem; font-size: 0.85rem; padding: 0.5rem 0.65rem; background: var(--surface-2); border-radius: 8px; border: 1px solid var(--border-hairline); box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-                  <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1 1 140px; min-width: 140px;">
-                    <img
-                      src="{{ inc.photo }}"
-                      alt="{{ inc.name }}"
-                      style="width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--surface-1);"
-                    >
-                    <div style="display: flex; flex-direction: column; gap: 0.15rem; min-width: 0;">
-                      <span style="font-weight: 700; color: var(--text-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem;">{{ inc.name }}</span>
-                    </div>
-                  </div>
-
-                  {% if inc.variants|length > 1 %}
-                    <select
-                      class="detail-pkg-variant-select"
-                      data-inc-id="{{ inc.id }}"
-                      style="font-size: 0.78rem; padding: 0.3rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-hairline); background: var(--surface-1); color: var(--text-body); cursor: pointer; font-weight: 600; max-width: 175px; flex-shrink: 0;"
-                      onchange="recalculateDetailPackageTotal()"
-                    >
-                      {% for v in inc.variants %}
-                        <option value="{{ v.id }}" data-price="{{ v.price }}" data-duration="{{ v.duration_mins }}" {% if v.id == inc.selected_variant_id %}selected{% endif %}>
-                          {{ v.label }} (₹{{ v.price|floatformat:0 }})
-                        </option>
-                      {% endfor %}
-                    </select>
-                  {% else %}
-                    <span style="font-size: 0.78rem; color: var(--ink-muted); font-weight: 700; white-space: nowrap; background: var(--surface-1); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--border-hairline);">
-                      ₹{{ inc.price|floatformat:0 }} · {{ inc.duration_label }}
-                    </span>
-                    <input type="hidden" class="detail-pkg-single-val" data-inc-id="{{ inc.id }}" value="{{ inc.selected_variant_id }}" data-price="{{ inc.price }}" data-duration="{{ inc.duration_mins }}">
-                  {% endif %}
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-        {% endif %}
-
-        <!-- CTAs -->
-        <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
-          <button
-            type="button"
-            class="btn btn--primary"
-            style="flex: 1; padding: 0.85rem 1.25rem; font-size: 1rem; border-radius: var(--radius-pill); font-weight: 700;"
-            id="detailAddToCartBtn"
-            onclick="addDetailItemToCart()"
-          >
-            Add to Cart
-          </button>
-          <a
-            href="{% url 'services_booking' %}"
-            class="btn btn--dark"
-            style="padding: 0.85rem 1.25rem; font-size: 0.9rem; border-radius: var(--radius-pill); text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem;"
-          >
-            View All Catalog
-          </a>
-        </div>
-
-        <!-- Trust Features -->
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-hairline); font-size: 0.8rem; color: var(--ink-muted);">
-          <div style="display: flex; align-items: center; gap: 0.4rem;">
-            <span style="color: var(--blue); font-weight: 700;">✓</span> 100% Certified Beauticians
-          </div>
-          <div style="display: flex; align-items: center; gap: 0.4rem;">
-            <span style="color: var(--blue); font-weight: 700;">✓</span> Mono-Dose Sealed Sachets
-          </div>
-          <div style="display: flex; align-items: center; gap: 0.4rem;">
-            <span style="color: var(--blue); font-weight: 700;">✓</span> Free Rescheduling & Cancel
-          </div>
-          <div style="display: flex; align-items: center; gap: 0.4rem;">
-            <span style="color: var(--blue); font-weight: 700;">✓</span> Mess-Free Home Clean-up
-          </div>
-        </div>
-
-      </div>
     </div>
 
-    <!-- How It Works Section -->
-    <div style="margin-top: 3.5rem; background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); padding: 2rem;">
-      <h2 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; margin: 0 0 1.5rem 0; color: var(--text-body);">
-        How At-Home Salon Works
-      </h2>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem;">
-        {% for hw in how_it_works %}
-          <div style="background: var(--surface-1); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-hairline);">
-            <div style="font-size: 1.5rem; font-weight: 800; color: var(--blue); margin-bottom: 0.5rem;">
-              {{ hw.step }}
-            </div>
-            <h3 style="font-size: 1rem; font-weight: 700; margin: 0 0 0.35rem 0; color: var(--text-body);">
-              {{ hw.title }}
-            </h3>
-            <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0; line-height: 1.4;">
-              {{ hw.desc }}
-            </p>
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-
-    <!-- Customer Reviews Section -->
-    <div style="margin-top: 2.5rem; background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); padding: 2rem;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-        <div>
-          <h2 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; margin: 0; color: var(--text-body);">
-            Customer Reviews & Ratings
-          </h2>
-          <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0.2rem 0 0 0;">
-            Based on {{ service.reviews_count|default:"128" }} verified completed appointments
-          </p>
+    <!-- Urban Company Mobile Sticky Bottom Action Bar (Docks right above bottom-nav) -->
+    <aside class="uc-detail__sticky-bar" aria-label="Quick Add to Cart">
+      <div class="uc-detail__sticky-price-wrap">
+        <div class="uc-detail__sticky-price" id="detailStickyPriceNow">
+          ₹{{ default_variant.price|floatformat:"-2" }}
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--surface-1); padding: 0.5rem 1rem; border-radius: var(--radius-pill); border: 1px solid var(--border-hairline);">
-          <span style="font-size: 1.25rem; font-weight: 800; color: #f59e0b;">★ {{ service.rating|default:"4.9" }}</span>
-          <span style="font-size: 0.85rem; color: var(--text-body); font-weight: 600;">Overall Score</span>
+        <div class="uc-detail__sticky-meta" id="detailStickyDuration">
+          ⏱ {{ default_variant.duration_label }}
         </div>
       </div>
-
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
-        {% for rev in reviews %}
-          <div style="background: var(--surface-1); padding: 1.15rem; border-radius: var(--radius-md); border: 1px solid var(--border-hairline); display: flex; flex-direction: column; gap: 0.5rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-              <span style="font-weight: 700; font-size: 0.9rem; color: var(--text-body);">{{ rev.display_name }}</span>
-              <span style="font-size: 0.75rem; color: var(--ink-muted);">{{ rev.created_at|timesince }} ago</span>
-            </div>
-            <div style="color: #f59e0b; font-size: 0.85rem;">
-              {% for _ in rev.rating|times %}★{% endfor %} <span style="color: var(--green); font-size: 0.75rem; margin-left: 0.35rem; font-weight: 600;">✓ Verified Booking</span>
-            </div>
-            {% if rev.comment %}
-              <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0; line-height: 1.4;">
-                "{{ rev.comment }}"
-              </p>
-            {% endif %}
-          </div>
-        {% empty %}
-          <p style="color: var(--ink-muted); font-size: 0.9rem;">No reviews yet — be the first to complete a booking and share your experience.</p>
-        {% endfor %}
-      </div>
-    </div>
-
-    <!-- FAQs Section -->
-    <div style="margin-top: 2.5rem; background: var(--surface-2); border: 1px solid var(--border-hairline); border-radius: var(--radius-lg); padding: 2rem;">
-      <h2 style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; margin: 0 0 1.25rem 0; color: var(--text-body);">
-        Frequently Asked Questions
-      </h2>
-      <div style="display: flex; flex-direction: column; gap: 0.85rem;">
-        {% for faq in faqs %}
-          <div style="background: var(--surface-1); padding: 1rem 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-hairline);">
-            <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0 0 0.35rem 0; color: var(--text-body);">
-              Q: {{ faq.question }}
-            </h3>
-            <p style="font-size: 0.85rem; color: var(--ink-muted); margin: 0; line-height: 1.4;">
-              {{ faq.answer }}
-            </p>
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<script>
-  let activeVariantId = '{{ default_variant.id }}';
-
-  function selectDetailVariant(btn) {
-    document.querySelectorAll('.detail-variant-pill').forEach(b => {
-      b.classList.remove('is-active');
-      b.style.background = 'var(--surface-1)';
-      b.style.borderColor = 'var(--border-hairline)';
-    });
-    btn.classList.add('is-active');
-    btn.style.background = 'var(--blue)';
-    btn.style.borderColor = 'var(--blue)';
-    btn.style.color = '#ffffff';
-
-    activeVariantId = btn.dataset.variantId;
-    const price = parseFloat(btn.dataset.price || 0);
-    const mrp = btn.dataset.mrp ? parseFloat(btn.dataset.mrp) : null;
-    const duration = btn.dataset.duration || '';
-    const discount = btn.dataset.discount || '';
-
-    const priceNowEl = document.getElementById('detailPriceNow');
-    const priceMrpEl = document.getElementById('detailPriceMrp');
-    const durationEl = document.getElementById('detailDurationLabel');
-    const discountBadge = document.getElementById('detailDiscountBadge');
-
-    if (priceNowEl) priceNowEl.textContent = `₹${price.toFixed(0)}`;
-    if (priceMrpEl) {
-      if (mrp) {
-        priceMrpEl.textContent = `₹${mrp.toFixed(0)}`;
-        priceMrpEl.style.display = 'inline';
-      } else {
-        priceMrpEl.style.display = 'none';
-      }
-    }
-    if (durationEl) durationEl.textContent = `⏱ ${duration}`;
-    if (discountBadge) {
-      if (discount) {
-        discountBadge.textContent = `${discount}% OFF`;
-        discountBadge.style.display = 'inline-block';
-      } else {
-        discountBadge.style.display = 'none';
-      }
-    }
-  }
-
-  // Both functions below defer the actual pricing math to
-  // window.GlamourBooking.computePackagePricing (booking.js) — the exact
-  // same formula the mini-cart and booking summary use for this same
-  // package, so this page's live preview can never drift from what
-  // actually gets added to cart or charged.
-  function recalculateDetailPackageTotal() {
-    const GB = window.GlamourBooking;
-    if (!GB) return;
-    const item = GB.getCatalog().find((i) => i.id === '{{ service.slug }}');
-    if (!item) return;
-
-    const included = GB.gatherIncludedSelections(document);
-    const { price, mrp, duration_mins } = GB.computePackagePricing(item, included);
-
-    const priceNowEl = document.getElementById('detailPriceNow');
-    const priceMrpEl = document.getElementById('detailPriceMrp');
-    const durationEl = document.getElementById('detailDurationLabel');
-
-    if (priceNowEl) priceNowEl.textContent = `₹${price}`;
-    if (priceMrpEl) priceMrpEl.textContent = `₹${mrp}`;
-    if (durationEl) durationEl.textContent = `⏱ ${GB.formatDuration(duration_mins)}`;
-  }
-
-  function addDetailItemToCart() {
-    const itemSlug = '{{ service.slug }}';
-    const GB = window.GlamourBooking;
-    if (!GB || !GB.addItem) {
-      // GB missing/broken means nothing was actually added — an alert
-      // claiming success here would just be lying to the customer.
-      console.error('GlamourBooking cart is unavailable — could not add to cart.');
-      return;
-    }
-    const variantId = activeVariantId ? parseInt(activeVariantId, 10) : null;
-    if ('{{ kind }}' === 'package') {
-      GB.addItem(itemSlug, variantId, GB.gatherIncludedSelections(document));
-    } else {
-      GB.addItem(itemSlug, variantId);
-    }
-  }
-</script>
+      <button
+        type="button"
+        class="uc-detail__sticky-btn"
+        id="detailStickyAddToCartBtn"
+        onclick="addDetailItemToCart()"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        <span>Add</span>
+      </button>
+    </aside>
 
   </main>
 
@@ -370,4 +1352,110 @@
   {% include 'booking/components/booking_drawer.html' %}
 
   <div class="toast-stack" data-toast-stack aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+    let activeVariantId = '{{ default_variant.id }}';
+
+    function toggleFaq(btn) {
+      const item = btn.closest('.uc-detail__faq-item');
+      if (!item) return;
+      const isOpen = item.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
+
+    function selectDetailVariant(btn) {
+      document.querySelectorAll('.uc-detail__variant-card').forEach(b => {
+        b.classList.remove('is-active');
+      });
+      btn.classList.add('is-active');
+
+      activeVariantId = btn.dataset.variantId;
+      const price = parseFloat(btn.dataset.price || 0);
+      const mrp = btn.dataset.mrp ? parseFloat(btn.dataset.mrp) : null;
+      const duration = btn.dataset.duration || '';
+      const discount = btn.dataset.discount || '';
+
+      const priceNowEl = document.getElementById('detailPriceNow');
+      const stickyPriceNowEl = document.getElementById('detailStickyPriceNow');
+      const priceMrpEl = document.getElementById('detailPriceMrp');
+      const durationEl = document.getElementById('detailDurationLabel');
+      const stickyDurationEl = document.getElementById('detailStickyDuration');
+      const discountBadge = document.getElementById('detailDiscountBadge');
+
+      const formattedPrice = `₹${price.toFixed(0)}`;
+      if (priceNowEl) priceNowEl.textContent = formattedPrice;
+      if (stickyPriceNowEl) stickyPriceNowEl.textContent = formattedPrice;
+
+      if (priceMrpEl) {
+        if (mrp) {
+          priceMrpEl.textContent = `₹${mrp.toFixed(0)}`;
+          priceMrpEl.style.display = 'inline';
+        } else {
+          priceMrpEl.style.display = 'none';
+        }
+      }
+      if (durationEl) {
+        const textSpan = durationEl.querySelector('span');
+        if (textSpan) textSpan.textContent = duration;
+        else durationEl.textContent = `⏱ ${duration}`;
+      }
+      if (stickyDurationEl) {
+        stickyDurationEl.textContent = `⏱ ${duration}`;
+      }
+      if (discountBadge) {
+        if (discount) {
+          discountBadge.textContent = `${discount}% OFF`;
+          discountBadge.style.display = 'inline-block';
+        } else {
+          discountBadge.style.display = 'none';
+        }
+      }
+    }
+
+    function recalculateDetailPackageTotal() {
+      const GB = window.GlamourBooking;
+      if (!GB) return;
+      const item = GB.getCatalog().find((i) => i.id === '{{ service.slug }}');
+      if (!item) return;
+
+      const included = GB.gatherIncludedSelections(document);
+      const { price, mrp, duration_mins } = GB.computePackagePricing(item, included);
+
+      const priceNowEl = document.getElementById('detailPriceNow');
+      const stickyPriceNowEl = document.getElementById('detailStickyPriceNow');
+      const priceMrpEl = document.getElementById('detailPriceMrp');
+      const durationEl = document.getElementById('detailDurationLabel');
+      const stickyDurationEl = document.getElementById('detailStickyDuration');
+
+      const formattedPrice = `₹${price}`;
+      if (priceNowEl) priceNowEl.textContent = formattedPrice;
+      if (stickyPriceNowEl) stickyPriceNowEl.textContent = formattedPrice;
+
+      if (priceMrpEl) priceMrpEl.textContent = `₹${mrp}`;
+      const formattedDur = GB.formatDuration(duration_mins);
+      if (durationEl) {
+        const textSpan = durationEl.querySelector('span');
+        if (textSpan) textSpan.textContent = formattedDur;
+        else durationEl.textContent = `⏱ ${formattedDur}`;
+      }
+      if (stickyDurationEl) {
+        stickyDurationEl.textContent = `⏱ ${formattedDur}`;
+      }
+    }
+
+    function addDetailItemToCart() {
+      const itemSlug = '{{ service.slug }}';
+      const GB = window.GlamourBooking;
+      if (!GB || !GB.addItem) {
+        console.error('GlamourBooking cart is unavailable — could not add to cart.');
+        return;
+      }
+      const variantId = activeVariantId ? parseInt(activeVariantId, 10) : null;
+      if ('{{ kind }}' === 'package') {
+        GB.addItem(itemSlug, variantId, GB.gatherIncludedSelections(document));
+      } else {
+        GB.addItem(itemSlug, variantId);
+      }
+    }
+  </script>
 {% endblock %}

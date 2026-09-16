@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Category, Package, Service, ServiceVariant
+from .models import Category, Package, Service, ServiceStep, ServiceVariant
 
 
 @admin.register(Category)
@@ -14,13 +14,20 @@ class ServiceVariantInline(admin.TabularInline):
     extra = 1
 
 
+class ServiceStepInline(admin.TabularInline):
+    model = ServiceStep
+    extra = 1
+    fields = ('sort_order', 'title', 'badge', 'description', 'image', 'image_url')
+    ordering = ('sort_order',)
+
+
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
     list_display = ('name', 'slug', 'category', 'popularity_score', 'is_active')
     list_filter = ('category', 'is_active', 'available_today')
     search_fields = ('name', 'slug', 'description')
     prepopulated_fields = {'slug': ('name',)}
-    inlines = [ServiceVariantInline]
+    inlines = [ServiceVariantInline, ServiceStepInline]
 
 
 @admin.register(ServiceVariant)

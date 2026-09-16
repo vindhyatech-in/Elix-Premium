@@ -226,3 +226,55 @@ class ServiceVariant(VariantBase):
 
     def __str__(self):
         return f'{self.service.name} — {self.label or self.duration_label}'
+
+
+class ServiceStep(models.Model):
+    """An ordered step in a service's treatment process — e.g. step 2 of a
+    facial: 'Cleansing'.  Steps are service-specific: each service row owns
+    its own list (via the FK + related_name='steps').  Services with no steps
+    have an empty queryset — callers check ``service.steps.exists()`` before
+    rendering the 'How it works' section.
+
+    Image priority mirrors the rest of the catalog: an uploaded file
+    (``image``) wins over a plain external link (``image_url``).  Both may be
+    blank — the template skips the image slot when neither is set.
+    """
+    service = models.ForeignKey(
+        Service,
+        on_delete=models.CASCADE,
+        related_name='steps',
+    )
+    sort_order = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='Lower numbers appear first. Edit this to reorder steps.',
+    )
+    title = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    badge = models.CharField(
+        max_length=40,
+        blank=True,
+        help_text="Short label shown on the step chip, e.g. 'KEY STEP', '5 mins'.",
+    )
+    image = models.ImageField(
+        upload_to='service_steps/%Y/%m/',
+        null=True,
+        blank=True,
+    )
+    image_url = models.URLField(
+        max_length=500,
+        blank=True,
+        help_text='External image URL — only used when no uploaded image is set.',
+    )
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+
+    def __str__(self):
+        return f'[{self.service.name}] Step {self.sort_order}: {self.title}'
+
+    @property
+    def display_image_url(self):
+        """Uploaded image wins over external URL — mirrors CatalogItemBase."""
+        if self.image:
+            return self.image.url
+        return self.image_url or None

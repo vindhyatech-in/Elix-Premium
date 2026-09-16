@@ -24,7 +24,7 @@ from accounts.models import Employee, EmployeeLeave
 from accounts.utils import generate_username_from_name
 from bookings.models import Booking, Offer
 from bookings.notifications import notify_user
-from catalog.models import Category, Package, Service, ServiceVariant
+from catalog.models import Category, Package, Service, ServiceStep, ServiceVariant
 from core.decorators import owner_required
 from core.email_service import send_booking_email_all
 from core.utils import (
@@ -783,6 +783,59 @@ def _handle_catalog_post_action(request, locked_kind):
                     first_var.save()
             messages.success(request, f'Deleted variant from "{parent.name}".')
 
+    # ------------------------------------------------------------------ #
+    # Step actions — Service-only.  Each step belongs to one Service row  #
+    # via ServiceStep.service FK.                                          #
+    # ------------------------------------------------------------------ #
+    elif action == 'add_step':
+        service = get_object_or_404_safe(Service, request.POST.get('service_id'))
+        if service:
+            title = request.POST.get('title', '').strip()
+            if not title:
+                messages.error(request, 'Step title is required.')
+            else:
+                step = ServiceStep(
+                    service=service,
+                    title=title,
+                    description=request.POST.get('description', '').strip(),
+                    badge=request.POST.get('badge', '').strip(),
+                    sort_order=int(request.POST.get('sort_order') or 0),
+                    image_url=request.POST.get('image_url', '').strip(),
+                )
+                image_file = request.FILES.get('step_image')
+                if image_file:
+                    step.image = image_file
+                step.save()
+                messages.success(request, f'Added step "{title}" to "{service.name}".')
+
+    elif action == 'edit_step':
+        step = get_object_or_404_safe(ServiceStep, request.POST.get('step_id'))
+        if step:
+            title = request.POST.get('title', '').strip()
+            if not title:
+                messages.error(request, 'Step title is required.')
+            else:
+                step.title = title
+                step.description = request.POST.get('description', '').strip()
+                step.badge = request.POST.get('badge', '').strip()
+                step.sort_order = int(request.POST.get('sort_order') or step.sort_order)
+                new_image_url = request.POST.get('image_url', '').strip()
+                if new_image_url:
+                    step.image_url = new_image_url
+                image_file = request.FILES.get('step_image')
+                if image_file:
+                    step.image = image_file
+                step.save()
+                messages.success(request, f'Updated step "{title}".')
+
+    elif action == 'delete_step':
+        step = get_object_or_404_safe(ServiceStep, request.POST.get('step_id'))
+        if step:
+            service_name = step.service.name
+            step_title = step.title
+            step.delete()
+            messages.success(request, f'Deleted step "{step_title}" from "{service_name}".')
+
     return redirect(request.get_full_path())
 
 
@@ -817,7 +870,7 @@ def _dashboard_catalog_list(request, locked_kind, page_title, active_nav, templa
     if locked_kind == 'package':
         services_qs = services_qs.prefetch_related('included_services__variants')
     else:
-        services_qs = services_qs.prefetch_related('variants')
+        services_qs = services_qs.prefetch_related('variants', 'steps')
 
     if category_slug != 'all':
         services_qs = services_qs.filter(category__slug=category_slug)
