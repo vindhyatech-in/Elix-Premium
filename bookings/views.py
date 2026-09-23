@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import json
 import logging
 from datetime import timedelta
@@ -14,6 +15,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from catalog.models import Package, Service
@@ -471,7 +473,12 @@ def bookings_dashboard(request):
         'booking_categories': booking_data.get_booking_categories(),
         'booking_offers': booking_data.get_booking_offers(),
         'booking_catalog': booking_data.get_booking_catalog(),
-        'notifications': booking_data.get_notifications_mock(),
+        'notifications': (
+            UserNotification.objects
+            .filter(user=request.user)
+            .select_related('booking')
+            [:20]
+        ),
         'bookings': bookings,
     }
     return render(request, 'booking/pages/bookings_dashboard.html', context)
@@ -497,7 +504,38 @@ def cancel_booking(request, booking_number):
     if booking.can_cancel:
         booking.status = 'cancelled'
         booking.save(update_fields=['status', 'updated_at'])
-        messages.success(request, f'Booking {booking.booking_number} has been cancelled.')
+
+        # BUG-02 fix — auto-refund for online-paid bookings.
+        # Full refund always, matching the can_cancel policy window.
+        # A RazorpayError / network failure logs loudly but does NOT re-raise —
+        # the cancellation already succeeded and support can issue the refund
+        # manually from the Razorpay dashboard if needed.
+        if booking.payment_status == 'paid' and booking.razorpay_payment_id:
+            try:
+                razorpay_client.create_refund(booking.razorpay_payment_id)
+                booking.payment_status = 'refunded'
+                booking.save(update_fields=['payment_status'])
+                messages.success(
+                    request,
+                    f'Booking {booking.booking_number} cancelled. '
+                    f'Your refund of ₹{booking.total_amount:,.0f} has been initiated '
+                    f'and will appear within 5–7 business days.',
+                )
+            except Exception:
+                logger.error(
+                    'Refund FAILED for booking %s (payment_id=%s) — manual refund needed.',
+                    booking.booking_number, booking.razorpay_payment_id,
+                    exc_info=True,
+                )
+                messages.warning(
+                    request,
+                    f'Booking {booking.booking_number} has been cancelled. '
+                    f'Your refund could not be processed automatically — '
+                    f'please contact support and quote your booking number.',
+                )
+        else:
+            messages.success(request, f'Booking {booking.booking_number} has been cancelled.')
+
         # Notify customer + admin + beautician (if assigned) — daemon threads
         send_booking_email_all(
             event_customer='booking_cancelled',
@@ -796,3 +834,103 @@ def notifications_mark_all_read(request):
     """POST /booking/notifications/read-all/ — marks all of the user's notifications read."""
     UserNotification.objects.filter(user=request.user, read=False).update(read=True)
     return JsonResponse({'ok': True})
+
+
+@csrf_exempt
+@require_POST
+def razorpay_webhook(request):
+    """
+    Server-side Razorpay webhook handler — BUG-01 fix.
+
+    Catches `payment.captured` events so that bookings where the customer's
+    browser closed / lost network BEFORE the JS `handler` callback fired are
+    automatically recovered: Razorpay sends this POST to us directly, we mark
+    the matching booking paid without needing the browser at all.
+
+    Security
+    --------
+    Every incoming request is validated with HMAC-SHA256 against
+    `settings.RAZORPAY_WEBHOOK_SECRET` (from `.env`). Any request with a
+    missing or wrong `X-Razorpay-Signature` header is rejected with HTTP 400.
+    If `RAZORPAY_WEBHOOK_SECRET` is not configured in `.env`, ALL webhook
+    requests are rejected until it is — the endpoint never silently accepts
+    unauthenticated data.
+
+    Idempotency
+    -----------
+    `.update(payment_status='pending')` only modifies rows still in the
+    pending state. Already-paid rows are a no-op, so Razorpay's automatic
+    retries on non-2xx (which we never return for valid signatures) are safe.
+
+    Registration
+    ------------
+    In Razorpay Dashboard → Settings → Webhooks, register:
+        URL: https://yourdomain.com/booking/webhook/razorpay/
+        Events: payment.captured
+        Secret: <same value as RAZORPAY_WEBHOOK_SECRET in .env>
+    """
+    secret = getattr(settings, 'RAZORPAY_WEBHOOK_SECRET', '')
+    if not secret:
+        logger.error(
+            'Razorpay webhook hit but RAZORPAY_WEBHOOK_SECRET is not configured — '
+            'set it in .env and register the webhook URL in the Razorpay dashboard.'
+        )
+        return HttpResponse(status=400)
+
+    body = request.body
+    sig = request.headers.get('X-Razorpay-Signature', '')
+    expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        logger.warning(
+            'Razorpay webhook: HMAC signature mismatch — possible forgery or wrong secret. '
+            'sig_received=%s', sig[:16] + '...' if sig else '(empty)',
+        )
+        return HttpResponse(status=400)
+
+    try:
+        event = json.loads(body)
+    except json.JSONDecodeError:
+        logger.error('Razorpay webhook: body is not valid JSON.')
+        return HttpResponse(status=400)
+
+    event_type = event.get('event', '')
+    logger.debug('Razorpay webhook received: event=%s', event_type)
+
+    if event_type == 'payment.captured':
+        try:
+            payment_entity = event['payload']['payment']['entity']
+            order_id = payment_entity.get('order_id', '').strip()
+            payment_id = payment_entity.get('id', '').strip()
+        except (KeyError, TypeError, AttributeError):
+            logger.exception('Razorpay webhook: malformed payment.captured payload.')
+            # Return 200 so Razorpay doesn't retry a genuinely malformed event forever.
+            return HttpResponse(status=200)
+
+        if order_id and payment_id:
+            updated = Booking.objects.filter(
+                razorpay_order_id=order_id,
+                payment_status='pending',
+            ).update(
+                payment_status='paid',
+                razorpay_payment_id=payment_id,
+            )
+            if updated:
+                logger.info(
+                    'Razorpay webhook: recovered %d booking(s) via payment.captured '
+                    '— order_id=%s payment_id=%s',
+                    updated, order_id, payment_id,
+                )
+            else:
+                logger.debug(
+                    'Razorpay webhook: no pending bookings found for order_id=%s '
+                    '(already paid, or booking not yet created — manual check needed).',
+                    order_id,
+                )
+        else:
+            logger.warning(
+                'Razorpay webhook: payment.captured event missing order_id or payment_id.'
+            )
+
+    # Return 200 for every valid-signature event — including events we don't
+    # handle — so Razorpay doesn't retry endlessly on unknown event types.
+    return HttpResponse(status=200)

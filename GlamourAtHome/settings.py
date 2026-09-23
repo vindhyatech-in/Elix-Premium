@@ -355,6 +355,10 @@ GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
 USE_GOOGLE_MAPS_FOR_ADDRESS = config('USE_GOOGLE_MAPS_FOR_ADDRESS', default=False, cast=bool)
 RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID', default='')
 RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='')
+# Webhook secret from Razorpay Dashboard → Settings → Webhooks.
+# Required for the server-side payment recovery webhook (BUG-01). Without
+# this set, the webhook endpoint rejects all incoming requests with 400.
+RAZORPAY_WEBHOOK_SECRET = config('RAZORPAY_WEBHOOK_SECRET', default='')
 
 # ---------------------------------------------------------------------------
 # Authentication (django-allauth) — see developed.md "Authentication".

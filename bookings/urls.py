@@ -5,6 +5,8 @@ from . import views
 urlpatterns = [
     path('booking/checkout/', views.create_booking, name='create_booking'),
     path('booking/razorpay/order/', views.create_razorpay_order, name='create_razorpay_order'),
+    # BUG-01 — server-side payment recovery webhook (csrf_exempt, no login required — Razorpay POSTs here)
+    path('booking/webhook/razorpay/', views.razorpay_webhook, name='razorpay_webhook'),
     path('booking/my-bookings/', views.bookings_dashboard, name='bookings_dashboard'),
     path('booking/my-bookings/<str:booking_number>/cancel/', views.cancel_booking, name='cancel_booking'),
     path('booking/my-bookings/<str:booking_number>/reschedule/', views.reschedule_booking, name='reschedule_booking'),

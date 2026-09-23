@@ -74,8 +74,10 @@ the same way you'd update a README.
   beauty tips, and FAQs are all real, admin-editable models now
   (`Hero`/`ValuePillar`/`HowItWorksStep`/`TrustPoint`/`TrustBadge`/
   `Beautician`/`Testimonial`/`GalleryBeforeAfter`/`GalleryPortfolioItem`/
-  `BeautyTip`/`FAQ`), plus `SiteNotification`/`TrendingSearch` backing
-  the booking app's notification bell and trending-search chips.
+  `BeautyTip`/`FAQ`), plus `TrendingSearch` backing the booking app's
+  trending-search chips. `SiteNotification` exists as a legacy model but
+  is **no longer used** — the notification bell is backed entirely by
+  `bookings.UserNotification` (real per-user, per-booking rows).
 - **Auth**: three-tier priority — Google/Apple OAuth first, phone-number
   OTP second (real MessageCentral integration,
   `accounts/messagecentral.py`), username/email + password third. A
@@ -2823,7 +2825,7 @@ Real per-user notification system replacing the static `SiteNotification` mock f
 ### Model — `bookings.UserNotification`
 - `user` FK (CASCADE) → authenticated customer.
 - `booking` FK (SET_NULL, nullable) → originating `Booking`, preserved as a reference even after deletion.
-- `ntype` — one of `booking_confirmed | beautician_assigned | booking_rescheduled | booking_cancelled | booking_completed | general`.
+- `ntype` — one of `booking_confirmed | beautician_assigned | booking_rescheduled | booking_cancelled | booking_completed | on_the_way | job_started | general`.
 - `title`, `body` — pre-formatted human-readable strings, generated from templates in `bookings/notifications.py`.
 - `read` — `BooleanField(default=False)`; flipped via the mark-read API.
 - `created_at` — ordered `['-created_at']`; `time_label` property returns a human-readable relative string ("Just now", "5m ago", "2h ago", "3 days ago").
@@ -2840,7 +2842,10 @@ Real per-user notification system replacing the static `SiteNotification` mock f
 | Reschedule | `bookings/views.py::reschedule_booking` | `booking_rescheduled` |
 | Beautician assigned (overview AJAX) | `core/admin_dashboard_views.py` (L~172) | `beautician_assigned` |
 | Beautician assigned (detail page) | `core/admin_dashboard_views.py` (L~428) | `beautician_assigned` |
-| Booking completed | `core/admin_dashboard_views.py` (L~413) | `booking_completed` |
+| Booking completed (admin) | `core/admin_dashboard_views.py` (L~413) | `booking_completed` |
+| Beautician marked on the way | `core/employee_dashboard_views.py::mark_on_the_way` | `on_the_way` |
+| OTP verified → job started | `core/employee_dashboard_views.py::verify_start_otp` | `job_started` |
+| Job completed (employee) | `core/employee_dashboard_views.py::update_booking_status` | `booking_completed` |
 
 ### API Endpoints (`bookings/urls.py`)
 | URL | View | Purpose |
@@ -2875,5 +2880,103 @@ Updated `.notif-item` with: icon column (`.notif-item__icon`), body text and tim
   - `core/admin_dashboard_views.py`: `dashboard_overview`, `dashboard_employees`, `dashboard_reports`, and `dashboard_reports_export` updated to use `timezone.localdate()` for today's counts, leave queries, and default report bounds.
   - `core/employee_dashboard_views.py`: `employee_dashboard_view` and `employee_profile_view` updated to use `timezone.localdate()` for today's job card filtering, month calendar rendering, and upcoming leave queries.
 - **Testing**: Added unit test suite in `bookings/tests.py` covering timezone configuration, aware `DateTimeField` timestamps, delta calculations on `UserNotification`, past-date booking validation, and 50-minute urgent slot window enforcement. All tests pass cleanly.
+
+## Cookie Consent Banner — BUG-23 (2026-09-23)
+
+Added a GDPR/DPDP Act 2023-compliant cookie consent banner required by Schedule A §19 of the client agreement.
+
+### Implementation
+
+- **Partial**: `templates/partials/cookie_consent.html` — a self-contained fixed bottom-bar. Includes inline `<style>` (scoped to `#cookie-consent-banner`) and inline `<script>` so it works without any changes to `main.css` or `main.js`.
+- **Slide-in animation**: Banner is rendered `display:none` in HTML, revealed via `requestAnimationFrame` + a CSS `transform: translateY(0)` transition (`var(--ease-premium)`, 600 ms) so page content always paints first.
+- **Persistence**: `localStorage.setItem('cookie_consent', 'accepted' | 'declined')`. On subsequent page loads the JS key-check fires before the transition runs — users who have already responded never see the banner.
+- **Buttons**: "Accept" (indigo gradient, pill shape) / "Decline" (ghost border). Both call the same `dismiss(choice)` helper which stores the preference and slides the banner out, then removes it from DOM after the transition completes.
+- **Dark mode**: Fully token-aware — uses `var(--surface-glass-dark)`, `var(--border-hairline-dark)`, `var(--text-soft)` etc. No hardcoded colours.
+- **Accessibility**: `role="dialog"`, `aria-label`, `aria-live="polite"`, `focus-visible` outline on buttons, responsive stacking on `max-width: 600px`.
+- **Included in**: `templates/base.html` (marketing site) and `templates/booking/layouts/booking_base.html` (booking app) — placed immediately before `</body>` after all JS blocks.
+
+### Privacy Policy link
+Uses `{% url 'privacy_policy' %}` — the existing route. No new URL required.
+
+---
+
+## Per-User Notifications — BUG-06 completion (2026-09-23)
+
+The `UserNotification` model, `notify_user()` helper, mark-read API endpoints, and JS-driven bell dropdown were all implemented in the 2026-08-24 session. Three remaining gaps were closed in this session:
+
+### 1. Retired `get_notifications_mock()` / `SiteNotification` from all view contexts
+
+All three remaining call sites were replaced with a real per-user query:
+
+```python
+UserNotification.objects.filter(user=request.user).select_related('booking')[:20]
+```
+
+| View | File | Notes |
+|---|---|---|
+| `services_booking` | `core/views.py` | Public page — anonymous users get `[]` (guarded by `request.user.is_authenticated`) |
+| `bookings_dashboard` | `bookings/views.py` | `@login_required` — always authenticated |
+| `profile` | `accounts/views.py` | `@login_required` — always authenticated |
+
+`get_notifications_mock()` / `SiteNotification` are now completely retired from all template contexts. `SiteNotification` rows still exist in the DB and admin, but are no longer surfaced anywhere in the product.
+
+### 2. Two new `ntype` values
+
+| ntype | Emoji | Title | Trigger |
+|---|---|---|---|
+| `on_the_way` | 🚗 | "Beautician On The Way" | `mark_on_the_way` action in employee dashboard |
+| `job_started` | ✂️ | "Service Started" | `verify_start_otp` success → `in_progress` |
+
+Added to `_MESSAGES` dict in `bookings/notifications.py`, `NTYPE_CHOICES` and `NTYPE_ICONS` on `bookings.UserNotification`.
+
+### 3. Employee dashboard `notify_user` call sites
+
+`bookings.notifications.notify_user` imported into `core/employee_dashboard_views.py` and wired at three points:
+
+- `mark_on_the_way` → after `booking.save()`: `notify_user(booking, 'on_the_way')`
+- `verify_start_otp` success → after `booking.save()`: `notify_user(booking, 'job_started')`
+- `update_booking_status` completed → after email sent: `notify_user(booking, 'booking_completed')`
+
+All three call sites are placed **after** `booking.save()` so a notification is only created when the transition actually persisted. `notify_user` itself swallows all exceptions, so a notification failure never blocks the employee dashboard request.
+
+---
+
+## Razorpay Webhook Payment Recovery — BUG-01 (2026-09-23)
+
+Resolved the payment recovery gap where online payments could be captured by Razorpay, but if the customer's browser disconnected or closed prior to the JS callback, the booking remained pending.
+
+### Implementation Details
+
+- **Webhook Handler**: Added `razorpay_webhook` view in `bookings/views.py`.
+  - Decorated with `@csrf_exempt` and `@require_POST`.
+  - Validates `X-Razorpay-Signature` against `settings.RAZORPAY_WEBHOOK_SECRET` using `hmac.new` with `hashlib.sha256` in constant time (`hmac.compare_digest`).
+  - Gracefully rejects with HTTP 400 if `RAZORPAY_WEBHOOK_SECRET` is unset or signature check fails.
+  - On `payment.captured` event: parses `order_id` and `payment_id`, then atomically updates matching `Booking` objects (`payment_status='pending'`) to `payment_status='paid'` and saves `razorpay_payment_id`.
+  - Idempotent and returns HTTP 200 for processed or unhandled valid events to avoid unneeded webhooks retries.
+- **Routing**: Registered endpoint `/booking/webhook/razorpay/` (`name='razorpay_webhook'`) in `bookings/urls.py`.
+- **Configuration**:
+  - Added `RAZORPAY_WEBHOOK_SECRET = config('RAZORPAY_WEBHOOK_SECRET', default='')` in `GlamourAtHome/settings.py`.
+  - Documented setup instructions and `RAZORPAY_WEBHOOK_SECRET` in `.env.example`.
+
+---
+
+## Refund on Cancellation — BUG-02 (2026-09-23)
+
+Introduced automatic Razorpay refund processing upon booking cancellation.
+
+### Implementation Details
+
+- **Razorpay Client Integration**:
+  - Implemented `create_refund(payment_id, amount_paise=None)` in `bookings/razorpay_client.py`.
+  - Dispatches `POST /v1/payments/{payment_id}/refund` with Bearer auth; omitting amount defaults to a full refund.
+  - Validates API responses and raises `RazorpayError` or `requests.HTTPError`.
+- **Model & Database Updates**:
+  - Added `('refunded', 'Refunded')` choice to `Booking.PAYMENT_STATUS_CHOICES` in `bookings/models.py`.
+  - Created migration `bookings/migrations/0022_booking_payment_status_refunded.py` and migrated.
+- **Cancellation View Workflow**:
+  - Updated `cancel_booking` in `bookings/views.py`.
+  - If a cancelled booking is `payment_status == 'paid'` and has `razorpay_payment_id`, triggers `create_refund`.
+  - Updates `booking.payment_status = 'refunded'` and alerts customer that their refund of ₹X has been initiated (5–7 business days).
+  - Robust error handling: catches errors during refund dispatch, logs failure for manual intervention, and informs the user via `messages.warning` without blocking the cancellation itself.
 
 

@@ -9,7 +9,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
-from bookings.models import Review
+from bookings.models import Review, UserNotification
 from catalog.models import Package, Service
 from core import booking_data
 
@@ -59,7 +59,12 @@ def profile_view(request):
         'booking_categories': booking_data.get_booking_categories(),
         'booking_offers': booking_data.get_booking_offers(),
         'booking_catalog': booking_data.get_booking_catalog(),
-        'notifications': booking_data.get_notifications_mock(),
+        'notifications': (
+            UserNotification.objects
+            .filter(user=request.user)
+            .select_related('booking')
+            [:20]
+        ),
     }
     return render(request, 'booking/pages/profile.html', context)
 

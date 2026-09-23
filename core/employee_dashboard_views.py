@@ -12,6 +12,7 @@ from django.utils.dateparse import parse_date
 
 from core.decorators import is_owner, owner_or_emp_required
 from core.email_service import send_booking_email_all
+from bookings.notifications import notify_user
 from core.utils import get_object_or_404_safe, looks_like_phone, validate_image_upload
 
 # How long a generated start OTP stays valid — long enough that a slow
@@ -281,6 +282,7 @@ def employee_dashboard(request):
                     event_beautician='beautician_job_completed',
                     booking=booking,
                 )
+                notify_user(booking, 'booking_completed')
 
         elif action == 'mark_paid' and employee:
             booking_id = request.POST.get('booking_id')
@@ -296,6 +298,7 @@ def employee_dashboard(request):
                 booking.status = 'on_the_way'
                 booking.save()
                 messages.success(request, f'Order #{booking.booking_number} marked On The Way.')
+                notify_user(booking, 'on_the_way')
 
         elif action == 'preview_verification' and employee:
             booking_id = request.POST.get('booking_id')
@@ -408,6 +411,7 @@ def employee_dashboard(request):
                 booking.otp_failed_attempts = 0
                 booking.save()
                 messages.success(request, f'Verified — #{booking.booking_number} is now Job Started.')
+                notify_user(booking, 'job_started')
 
         return redirect(request.get_full_path())
 

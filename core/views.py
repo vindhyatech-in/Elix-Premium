@@ -26,6 +26,7 @@ from .models import (
     FAQ, BeautyTip, GalleryBeforeAfter, GalleryPortfolioItem,
     Hero, HowItWorksStep, Testimonial, TrustBadge, TrustPoint, ValuePillar,
 )
+from bookings.models import UserNotification
 
 logger = logging.getLogger(__name__)
 
@@ -63,11 +64,19 @@ def services_booking(request):
     Phase 2/3 roadmap: booking drawer, real chat, notifications backend,
     bookings dashboard).
     """
+    notifications = (
+        UserNotification.objects
+        .filter(user=request.user)
+        .select_related('booking')
+        [:20]
+        if request.user.is_authenticated
+        else []
+    )
     context = {
         'booking_categories': booking_data.get_booking_categories(),
         'booking_offers': booking_data.get_booking_offers(),
         'booking_catalog': booking_data.get_booking_catalog(),
-        'notifications': booking_data.get_notifications_mock(),
+        'notifications': notifications,
         'trending_searches': booking_data.get_trending_searches(),
     }
     return render(request, 'booking/pages/service_booking.html', context)

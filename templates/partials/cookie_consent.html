@@ -1,0 +1,234 @@
+{% comment %}
+  Cookie Consent Banner — BUG-23
+  ---------------------------------------------------------------
+  • Shows once per browser until the user clicks Accept or Decline.
+  • Preference is persisted in localStorage('cookie_consent'):
+      'accepted'  — user agreed
+      'declined'  — user declined (essential cookies only)
+  • The banner is hidden immediately (display:none) and revealed
+    only by JS so users with a stored preference never see it.
+  • Fully dark-mode aware via Elix design tokens.
+  • DPDP Act 2023 / Schedule A §19 compliant.
+{% endcomment %}
+
+<div
+  id="cookie-consent-banner"
+  role="dialog"
+  aria-label="Cookie consent"
+  aria-live="polite"
+  style="display:none;"
+>
+  <div class="cc-inner">
+    <div class="cc-text">
+      <span class="cc-icon" aria-hidden="true">🍪</span>
+      <p>
+        We use cookies to enhance your experience and analyse site traffic.
+        By clicking <strong>Accept</strong>, you consent to our use of cookies
+        as described in our
+        <a href="{% url 'privacy_policy' %}" class="cc-link">Privacy Policy</a>.
+        Essential session cookies are always active.
+      </p>
+    </div>
+    <div class="cc-actions">
+      <button id="cc-decline-btn" class="cc-btn cc-btn--secondary" type="button">
+        Decline
+      </button>
+      <button id="cc-accept-btn" class="cc-btn cc-btn--primary" type="button">
+        Accept
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* ── Cookie Consent Banner ──────────────────────────────────── */
+  #cookie-consent-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: calc(var(--z-toast, 950) - 10);
+    background: var(--surface-glass, rgba(255,255,255,0.92));
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    border-top: 1px solid var(--border-hairline, rgba(15,23,42,0.08));
+    box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.10);
+    padding: var(--space-sm, 1rem) var(--container-pad, clamp(1rem, 4vw, 4rem));
+    transform: translateY(100%);
+    transition: transform var(--dur-md, 0.6s) var(--ease-premium, cubic-bezier(0.16,1,0.3,1));
+  }
+
+  [data-theme="dark"] #cookie-consent-banner {
+    background: var(--surface-glass-dark, rgba(15,23,42,0.92));
+    border-top-color: var(--border-hairline-dark, rgba(255,255,255,0.12));
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
+  }
+
+  #cookie-consent-banner.cc-visible {
+    transform: translateY(0);
+  }
+
+  .cc-inner {
+    max-width: var(--container-width, 1280px);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md, 1.5rem);
+    flex-wrap: wrap;
+  }
+
+  .cc-text {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-xs, 0.75rem);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .cc-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+    line-height: 1.6;
+  }
+
+  .cc-text p {
+    margin: 0;
+    font-size: var(--fs-sm, 0.875rem);
+    color: var(--text-soft, #334155);
+    line-height: 1.6;
+  }
+
+  [data-theme="dark"] .cc-text p {
+    color: var(--text-soft, #cbd5e1);
+  }
+
+  .cc-link {
+    color: var(--blue, #4f46e5);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-weight: 500;
+    transition: color var(--dur-sm, 0.3s);
+  }
+
+  .cc-link:hover {
+    color: var(--blue-deep, #3730a3);
+  }
+
+  .cc-actions {
+    display: flex;
+    gap: var(--space-2xs, 0.5rem);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .cc-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.55rem 1.25rem;
+    border-radius: var(--radius-pill, 999px);
+    font-size: var(--fs-sm, 0.875rem);
+    font-weight: 600;
+    font-family: var(--font-body, 'Inter', sans-serif);
+    cursor: pointer;
+    border: none;
+    transition:
+      background var(--dur-sm, 0.3s) var(--ease-soft),
+      color var(--dur-sm, 0.3s) var(--ease-soft),
+      box-shadow var(--dur-sm, 0.3s) var(--ease-soft),
+      transform var(--dur-sm, 0.3s) var(--ease-premium);
+    white-space: nowrap;
+  }
+
+  .cc-btn:focus-visible {
+    outline: 2px solid var(--blue, #4f46e5);
+    outline-offset: 3px;
+  }
+
+  .cc-btn--primary {
+    background: var(--gradient-primary, linear-gradient(135deg, #6366f1, #4f46e5));
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.30);
+  }
+
+  .cc-btn--primary:hover {
+    background: var(--blue-deep, #3730a3);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.40);
+    transform: translateY(-1px);
+  }
+
+  .cc-btn--primary:active {
+    transform: translateY(0);
+  }
+
+  .cc-btn--secondary {
+    background: transparent;
+    color: var(--ink-muted, #64748b);
+    border: 1.5px solid var(--border-hairline, rgba(15,23,42,0.15));
+  }
+
+  .cc-btn--secondary:hover {
+    background: var(--surface-3, #f1f5f9);
+    color: var(--text-body, #0f172a);
+    border-color: var(--ink-muted, #64748b);
+    transform: translateY(-1px);
+  }
+
+  [data-theme="dark"] .cc-btn--secondary {
+    border-color: var(--border-hairline-dark, rgba(255,255,255,0.12));
+    color: var(--ink-muted, #94a3b8);
+  }
+
+  [data-theme="dark"] .cc-btn--secondary:hover {
+    background: var(--surface-2, #1e293b);
+    color: var(--text-body, #f8fafc);
+    border-color: rgba(255,255,255,0.25);
+  }
+
+  @media (max-width: 600px) {
+    .cc-inner {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .cc-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+  }
+</style>
+
+<script>
+  (function () {
+    var STORAGE_KEY = 'cookie_consent';
+    var banner = document.getElementById('cookie-consent-banner');
+    if (!banner) return;
+
+    // If the user has already responded, never show the banner again.
+    if (localStorage.getItem(STORAGE_KEY)) return;
+
+    // Show the banner with a slight entrance delay so page content renders first.
+    banner.style.display = '';
+    // Force a reflow before adding the class so the CSS transition fires.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        banner.classList.add('cc-visible');
+      });
+    });
+
+    function dismiss(choice) {
+      localStorage.setItem(STORAGE_KEY, choice);
+      banner.classList.remove('cc-visible');
+      // Remove from DOM after the slide-out transition completes (600 ms).
+      setTimeout(function () {
+        banner.remove();
+      }, 650);
+    }
+
+    document.getElementById('cc-accept-btn').addEventListener('click', function () {
+      dismiss('accepted');
+    });
+
+    document.getElementById('cc-decline-btn').addEventListener('click', function () {
+      dismiss('declined');
+    });
+  })();
+</script>

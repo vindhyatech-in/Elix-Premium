@@ -48,5 +48,6 @@
   <script src="{% static 'js/main.js' %}" defer></script>
   <script src="{% static 'js/animations.js' %}" defer></script>
   {% block extra_js %}{% endblock %}
+  {% include 'partials/cookie_consent.html' %}
 </body>
 </html>

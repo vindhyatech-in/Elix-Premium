@@ -33,6 +33,7 @@ class Booking(models.Model):
         ('pending', 'Pending'),
         ('paid', 'Paid'),
         ('failed', 'Failed'),
+        ('refunded', 'Refunded'),
     ]
     # Labels only — DB values stay as-is (upcoming/in_progress) so every
     # existing filter(status='upcoming')/etc. across views/templates/admin
@@ -325,6 +326,8 @@ class UserNotification(models.Model):
         ('booking_rescheduled', 'Booking Rescheduled'),
         ('booking_cancelled', 'Booking Cancelled'),
         ('booking_completed', 'Booking Completed'),
+        ('on_the_way', 'Beautician On The Way'),
+        ('job_started', 'Service Started'),
         ('general', 'General'),
     ]
     NTYPE_ICONS = {
@@ -333,6 +336,8 @@ class UserNotification(models.Model):
         'booking_rescheduled': '📅',
         'booking_cancelled': '❌',
         'booking_completed': '✅',
+        'on_the_way': '🚗',
+        'job_started': '✂️',
         'general': '🔔',
     }
 

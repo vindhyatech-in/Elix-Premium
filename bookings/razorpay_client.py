@@ -52,3 +52,36 @@ def verify_payment_signature(order_id, payment_id, signature):
     body = f'{order_id}|{payment_id}'.encode()
     expected = hmac.new(settings.RAZORPAY_KEY_SECRET.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature or '')
+
+
+def create_refund(payment_id, amount_paise=None):
+    """
+    Initiates a Razorpay refund for a captured payment — BUG-02 fix.
+
+    `payment_id` — the Razorpay payment ID stored in `Booking.razorpay_payment_id`.
+    `amount_paise` — amount to refund in paise (100 paise = ₹1). Omit (or
+    pass None) for a full refund, which is Razorpay's default behaviour.
+
+    Raises `RazorpayError` on API-level rejection (bad payment_id, payment
+    already fully refunded, etc.). Raises `requests.HTTPError` on network/
+    server errors — callers should catch both.
+
+    Refunds typically settle in 5–7 business days for bank transfers and
+    instantly for UPI/wallet payments (Razorpay-side behaviour, not ours).
+    """
+    payload = {}
+    if amount_paise is not None:
+        payload['amount'] = int(amount_paise)
+
+    response = requests.post(
+        f'{BASE_URL}/payments/{payment_id}/refund',
+        json=payload,
+        headers={'Authorization': _auth_header()},
+        timeout=15,
+    )
+    response.raise_for_status()
+    data = response.json()
+    if data.get('entity') != 'refund' and 'id' not in data:
+        raise RazorpayError(data.get('error', {}).get('description') or 'Refund API returned an unexpected response.')
+    return data
+

@@ -41,6 +41,16 @@ _MESSAGES = {
         'Your booking #{booking_number} is now complete. '
         'We hope you loved the experience! Please leave a review.',
     ),
+    'on_the_way': (
+        '🚗 Beautician On The Way',
+        'Your beautician {beautician_name} is on the way for booking '
+        '#{booking_number}. Please be ready!',
+    ),
+    'job_started': (
+        '✂️ Service Started',
+        'Your appointment for booking #{booking_number} has started. '
+        'Sit back and enjoy the experience!',
+    ),
 }
 
 
