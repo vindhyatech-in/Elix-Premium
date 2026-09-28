@@ -2979,4 +2979,78 @@ Introduced automatic Razorpay refund processing upon booking cancellation.
   - Updates `booking.payment_status = 'refunded'` and alerts customer that their refund of ₹X has been initiated (5–7 business days).
   - Robust error handling: catches errors during refund dispatch, logs failure for manual intervention, and informs the user via `messages.warning` without blocking the cancellation itself.
 
+---
+
+## WhatsApp Cloud API OTP Login (2026-09-23)
+
+Upgraded the Tier-2 Phone Sign-In flow from MessageCentral to **Meta WhatsApp Cloud API** using an official Authentication message template (`login_otp`).
+
+### Architecture & Implementation
+
+- **Meta Graph API Template Integration**:
+  - Module: `accounts/whatsapp_otp.py`.
+  - Dispatches `POST https://graph.facebook.com/v20.0/{WHATSAPP_PHONE_NUMBER_ID}/messages`.
+  - Handles the approved `login_otp` authentication template components:
+    - **Body**: Positional parameters `{{1}}` (6-digit OTP) and `{{2}}` ("Login to Elix" purpose).
+    - **Button**: `sub_type: "url"` with parameter `{{1}}` (OTP code), powering the native WhatsApp "Copy code" button.
+  - Normalizes phone numbers to E.164 digits without leading `+` (e.g. `919584979324`).
+- **Cryptographic Security & Expiry**:
+  - OTPs generated using Python's `secrets.randbelow(1_000_000)` (6 digits).
+  - Stored in Django cache with a 10-minute TTL matching the template's expiration footer.
+  - Validated using constant-time string comparison (`secrets.compare_digest`).
+  - Single-use: cache entry is deleted immediately upon successful verification to prevent replay attacks.
+  - Rate limiting & lockout: 5 failed challenge attempts lock out the attempt window, requiring a fresh code request.
+- **Settings & Environment**:
+  - `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TEMPLATE_NAME`, `WHATSAPP_TEMPLATE_LANG`, `WHATSAPP_API_VERSION`, and `OTP_GATEWAY` wired in `GlamourAtHome/settings.py` and documented in `.env.example`.
+- **UI & UX Updates**:
+  - `templates/account/phone_login_request.html` & `templates/account/phone_login_confirm.html` updated with clean copy clarifying WhatsApp delivery ("Sign In with WhatsApp", "Enter WhatsApp Code").
+- **CLI Diagnostics**:
+  - Added management command `accounts/management/commands/test_whatsapp_otp.py` (`python manage.py test_whatsapp_otp <number>`) for end-to-end dispatch verification.
+
+---
+
+## Superadmin "Log In As User" / Impersonation (2026-09-28)
+
+Implemented direct user impersonation from the Django Admin, enabling Superadmins (`is_superuser=True`) to audit, troubleshoot, and test the platform from the exact perspective of any Customer, Employee, or Owner.
+
+### Implementation Details
+
+- **Django Admin Customization**:
+  - Re-registered `django.contrib.auth.models.User` with `CustomUserAdmin` in `accounts/admin.py`.
+  - Added a color-coded **Role** badge column (`Super Admin`, `Owner`, `Employee`, `Customer`).
+  - Added a one-click **"Log In As"** action button to every non-superuser row in the user change list.
+  - Added a batch admin action: *"Log In as selected user"*.
+  - Added an object tool button **"Log In As This User"** to the User change form (`templates/admin/auth/user/change_form.html`).
+- **Impersonation Workflow & Intelligent Routing**:
+  - Views: `impersonate_user` and `stop_impersonation` in `accounts/views.py`.
+  - Routes: `/accounts/impersonate/<int:user_id>/` and `/accounts/impersonate/stop/` in `accounts/urls.py`.
+  - Stash original superadmin ID and username in `request.session['impersonator_id']` and `request.session['impersonator_username']`.
+  - Security gates:
+    - Strictly blocks non-superadmins (redirects with error).
+    - Prevents impersonating other superusers or deactivated accounts.
+    - Prevents self-impersonation.
+  - Role-based automatic landing:
+    - Impersonating an **Owner** &rarr; redirects to `/dashboard/` (`admin_dashboard_overview`).
+    - Impersonating an **Employee** &rarr; redirects to `/employee/` (`employee_dashboard`).
+    - Impersonating a **Customer** &rarr; redirects to `/booking/my-bookings/` (`bookings_dashboard`).
+- **Persistent Floating Top Banner**:
+  - Middleware: `core.middleware.ImpersonationBannerMiddleware`.
+  - Registered in `MIDDLEWARE` in `GlamourAtHome/settings.py`.
+  - Whenever `impersonator_id` is present in session, injects a fixed, high-contrast top bar across all HTML pages showing:
+    - Amber "Impersonating" pill.
+    - Target user full name/username, email, and active role.
+    - Original Super Admin username.
+    - One-click **"Switch Back to Admin"** button that immediately logs the superadmin back in and redirects to `/admin/auth/user/`.
+    - Automatically adds top padding to the document body to prevent overlapping page headers.
+- **Automated Testing**:
+  - Unit test suite in `accounts/tests.py` (`ImpersonationTests`):
+    - Gating against non-superusers.
+    - Successful customer impersonation & session stamps.
+    - Rejection of superadmin-on-superuser impersonation.
+    - Clean restoration upon stop impersonation.
+    - HTML banner injection validation.
+    - All 5 tests passing cleanly.
+
+
+
 

@@ -9,15 +9,14 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from accounts import messagecentral
+from accounts import whatsapp_otp
 from accounts.forms import PhoneLoginConfirmForm, PhoneLoginRequestForm
 
 logger = logging.getLogger(__name__)
 
 # A wrong-code lockout, same defense-in-depth reasoning as the employee
-# arrival-OTP lockout (core/employee_dashboard_views.py) — MessageCentral
-# is the source of truth for correctness/expiry now, but nothing stops
-# an attacker from just hammering this endpoint with guesses otherwise.
+# arrival-OTP lockout (core/employee_dashboard_views.py) — 5 failed attempts
+# invalidates the current challenge, forcing a fresh code request.
 MAX_CONFIRM_ATTEMPTS = 5
 
 
@@ -30,11 +29,9 @@ def _safe_next_url(request):
 
 def request_phone_login(request):
     """
-    Tier-2 login ("Continue with Phone Number") — replaces allauth's own
-    login-by-code for this project, since MessageCentral's Verify Now
-    product generates and validates its own OTP (there's no way to hand
-    it an allauth-generated code to just relay, unlike MSG91's plain SMS
-    API) — see accounts/messagecentral.py for the full explanation.
+    Tier-2 login ("Continue with Phone Number") — sends a 6-digit one-time
+    verification code via Meta's WhatsApp Cloud API authentication template
+    (login_otp) and validates it upon confirmation.
     """
     if request.user.is_authenticated:
         return redirect('index')
@@ -47,10 +44,10 @@ def request_phone_login(request):
                 form.add_error(None, 'Too many requests — please wait a bit and try again.')
             else:
                 try:
-                    verification_id = messagecentral.send_otp(phone)
-                except (messagecentral.MessageCentralError, Exception):
-                    logger.exception('MessageCentral send_otp failed for %s', phone)
-                    form.add_error(None, "Couldn't send a code to that number right now — please try again shortly.")
+                    verification_id = whatsapp_otp.send_otp(phone)
+                except (whatsapp_otp.WhatsAppAPIError, Exception):
+                    logger.exception('WhatsApp send_otp failed for %s', phone)
+                    form.add_error(None, "Couldn't send a WhatsApp code to that number right now — please try again shortly.")
                 else:
                     request.session['phone_login'] = {
                         'phone': phone,
@@ -69,11 +66,6 @@ def request_phone_login(request):
 
 
 def confirm_phone_login(request):
-    # Without this, an already-authenticated session (a leftover tab, a
-    # shared/kiosk device) that still had a pending phone_login in its
-    # session could confirm a code meant to log in as a DIFFERENT
-    # account, silently switching who's logged in — request_phone_login
-    # already guards this the same way; this view just never had it.
     if request.user.is_authenticated:
         request.session.pop('phone_login', None)
         return redirect('index')
@@ -90,14 +82,14 @@ def confirm_phone_login(request):
                 messages.error(request, 'Too many requests — please wait a bit and try again.')
             else:
                 try:
-                    state['verification_id'] = messagecentral.send_otp(state['phone'])
+                    state['verification_id'] = whatsapp_otp.send_otp(state['phone'])
                     state['attempts'] = 0
                     state['sent_at'] = timezone.now().timestamp()
                     request.session['phone_login'] = state
-                    messages.success(request, 'A new code has been sent.')
-                except (messagecentral.MessageCentralError, Exception):
-                    logger.exception('MessageCentral resend failed for %s', state['phone'])
-                    messages.error(request, "Couldn't resend a code right now — please try again shortly.")
+                    messages.success(request, 'A new verification code has been sent to your WhatsApp.')
+                except (whatsapp_otp.WhatsAppAPIError, Exception):
+                    logger.exception('WhatsApp resend failed for %s', state['phone'])
+                    messages.error(request, "Couldn't resend a WhatsApp code right now — please try again shortly.")
             return redirect('phone_login_confirm')
 
         if state.get('attempts', 0) >= MAX_CONFIRM_ATTEMPTS:
@@ -105,9 +97,9 @@ def confirm_phone_login(request):
         elif form.is_valid():
             code = form.cleaned_data['code']
             try:
-                verified = messagecentral.validate_otp(state['verification_id'], code)
+                verified = whatsapp_otp.validate_otp(state['verification_id'], code)
             except Exception:
-                logger.exception('MessageCentral validate_otp failed for %s', state['phone'])
+                logger.exception('WhatsApp validate_otp failed for %s', state['phone'])
                 verified = False
 
             if verified:
@@ -118,10 +110,7 @@ def confirm_phone_login(request):
                     return redirect('account_signup')
 
                 # login() skips authenticate() entirely, so it never runs
-                # ModelBackend's own is_active check — without this, a
-                # deactivated account could still fully log in through
-                # this tier even though the same account is correctly
-                # blocked logging in with a password.
+                # ModelBackend's own is_active check — guard deactivated accounts.
                 if not user.is_active:
                     messages.error(request, 'This account has been disabled. Contact support for help.')
                     del request.session['phone_login']
@@ -143,3 +132,4 @@ def confirm_phone_login(request):
         'attempts_left': max(0, MAX_CONFIRM_ATTEMPTS - state.get('attempts', 0)),
         'sent_at': state.get('sent_at', ''),
     })
+

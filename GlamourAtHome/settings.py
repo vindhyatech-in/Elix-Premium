@@ -166,6 +166,8 @@ MIDDLEWARE = [
     # priority — this only concerns itself with role-based routing once
     # a user is fully authenticated). See core/middleware.py.
     'core.middleware.RoleRedirectMiddleware',
+    # Injects floating top bar when superadmin is impersonating another user
+    'core.middleware.ImpersonationBannerMiddleware',
 ]
 
 ROOT_URLCONF = 'GlamourAtHome.urls'
@@ -423,9 +425,18 @@ MESSAGECENTRAL_AUTH_TOKEN = config('SMS_KEY', default='')
 # False -> accounts/messagecentral.py prints the OTP to the console
 # instead of calling the real gateway (no real send/receive round trip,
 # no credits spent) — same "console fallback for dev" pattern as
-# EMAIL_BACKEND above. True -> real MessageCentral send/validate calls.
+# EMAIL_BACKEND above. True -> real gateway send calls.
 OTP_GATEWAY = config('OTP_GATEWAY', default=False, cast=bool)
 MESSAGECENTRAL_PASSWORD = config('MESSAGECENTRAL_PASSWORD', default='')
+
+# ---------------------------------------------------------------------------
+# WhatsApp Cloud API (Meta) — Phone OTP Authentication
+# ---------------------------------------------------------------------------
+WHATSAPP_ACCESS_TOKEN = config('WHATSAPP_ACCESS_TOKEN', default='')
+WHATSAPP_PHONE_NUMBER_ID = config('WHATSAPP_PHONE_NUMBER_ID', default='1319517661244576')
+WHATSAPP_TEMPLATE_NAME = config('WHATSAPP_TEMPLATE_NAME', default='login_otp')
+WHATSAPP_TEMPLATE_LANG = config('WHATSAPP_TEMPLATE_LANG', default='en_US')
+WHATSAPP_API_VERSION = config('WHATSAPP_API_VERSION', default='v20.0')
 
 LOGIN_REDIRECT_URL = '/booking/'
 LOGOUT_REDIRECT_URL = '/booking/'

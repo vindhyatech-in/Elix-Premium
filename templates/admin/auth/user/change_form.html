@@ -1,0 +1,14 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls %}
+
+{% block object-tools-items %}
+  {% if can_impersonate and impersonate_url %}
+    <li>
+      <a href="{{ impersonate_url }}" class="historylink" style="background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%) !important; color: #ffffff !important; font-weight: 600 !important; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+        Log In As This User
+      </a>
+    </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

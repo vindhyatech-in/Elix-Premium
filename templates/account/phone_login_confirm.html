@@ -5,9 +5,9 @@
 
 {% block content %}
   <div class="auth-card__header">
-    <h1 class="auth-card__title">{% trans "Enter Sign-In Code" %}</h1>
+    <h1 class="auth-card__title">{% trans "Enter WhatsApp Code" %}</h1>
     <p class="auth-card__text">
-      {% blocktranslate %}We've sent a code to <a href="tel:{{ phone }}">{{ phone }}</a>.{% endblocktranslate %}
+      {% blocktranslate %}We've sent a 6-digit verification code to your WhatsApp at <a href="tel:{{ phone }}">{{ phone }}</a>.{% endblocktranslate %}
     </p>
   </div>
 
@@ -45,7 +45,7 @@
     </div>
 
     <button type="submit" class="auth-submit-btn">
-      {% trans "Confirm" %}
+      {% trans "Confirm & Sign In" %}
     </button>
   </form>
 
@@ -53,7 +53,7 @@
     <form method="post" class="auth-resend-form" data-otp-resend-form data-otp-sent-at="{{ sent_at }}">
       {% csrf_token %}
       <input type="hidden" name="action" value="resend">
-      <button type="submit" class="auth-forgot-link auth-resend-btn" data-otp-resend-btn>{% trans "Request new code" %}</button>
+      <button type="submit" class="auth-forgot-link auth-resend-btn" data-otp-resend-btn>{% trans "Resend WhatsApp code" %}</button>
     </form>
     <a href="{% url 'phone_login_request' %}" class="auth-forgot-link">{% trans "Use a different number" %}</a>
   </div>

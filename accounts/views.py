@@ -2,8 +2,9 @@ import json
 
 from django import forms
 from django.contrib import messages
-from django.contrib.auth import logout
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.db.models import Avg, Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -174,3 +175,79 @@ def address_delete(request, address_id):
     address = get_object_or_404(Address, id=address_id, user=request.user)
     address.delete()
     return JsonResponse({'ok': True})
+
+
+@login_required
+def impersonate_user(request, user_id):
+    """
+    Allows a logged-in superadmin to log in as another user directly from Django admin.
+    Stores the superadmin's ID in request.session['impersonator_id'] so they can return
+    at any time via the persistent top banner.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, 'Permission denied: Only Super Admins can log in as other users.')
+        return redirect('index')
+
+    target_user = get_object_or_404(User, id=user_id)
+
+    if target_user.pk == request.user.pk:
+        messages.warning(request, 'You are already logged in as this user.')
+        return redirect('/admin/auth/user/')
+
+    if target_user.is_superuser:
+        messages.error(request, 'Cannot impersonate another Super Admin.')
+        return redirect('/admin/auth/user/')
+
+    if not target_user.is_active:
+        messages.error(request, f'User {target_user.username} is deactivated.')
+        return redirect('/admin/auth/user/')
+
+    original_id = request.user.id
+    original_username = request.user.username
+
+    # Switch session authentication to target_user
+    login(request, target_user, backend='django.contrib.auth.backends.ModelBackend')
+
+    # Stamp impersonator state onto the active session
+    request.session['impersonator_id'] = original_id
+    request.session['impersonator_username'] = original_username
+    request.session.modified = True
+
+    messages.info(
+        request,
+        f'You are now logged in as {target_user.username}. '
+        'Click "Switch Back" in the top banner to return to Super Admin.'
+    )
+
+    # Route intelligently based on target user's role
+    if target_user.groups.filter(name='owner').exists():
+        return redirect('admin_dashboard_overview')
+    elif target_user.groups.filter(name='emp').exists():
+        return redirect('employee_dashboard')
+    else:
+        return redirect('bookings_dashboard')
+
+
+@login_required
+def stop_impersonation(request):
+    """
+    Exits the impersonation session and restores the original superadmin.
+    """
+    impersonator_id = request.session.get('impersonator_id')
+    if not impersonator_id:
+        messages.warning(request, 'You are not currently impersonating any user.')
+        return redirect('index')
+
+    superadmin = get_object_or_404(User, id=impersonator_id, is_superuser=True)
+
+    # Clear impersonation markers
+    request.session.pop('impersonator_id', None)
+    request.session.pop('impersonator_username', None)
+
+    # Re-login original superadmin
+    login(request, superadmin, backend='django.contrib.auth.backends.ModelBackend')
+    request.session.modified = True
+
+    messages.success(request, f'Switched back to Super Admin account ({superadmin.username}).')
+    return redirect('/admin/auth/user/')
+

@@ -9,4 +9,6 @@ urlpatterns = [
     path('booking/addresses/<int:address_id>/', views.address_delete, name='address_delete'),
     path('accounts/phone/login/', phone_login_views.request_phone_login, name='phone_login_request'),
     path('accounts/phone/login/confirm/', phone_login_views.confirm_phone_login, name='phone_login_confirm'),
+    path('accounts/impersonate/<int:user_id>/', views.impersonate_user, name='admin_impersonate_user'),
+    path('accounts/impersonate/stop/', views.stop_impersonation, name='admin_stop_impersonation'),
 ]
