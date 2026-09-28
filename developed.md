@@ -3051,6 +3051,65 @@ Implemented direct user impersonation from the Django Admin, enabling Superadmin
     - HTML banner injection validation.
     - All 5 tests passing cleanly.
 
+---
+
+## Service Steps Demo Images Seeding (2026-09-28)
+
+Populated high-resolution, curated demo imagery across all 81 demo `ServiceStep` records in the database (spanning all 9 facial services) to ensure full Urban Company-style visual presentation on service detail pages (`/services/<slug>/`).
+
+### Implementation Details
+- **Step-Specific Image Curation**:
+  - Selected 9 distinct, aesthetic, high-resolution beauty & spa treatment images from Unsplash matching each treatment step:
+    1. **Setup**: Spa tools, towels, and preparation setup (`https://images.unsplash.com/photo-1540555700478-4be289fbecef?...`)
+    2. **Cleansing**: Gentle face cleansing treatment (`https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?...`)
+    3. **Exfoliation**: Dead skin removal & gentle scrub exfoliation (`https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?...`)
+    4. **Blackhead Extraction**: Steam preparation & pore extraction (`https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?...`)
+    5. **Serum**: Concentrated serum application via dropper (`https://images.unsplash.com/photo-1620916566398-39f1143ab7be?...`)
+    6. **Moisturisation**: Hydrating cream barrier infusion (`https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?...`)
+    7. **Mask Application**: Nutrient-rich soothing face mask (`https://images.unsplash.com/photo-1560750588-73207b1ef5b8?...`)
+    8. **Massage**: Relaxing lymphatic face, neck & shoulder massage (`https://images.unsplash.com/photo-1544161515-4ab6ce6db874?...`)
+    9. **Sun Protection**: SPF sunscreen protection & final glow lock (`https://images.unsplash.com/photo-1556228720-195a672e8a03?...`)
+- **Database Migrations**:
+  - `catalog/migrations/0018_seed_servicestep_images.py`: A data migration mapping step titles to their curated CDN URLs and updating all 81 existing records.
+  - `catalog/migrations/0017_seed_facial_steps.py`: Updated `FACIAL_STEPS` definitions to include `image_url` on initial creation for fresh environments.
+- **Frontend Presentation**:
+  - Leverages `ServiceStep.display_image_url` within `templates/booking/pages/service_detail.html`.
+  - Step cards render `.uc-steps__img-wrap` with `.uc-steps__img` (`loading="lazy"`), featuring responsive styling and smooth hover zoom effects.
+
+---
+
+## Service After-Care Section & Single-Box Model (2026-09-28)
+
+Added an after-care guidance section for services rendered directly below the treatment steps section on the service detail page (`/services/<slug>/`).
+
+### Implementation Details
+- **Data Model (`catalog/models.py`)**:
+  - Created `ServiceAfterCare` with a 1-to-1 relationship to `Service` (`related_name='aftercare'`).
+  - Fields:
+    - `title`: Header for the section (default: `"Facial After-Care Tips"`).
+    - `tips`: Single `TextField` box allowing admins to enter or paste one tip per line.
+  - Python Properties:
+    - `tips_list`: Splits text by newlines, automatically stripping bullet characters (`•`, `-`, `*`, `–`, `—`) and whitespace.
+    - `formatted_tips_list`: Safely escapes HTML and formats markdown `**bold**` into `<strong>bold</strong>` tags.
+- **Django Admin Integration (`catalog/admin.py`)**:
+  - `ServiceAfterCareInline` added to `ServiceAdmin.inlines` (`StackedInline`, `max_num=1`) so it can be managed right on the service edit page as a single box.
+  - Registered `ServiceAfterCareAdmin` with search and `tips_count` display.
+- **Database Migrations & Seeding**:
+  - `catalog/migrations/0019_serviceaftercare.py`: Schema creation for `ServiceAfterCare`.
+  - `catalog/migrations/0020_seed_facial_aftercare.py`: Data migration seeding after-care tips across all 9 facial services:
+    - Avoid using any **face wash or soap** for at least 24 hours.
+    - Do not apply **makeup** immediately to let your pores breathe.
+    - Stay away from **direct sunlight** and **heavy sweat or steam** for a day.
+    - Keep yourself **hydrated** by drinking plenty of water.
+- **Frontend Presentation (`templates/booking/pages/service_detail.html`)**:
+  - Styled with Urban Company aesthetic (`.uc-aftercare`, `.uc-aftercare__header`, `.uc-aftercare__icon`, `.uc-aftercare__list`, `.uc-aftercare__item`, `.uc-aftercare__bullet`).
+  - Only renders when `service.aftercare` exists and has at least one tip.
+  - Positioned directly below the treatment steps timeline section.
+- **Automated Testing (`catalog/tests.py`)**:
+  - Suite covering model creation, newline splitting, bullet stripping, HTML escaping, markdown bold formatting, and view rendering/omission. All 5 tests passing cleanly.
+
+
+
 
 
 

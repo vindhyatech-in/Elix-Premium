@@ -21,6 +21,7 @@ FACIAL_STEPS = [
             'and neatly laid out before the session begins.'
         ),
         'badge': '5 mins',
+        'image_url': 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80',
     },
     {
         'sort_order': 2,
@@ -31,6 +32,7 @@ FACIAL_STEPS = [
             'a damp cotton pad for a fresh, clean base.'
         ),
         'badge': '★ KEY STEP',
+        'image_url': 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=800&q=80',
     },
     {
         'sort_order': 3,
@@ -40,6 +42,7 @@ FACIAL_STEPS = [
             'dead skin cells and refine skin texture, then gently wiped off.'
         ),
         'badge': '',
+        'image_url': 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80',
     },
     {
         'sort_order': 4,
@@ -50,6 +53,7 @@ FACIAL_STEPS = [
             'to close pores and calm the skin.'
         ),
         'badge': '',
+        'image_url': 'https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?auto=format&fit=crop&w=800&q=80',
     },
     {
         'sort_order': 5,
@@ -60,6 +64,7 @@ FACIAL_STEPS = [
             'for maximum absorption.'
         ),
         'badge': '★ KEY STEP',
+        'image_url': 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80',
     },
     {
         'sort_order': 6,
@@ -70,6 +75,7 @@ FACIAL_STEPS = [
             "moisture barrier."
         ),
         'badge': '',
+        'image_url': 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?auto=format&fit=crop&w=800&q=80',
     },
     {
         'sort_order': 7,
@@ -79,6 +85,7 @@ FACIAL_STEPS = [
             'During this time, a gentle relaxing head massage is performed.'
         ),
         'badge': '',
+        'image_url': 'https://images.unsplash.com/photo-1560750588-73207b1ef5b8?auto=format&fit=crop&w=800&q=80',
     },
     {
         'sort_order': 8,
@@ -88,6 +95,7 @@ FACIAL_STEPS = [
             'you unwind while the treatment takes effect. (Feet not included.)'
         ),
         'badge': '15 mins',
+        'image_url': 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=800&q=80',
     },
     {
         'sort_order': 9,
@@ -97,6 +105,7 @@ FACIAL_STEPS = [
             'protective step before the session concludes.'
         ),
         'badge': '',
+        'image_url': 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=800&q=80',
     },
 ]
 
@@ -121,6 +130,7 @@ def seed_facial_steps(apps, schema_editor):
                     title=step_data['title'],
                     description=step_data['description'],
                     badge=step_data['badge'],
+                    image_url=step_data.get('image_url', ''),
                 )
             )
 

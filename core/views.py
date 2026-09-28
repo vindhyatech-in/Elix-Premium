@@ -95,7 +95,7 @@ def service_detail(request, slug):
     # catalog model split (see catalog/models.py) — a detail slug can land
     # in either, so try Service first (the common case) then Package.
     try:
-        service = Service.objects.select_related('category').prefetch_related('variants').get(
+        service = Service.objects.select_related('category', 'aftercare').prefetch_related('variants').get(
             slug=slug, is_active=True,
         )
         kind = 'service'

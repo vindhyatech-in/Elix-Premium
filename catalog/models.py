@@ -278,3 +278,65 @@ class ServiceStep(models.Model):
         if self.image:
             return self.image.url
         return self.image_url or None
+
+
+class ServiceAfterCare(models.Model):
+    """Post-service / after-treatment guidelines for a service (e.g. 'Facial After-Care Tips').
+    Managed in Django admin via a single textarea box where each tip is entered on a new line.
+    The template splits the text by newline and renders them as a clean bulleted <ul> list.
+    """
+    service = models.OneToOneField(
+        Service,
+        on_delete=models.CASCADE,
+        related_name='aftercare',
+        help_text='The service this after-care section belongs to.',
+    )
+    title = models.CharField(
+        max_length=140,
+        default='Facial After-Care Tips',
+        blank=True,
+        help_text="Header shown above the tips list, e.g. 'Facial After-Care Tips' or 'After-Care Tips'.",
+    )
+    tips = models.TextField(
+        blank=True,
+        help_text='Single box: Enter each after-care tip on a new line. They will be split and displayed as a bulleted UL list.',
+    )
+
+    class Meta:
+        verbose_name = 'Service After-Care'
+        verbose_name_plural = 'Service After-Care Sections'
+
+    def __str__(self):
+        return f'[{self.service.name}] {self.title or "After-Care Tips"}'
+
+    @property
+    def tips_list(self):
+        """Splits the single box text after new lines into clean bullet strings,
+        stripping any bullet characters (•, -, *, etc.) and extraneous whitespace.
+        """
+        if not self.tips:
+            return []
+        items = []
+        for line in self.tips.splitlines():
+            cleaned = line.strip()
+            cleaned = cleaned.lstrip('•-*–— \t')
+            if cleaned:
+                items.append(cleaned)
+        return items
+
+    @property
+    def formatted_tips_list(self):
+        """Returns list of safe HTML strings where markdown **bold** syntax is converted
+        to <strong>bold</strong>, with all text safely HTML-escaped.
+        """
+        import re
+        from django.utils.html import escape
+        from django.utils.safestring import mark_safe
+
+        result = []
+        for tip in self.tips_list:
+            escaped = escape(tip)
+            formatted = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', escaped)
+            result.append(mark_safe(formatted))
+        return result
+
