@@ -1,8 +1,14 @@
-<div class="emp-job-card emp-job-card--{{ booking.status }}">
+<div class="emp-job-card emp-job-card--{{ booking.status }}{% if booking.booking_type == 'urgent' %} emp-job-card--urgent-highlight{% endif %}">
   <div class="emp-job-card__head">
-    <div>
+    <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
       <span class="emp-job-id">#{{ booking.booking_number }}</span>
       <span class="emp-badge emp-badge--{{ booking.status }}">{{ booking.get_status_display }}</span>
+      {% if booking.booking_type == 'urgent' %}
+        <span class="urgent-badge-pulse">⚡ URGENT</span>
+      {% endif %}
+      {% if booking.beautician_rush_bonus and booking.beautician_rush_bonus > 0 %}
+        <span style="display:inline-flex;align-items:center;gap:0.25rem;background:rgba(16,185,129,0.15);color:#059669;border:1px solid rgba(16,185,129,0.3);padding:0.18rem 0.55rem;border-radius:9999px;font-size:0.72rem;font-weight:700;">🚀 +₹{{ booking.beautician_rush_bonus|floatformat:0 }} Rush Bonus</span>
+      {% endif %}
     </div>
     <div class="emp-job-time">
       ⏰ {{ booking.get_time_slot_display|default:booking.exact_time }}

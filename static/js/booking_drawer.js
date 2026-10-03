@@ -476,34 +476,116 @@
       return `${h}:${m} ${ampm}`;
     }
 
-    function populateUrgentTimeDropdown() {
-      if (!urgentTimeInput) return;
-      urgentTimeInput.innerHTML = '';
+    function cartDuration() {
+      const cart = (window.GB && GB.getCart) ? GB.getCart() : [];
+      const catalog = (window.GB && GB.getCatalog) ? GB.getCatalog() : [];
+      let totalMins = 0;
+      cart.forEach((line) => {
+        const item = catalog.find((i) => i.id === line.id);
+        if (!item) return;
+        const variant = lineVariant(item, line);
+        const dur = variant ? (variant.duration || variant.duration_mins || 60) : (item.duration || item.duration_mins || 60);
+        totalMins += (Number(dur) || 60) * (Number(line.qty) || 1);
+      });
+      return totalMins || 60;
+    }
 
+    let urgentFetchSeq = 0;
+
+    async function populateUrgentTimeDropdown() {
+      if (!urgentTimeInput) return;
+      const currentSeq = ++urgentFetchSeq;
+
+      const urgentExpressTimeEl = drawer.querySelector('[data-urgent-express-time]');
+      const urgentHintEl = drawer.querySelector('[data-urgent-time-hint]');
+      const bannerTimerEl = drawer.querySelector('.urgent-express-banner__timer');
+
+      urgentTimeInput.innerHTML = '<option value="">Checking artist availability...</option>';
+      urgentTimeInput.disabled = true;
+      if (urgentExpressTimeEl) urgentExpressTimeEl.textContent = 'Checking...';
+
+      const dur = cartDuration();
+      const targetDate = state.date || toISODate(new Date());
+
+      try {
+        const resp = await fetch(`/booking/urgent-slots/?date=${encodeURIComponent(targetDate)}&duration=${dur}`);
+        const data = await resp.json();
+        if (currentSeq !== urgentFetchSeq) return;
+
+        urgentTimeInput.innerHTML = '';
+        urgentTimeInput.disabled = false;
+
+        if (data.ok && data.has_slots && data.slots && data.slots.length > 0) {
+          data.slots.forEach((slot, idx) => {
+            const opt = document.createElement('option');
+            opt.value = slot.time;
+            if (idx === 0) {
+              opt.textContent = `${slot.display} (${data.is_delayed ? 'Next Available' : 'Earliest Express — 50 min'})`;
+            } else {
+              opt.textContent = slot.display;
+            }
+            urgentTimeInput.appendChild(opt);
+          });
+
+          urgentTimeInput.selectedIndex = 0;
+          state.urgentTime = urgentTimeInput.value;
+
+          if (data.is_delayed) {
+            if (urgentHintEl) {
+              urgentHintEl.innerHTML = `<span style="color:#d97706;font-weight:700;">⚡ High Demand:</span> All artists currently busy. Next available artist: <strong>${data.earliest_slot.display}</strong>.`;
+            }
+            if (bannerTimerEl) bannerTimerEl.textContent = `Next: ${data.earliest_slot.display}`;
+          } else {
+            if (urgentHintEl) {
+              urgentHintEl.innerHTML = `Earliest available express slot calculated with live verified artist availability.`;
+            }
+            if (bannerTimerEl) bannerTimerEl.textContent = 'Arriving in 50 Mins';
+          }
+        } else {
+          // Fully booked
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'All artists fully booked for instant delivery today';
+          urgentTimeInput.appendChild(opt);
+          state.urgentTime = null;
+
+          if (urgentHintEl) {
+            urgentHintEl.innerHTML = `<span style="color:#ef4444;font-weight:700;">⚠️ High Demand:</span> All artists fully booked for urgent orders. Please choose a Regular time slot.`;
+          }
+          if (bannerTimerEl) bannerTimerEl.textContent = 'Fully Booked';
+        }
+      } catch (err) {
+        if (currentSeq !== urgentFetchSeq) return;
+        urgentTimeInput.disabled = false;
+        fallbackPopulateUrgentTime();
+      }
+
+      updateUrgentTimeDisplay();
+      updateNextButtonState();
+    }
+
+    function fallbackPopulateUrgentTime() {
+      urgentTimeInput.innerHTML = '';
       const now = new Date();
       const isToday = isTodayOrPast(state.date);
 
       let startMins;
       if (isToday) {
-        // Current time + 50 minutes, rounded up to next 15-min slot
         const minDate = new Date(now.getTime() + 50 * 60 * 1000);
         const rem = minDate.getMinutes() % 15;
-        if (rem > 0) {
-          minDate.setMinutes(minDate.getMinutes() + (15 - rem));
-        }
+        if (rem > 0) minDate.setMinutes(minDate.getMinutes() + (15 - rem));
         startMins = minDate.getHours() * 60 + minDate.getMinutes();
       } else {
-        startMins = 8 * 60; // 8:00 AM for future dates
+        startMins = 8 * 60;
       }
 
-      const endMins = 21 * 60; // 9:00 PM
+      const endMins = 21 * 60;
       let count = 0;
 
       for (let m = startMins; m <= endMins; m += 15) {
         const hh = Math.floor(m / 60);
         const mm = m % 60;
         const isoTime = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-        
         const ampm = hh >= 12 ? 'PM' : 'AM';
         const displayH = hh % 12 || 12;
         const displayM = String(mm).padStart(2, '0');
@@ -511,11 +593,7 @@
 
         const opt = document.createElement('option');
         opt.value = isoTime;
-        if (count === 0 && isToday) {
-          opt.textContent = `${formatted12h} (Earliest Express — 50 min)`;
-        } else {
-          opt.textContent = formatted12h;
-        }
+        opt.textContent = count === 0 && isToday ? `${formatted12h} (Earliest Express — 50 min)` : formatted12h;
         urgentTimeInput.appendChild(opt);
         count++;
       }
@@ -533,7 +611,6 @@
       } else {
         state.urgentTime = null;
       }
-      updateUrgentTimeDisplay();
     }
 
     function updateUrgentTimeDisplay() {
@@ -547,7 +624,7 @@
       state.urgentTime = urgentTimeInput.value;
       const formatted = formatTime12h(urgentTimeInput.value);
       if (urgentExpressTimeEl) {
-        urgentExpressTimeEl.textContent = `${formatted} (Within 50 mins)`;
+        urgentExpressTimeEl.textContent = `${formatted} (Express Service)`;
       }
     }
 
@@ -628,7 +705,8 @@
       });
       const rate = GB.getAppliedDiscountRate();
       const discount = Math.round(subtotal * rate);
-      return { subtotal, discount, total: subtotal - discount };
+      const urgentFee = (state.type === 'urgent') ? 99 : 0;
+      return { subtotal, discount, urgentFee, total: subtotal - discount + urgentFee };
     }
 
     paymentButtons.forEach((btn) => btn.addEventListener('click', () => {
@@ -665,7 +743,11 @@
         const response = await fetch('/booking/razorpay/order/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
-          body: JSON.stringify({ cart: GB.getCart(), coupon_code: GB.getAppliedCouponCode() || '' }),
+          body: JSON.stringify({
+            cart: GB.getCart(),
+            coupon_code: GB.getAppliedCouponCode() || '',
+            booking_type: state.type || 'regular',
+          }),
         });
         order = await response.json();
         if (!response.ok || !order.ok) {
@@ -740,7 +822,7 @@
       const address = getAddresses().find((a) => a.id === state.addressId);
       const cart = GB.getCart();
       const catalog = GB.getCatalog();
-      const { subtotal, discount, total } = cartTotal();
+      const { subtotal, discount, urgentFee, total } = cartTotal();
 
       const dateLabel = state.date ? formatDateLabel(state.date) : '—';
       const timeLabel = state.type === 'urgent' ? `${state.urgentTime || '—'} today (Urgent)` : slotLabel(state.slot);
@@ -766,6 +848,7 @@
         <div class="booking-summary__totals">
           <div class="floating-cart__row"><span>Subtotal</span><span>${GB.formatCurrency(subtotal)}</span></div>
           ${discount > 0 ? `<div class="floating-cart__row floating-cart__row--discount"><span>Discount</span><span>-${GB.formatCurrency(discount)}</span></div>` : ''}
+          ${urgentFee > 0 ? `<div class="floating-cart__row" style="color:#dc2626;font-weight:600;"><span>⚡ Express Priority Dispatch</span><span>+${GB.formatCurrency(urgentFee)}</span></div>` : ''}
           <div class="floating-cart__row floating-cart__row--total"><span>Total</span><span>${GB.formatCurrency(total)}</span></div>
         </div>`;
     }

@@ -87,6 +87,8 @@ class Booking(models.Model):
     # must never alter a past booking's receipt.
     subtotal = models.DecimalField(max_digits=9, decimal_places=2)
     discount_amount = models.DecimalField(max_digits=9, decimal_places=2, default=0)
+    urgent_fee = models.DecimalField(max_digits=7, decimal_places=2, default=0, help_text="Extra priority dispatch fee charged for urgent booking (e.g. ₹99)")
+    beautician_rush_bonus = models.DecimalField(max_digits=7, decimal_places=2, default=0, help_text="Rush allowance paid to beautician if starting within 30 min buffer (e.g. ₹50)")
     total_amount = models.DecimalField(max_digits=9, decimal_places=2)
     coupon_code = models.CharField(max_length=30, blank=True)
 

@@ -3094,6 +3094,10 @@ Added an after-care guidance section for services rendered directly below the tr
 - **Django Admin Integration (`catalog/admin.py`)**:
   - `ServiceAfterCareInline` added to `ServiceAdmin.inlines` (`StackedInline`, `max_num=1`) so it can be managed right on the service edit page as a single box.
   - Registered `ServiceAfterCareAdmin` with search and `tips_count` display.
+- **Owner Dashboard (`/dashboard/services/`)**:
+  - Added a dedicated **🌿 After-Care** button on each service card.
+  - Opens a quick modal (`manageAfterCareModal`) with the single textarea box and title field.
+  - Handles `save_aftercare` POST action in `core/admin_dashboard_views.py` so owners can manage tips without needing Django Admin access.
 - **Database Migrations & Seeding**:
   - `catalog/migrations/0019_serviceaftercare.py`: Schema creation for `ServiceAfterCare`.
   - `catalog/migrations/0020_seed_facial_aftercare.py`: Data migration seeding after-care tips across all 9 facial services:
@@ -3107,6 +3111,67 @@ Added an after-care guidance section for services rendered directly below the tr
   - Positioned directly below the treatment steps timeline section.
 - **Automated Testing (`catalog/tests.py`)**:
   - Suite covering model creation, newline splitting, bullet stripping, HTML escaping, markdown bold formatting, and view rendering/omission. All 5 tests passing cleanly.
+
+---
+
+## Dual WhatsApp & Email OTP Login (2026-09-30)
+
+Upgraded the Tier-2 passwordless login flow so that verification OTPs are simultaneously delivered to **both WhatsApp and Email**, providing complete channel redundancy and allowing users to sign in using either their 10-digit phone number or email address.
+
+### Implementation Details
+- **Email Template System (`templates/emails/login_otp.html` & `.txt`)**:
+  - Built an HTML email extending `templates/emails/base_email.html` with Elix luxury branding, dashed gold OTP highlight box, validity notice (10 minutes), and safety disclaimer.
+- **Dispatch Engine (`accounts/whatsapp_otp.py`)**:
+  - `send_email_otp(email, code, purpose)`: Dispatches multipart HTML/text transactional email via Django's configured `EMAIL_BACKEND` (Brevo in production, console in development) asynchronously in a daemon thread.
+  - `send_otp(phone=None, purpose='Login to Elix Premium Salon', email=None)`:
+    - Generates cryptographically secure 6-digit numeric OTP and unique `verification_id`.
+    - Stashes payload in Django cache with 10-minute expiry: `{'code': code, 'phone': clean_number, 'email': clean_email}`.
+    - Dispatches to WhatsApp via Meta Cloud API template (`login_otp`).
+    - Dispatches to Email asynchronously.
+    - Graceful failover: if one channel encounters an API hiccup, delivery through the other channel still succeeds, preventing login lockouts.
+- **Unified Request Form (`accounts/forms.py::PhoneLoginRequestForm`)**:
+  - Accepts either a 10-digit Indian phone number (`+91`) or an email address.
+  - Automatically detects whether input is an email or phone, cleanly parsing and validating both.
+- **View Logic (`accounts/phone_login_views.py`)**:
+  - `request_phone_login`: Resolves associated user. If phone was entered, finds `user.email`; if email was entered, finds `user.profile.phone`. Dispatches to both channels.
+  - `confirm_phone_login`: Validates the 6-digit OTP in constant time (`secrets.compare_digest`). Displays masked phone (`+91 ••••• •9324`) and masked email (`s***n@example.com`) to indicate delivery destinations. Supports unified resending to both channels.
+- **Template Updates**:
+  - `templates/account/login.html`: Tier-2 button updated to *"Continue with WhatsApp / Email OTP"*.
+  - `templates/account/phone_login_request.html`: Form updated to *"Sign In with OTP"* accepting phone number or email.
+  - `templates/account/phone_login_confirm.html`: Shows masked WhatsApp and Email delivery destinations and unified resend button.
+- **CLI Diagnostics**:
+  - `accounts/management/commands/test_whatsapp_otp.py`: Added `--email` flag to test live OTP delivery across both WhatsApp and Email in one command.
+- **Automated Testing (`accounts/tests.py`)**:
+  - Added `DualWhatsAppAndEmailOTPTests` covering caching, phone-to-email resolution, email-to-phone resolution, OTP validation, and authentication. All 9 `accounts` tests passing.
+
+---
+
+## Automated Beautician Assignment, Buffer Window & Urgent Peak Handling (2026-10-03)
+
+Implemented an automated intelligent staff dispatch and load balancing engine with real-time checkout availability and owner escalation:
+
+- **±1 Hour Buffer Rule (`bookings/auto_assign.py`)**:
+  - Automatically calculates each booking's blocked duration window: `[exact_time - 1 hr, exact_time + duration + 1 hr]`.
+  - Ensures a beautician booked for 11:00 AM – 1:00 PM (2 hrs) is blocked from other assignments between 10:00 AM – 2:00 PM.
+  - Takes `EmployeeLeave` (full-day, multi-day, and intra-day short breaks) into account.
+- **Equal Daily Order Distribution**:
+  - Load balances across staff by sorting eligible free beauticians by their daily booking count ascending (`bookings_today_count`).
+- **Urgent Booking Live Capacity Checking (`GET /booking/urgent-slots/`)**:
+  - Checkout drawer (`static/js/booking_drawer.js`) checks real-time artist capacity across all staff before populating express time options.
+  - When all artists are booked for early slots, dynamically shifts the earliest express slot to the next realistic time (e.g. 2:30 PM) and displays a `⚡ High Demand` notice.
+  - When 100% capacity is reached across all slots today, notifies the customer and prompts them to pick a Regular slot.
+- **Fallback Assignment & High-Priority Owner Alert**:
+  - If an urgent booking arrives when all beauticians are booked, it is fallback-assigned to the beautician whose existing job finishes soonest (`soonest_free_block_end`).
+  - Automatically fires high-priority alerts:
+    - **In-App Notification**: Creates admin `UserNotification` with `⚠️ URGENT OVERLAP` banner.
+    - **Owner Email**: Dispatches detailed email with customer phone, address, and dispatch instructions to `SITE_EMAIL`.
+    - **Admin Dashboard Tag**: Displays a `⚠️ Overlap Alert` badge in the admin bookings table alongside the pulsing `⚡ URGENT` badge.
+- **Urgent Job Card Highlighting**:
+  - Added pulsing `⚡ URGENT` badge and red accent border (`emp-job-card--urgent-highlight`) on the employee dashboard (`job_card.html`).
+- **Automated Tests (`bookings/tests.py`)**:
+  - 6 dedicated tests in `AutoAssignAndUrgentBadgeTests` validating buffer rules, load balancing, fallback to earliest free staff, urgent slot API, and admin notifications. All 13 `bookings` tests passing.
+
+
 
 
 

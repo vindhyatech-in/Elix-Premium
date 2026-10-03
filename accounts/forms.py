@@ -76,10 +76,51 @@ class CustomResetPasswordForm(AllauthResetPasswordForm):
 
 
 class PhoneLoginRequestForm(forms.Form):
-    """Tier-2 login: "Continue with Phone Number" — see accounts/messagecentral.py
-    and accounts/phone_login_views.py. Reuses the same +91-auto-prepend/
-    E.164 field the signup form uses, for one consistent phone UX."""
-    phone = IndianPhoneField(label='Phone number', required=True)
+    """
+    Tier-2 login: Sign in with OTP sent to WhatsApp & Email.
+    Accepts either a 10-digit Indian phone number (+91) or an email address.
+    Supports both login_identifier and phone field names for compatibility.
+    """
+    login_identifier = forms.CharField(
+        label='Phone number or Email',
+        required=False,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Enter phone number or email',
+            'autocomplete': 'username tel email',
+            'autofocus': True,
+        }),
+    )
+    phone = forms.CharField(required=False, widget=forms.HiddenInput())
+
+    def clean(self):
+        cleaned_data = super().clean()
+        raw_val = (cleaned_data.get('login_identifier') or cleaned_data.get('phone') or '').strip()
+
+        if not raw_val:
+            raise forms.ValidationError('Please enter your phone number or email address.')
+
+        if '@' in raw_val:
+            email_field = forms.EmailField()
+            try:
+                cleaned_email = email_field.clean(raw_val).lower()
+                cleaned_data['identifier_type'] = 'email'
+                cleaned_data['email'] = cleaned_email
+                cleaned_data['phone'] = ''
+                return cleaned_data
+            except forms.ValidationError:
+                raise forms.ValidationError('Please enter a valid email address.')
+
+        phone_field = IndianPhoneField()
+        try:
+            parsed_phone = phone_field.clean(raw_val)
+        except forms.ValidationError:
+            raise forms.ValidationError('Enter a valid 10-digit Indian phone number or email address.')
+
+        cleaned_data['identifier_type'] = 'phone'
+        cleaned_data['phone'] = parsed_phone
+        cleaned_data['email'] = ''
+        return cleaned_data
+
 
 
 class PhoneLoginConfirmForm(forms.Form):

@@ -16,7 +16,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from catalog.models import Package, Service
 from core import booking_data
@@ -167,6 +167,7 @@ def _resolve_cart_pricing(cart, coupon_code_raw):
 # retried request with the exact same cart — long enough to cover a slow
 # network retry or an accidental refresh before paying, short enough that
 # a stale entry for an abandoned cart doesn't linger meaningfully.
+URGENT_BOOKING_FEE = Decimal('99.00')
 RAZORPAY_ORDER_CACHE_TTL = 15 * 60
 
 
@@ -197,16 +198,21 @@ def create_razorpay_order(request):
         return JsonResponse({'ok': False, 'error': 'Invalid request body.'}, status=400)
 
     cart = payload.get('cart') or []
+    booking_type = payload.get('booking_type') or 'regular'
 
     try:
         _, _, _, total_amount, coupon_code = _resolve_cart_pricing(cart, payload.get('coupon_code'))
     except CartError as exc:
         return JsonResponse({'ok': False, 'error': exc.message}, status=400)
 
-    if total_amount <= 0:
+    # Add ₹99 express priority fee for urgent bookings
+    urgent_fee = URGENT_BOOKING_FEE if booking_type == 'urgent' else Decimal('0.00')
+    final_amount = total_amount + urgent_fee
+
+    if final_amount <= 0:
         return JsonResponse({'ok': False, 'error': 'Cart total must be greater than zero.'}, status=400)
 
-    cache_key = f'razorpay_pending_order:{request.user.id}:{_cart_signature(cart, coupon_code, total_amount)}'
+    cache_key = f'razorpay_pending_order:{request.user.id}:{_cart_signature(cart, coupon_code, final_amount)}'
     cached = cache.get(cache_key)
 
     if cached:
@@ -225,7 +231,7 @@ def create_razorpay_order(request):
 
     try:
         order = razorpay_client.create_order(
-            amount_paise=int((total_amount * 100).to_integral_value()),
+            amount_paise=int((final_amount * 100).to_integral_value()),
             receipt=f'user-{request.user.id}-{int(timezone.now().timestamp())}',
         )
     except (razorpay_client.RazorpayError, Exception):
@@ -318,6 +324,10 @@ def create_booking(request):
     except CartError as exc:
         return JsonResponse({'ok': False, 'error': exc.message}, status=400)
 
+    # Add ₹99 express priority fee for urgent bookings
+    urgent_fee = URGENT_BOOKING_FEE if booking_type == 'urgent' else Decimal('0.00')
+    final_total_amount = total_amount + urgent_fee
+
     razorpay_order_id = ''
     razorpay_payment_id = ''
     payment_status = 'pending'
@@ -341,7 +351,7 @@ def create_booking(request):
             order = razorpay_client.fetch_order(razorpay_order_id)
         except Exception:
             return JsonResponse({'ok': False, 'error': "Couldn't confirm payment right now — please try again shortly."}, status=502)
-        if order.get('amount') != int((total_amount * 100).to_integral_value()):
+        if order.get('amount') != int((final_total_amount * 100).to_integral_value()):
             return JsonResponse({'ok': False, 'error': 'Paid amount does not match your cart — please try again.'}, status=400)
 
         payment_status = 'paid'
@@ -373,7 +383,9 @@ def create_booking(request):
                 razorpay_payment_id=razorpay_payment_id,
                 subtotal=subtotal,
                 discount_amount=discount_amount,
-                total_amount=total_amount,
+                urgent_fee=urgent_fee,
+                beautician_rush_bonus=Decimal('0.00'),
+                total_amount=final_total_amount,
                 coupon_code=coupon_code,
             )
             BookingItem.objects.bulk_create([
@@ -406,14 +418,28 @@ def create_booking(request):
 
     return_data = {'ok': True, 'booking_number': booking.booking_number}
 
+    # Auto-assign the best available beautician immediately after the booking
+    # is confirmed, so owners don't have to assign manually for every order.
+    # Falls back to the soonest-free employee if everyone is busy.
+    try:
+        from bookings.auto_assign import auto_assign_beautician
+        assigned = auto_assign_beautician(booking)
+        if assigned:
+            booking.assigned_beautician = assigned
+            booking.save(update_fields=['assigned_beautician', 'beautician_rush_bonus'])
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            'auto_assign failed for booking %s — leaving unassigned.',
+            booking.booking_number,
+        )
+        assigned = None
+
     # Fire-and-forget emails in daemon threads — never blocks the HTTP response.
-    # Beautician email is skipped here because the beautician hasn't been
-    # assigned yet at creation time; that fires from admin_dashboard_views
-    # when 'assign_beautician' is actioned.
     send_booking_email_all(
         event_customer='booking_confirmed',
         event_admin='admin_new_booking',
-        event_beautician=None,
+        event_beautician='beautician_assigned_job' if assigned else None,
         booking=booking,
     )
     # In-app notification — shows immediately in the bell dropdown.
@@ -934,3 +960,29 @@ def razorpay_webhook(request):
     # Return 200 for every valid-signature event — including events we don't
     # handle — so Razorpay doesn't retry endlessly on unknown event types.
     return HttpResponse(status=200)
+
+
+@require_GET
+def urgent_slots_availability(request):
+    """
+    Returns available express slots for the requested date and service duration.
+    Used by the booking drawer to dynamically populate express slots with real-time
+    availability checks across all active beauticians.
+    """
+    from bookings.auto_assign import get_urgent_slot_availability
+
+    date_str = request.GET.get('date', '').strip()
+    target_date = parse_date(date_str) if date_str else timezone.localdate()
+    if not target_date:
+        target_date = timezone.localdate()
+
+    try:
+        duration_mins = int(request.GET.get('duration') or 60)
+        if duration_mins <= 0 or duration_mins > 720:
+            duration_mins = 60
+    except (ValueError, TypeError):
+        duration_mins = 60
+
+    data = get_urgent_slot_availability(target_date, duration_mins=duration_mins)
+    return JsonResponse({'ok': True, **data})
+

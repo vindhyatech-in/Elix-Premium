@@ -836,6 +836,18 @@ def _handle_catalog_post_action(request, locked_kind):
             step.delete()
             messages.success(request, f'Deleted step "{step_title}" from "{service_name}".')
 
+    elif action == 'save_aftercare':
+        service = get_object_or_404_safe(Service, request.POST.get('service_id'))
+        if service:
+            title = request.POST.get('title', '').strip() or 'Facial After-Care Tips'
+            tips = request.POST.get('tips', '').strip()
+            from catalog.models import ServiceAfterCare
+            ServiceAfterCare.objects.update_or_create(
+                service=service,
+                defaults={'title': title, 'tips': tips}
+            )
+            messages.success(request, f'Updated after-care tips for "{service.name}".')
+
     return redirect(request.get_full_path())
 
 
@@ -866,11 +878,10 @@ def _dashboard_catalog_list(request, locked_kind, page_title, active_nav, templa
     search_query = request.GET.get('q', '').strip()
     sort = request.GET.get('sort', '-created_at')
 
-    services_qs = ItemModel.objects.select_related('category')
     if locked_kind == 'package':
-        services_qs = services_qs.prefetch_related('included_services__variants')
+        services_qs = ItemModel.objects.select_related('category').prefetch_related('included_services__variants')
     else:
-        services_qs = services_qs.prefetch_related('variants', 'steps')
+        services_qs = ItemModel.objects.select_related('category', 'aftercare').prefetch_related('variants', 'steps')
 
     if category_slug != 'all':
         services_qs = services_qs.filter(category__slug=category_slug)

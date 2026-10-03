@@ -1103,3 +1103,29 @@ body.emp-body {
 .emp-calendar-dot--job { background: var(--accent-gold); }
 .emp-calendar-dot--leave { background: rgba(231, 76, 60, 0.5); border: 1px solid #e74c3c; }
 .emp-calendar-dot--conflict { background: #e74c3c; }
+
+/* ── Urgent booking badge ──────────────────────────────────────────────── */
+@keyframes urgentPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  60%  { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+.urgent-badge-pulse {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  animation: urgentPulse 1.6s ease-in-out infinite;
+}
+
+/* Urgent card border highlight */
+.emp-job-card--urgent-highlight {
+  border-left: 4px solid #ef4444 !important;
+  background: linear-gradient(135deg, rgba(239,68,68,0.04) 0%, transparent 50%) !important;
+}

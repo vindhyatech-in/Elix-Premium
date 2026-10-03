@@ -87,3 +87,64 @@ class ImpersonationTests(TestCase):
         self.assertIn('superadmin-impersonation-bar', content)
         self.assertIn('Switch Back to Admin', content)
         self.assertIn('admin_boss', content)
+
+
+class DualWhatsAppAndEmailOTPTests(TestCase):
+    def setUp(self):
+        from accounts.models import Profile
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='sachin_test',
+            email='sachin@example.com',
+            password='Password123!',
+        )
+        Profile.objects.update_or_create(
+            user=self.user,
+            defaults={'phone': '+919584979324'}
+        )
+
+    def test_send_otp_stores_both_phone_and_email(self):
+        from accounts import whatsapp_otp
+        from django.core.cache import cache
+
+        v_id = whatsapp_otp.send_otp(phone='9584979324', email='sachin@example.com')
+        cached = cache.get(f'{whatsapp_otp.CACHE_PREFIX}{v_id}')
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached['phone'], '919584979324')
+        self.assertEqual(cached['email'], 'sachin@example.com')
+        self.assertEqual(len(cached['code']), 6)
+
+    def test_phone_login_request_with_phone_resolves_email(self):
+        url = reverse('phone_login_request')
+        response = self.client.post(url, {'login_identifier': '9584979324'}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        session_data = self.client.session.get('phone_login')
+        self.assertIsNotNone(session_data)
+        self.assertEqual(session_data['phone'], '+919584979324')
+        self.assertEqual(session_data['email'], 'sachin@example.com')
+
+    def test_phone_login_request_with_email_resolves_phone(self):
+        url = reverse('phone_login_request')
+        response = self.client.post(url, {'login_identifier': 'sachin@example.com'}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        session_data = self.client.session.get('phone_login')
+        self.assertIsNotNone(session_data)
+        self.assertEqual(session_data['phone'], '+919584979324')
+        self.assertEqual(session_data['email'], 'sachin@example.com')
+
+    def test_confirm_otp_successful_login(self):
+        from accounts import whatsapp_otp
+        from django.core.cache import cache
+
+        # Request OTP
+        self.client.post(reverse('phone_login_request'), {'login_identifier': '9584979324'})
+        session_data = self.client.session['phone_login']
+        cached = cache.get(f"{whatsapp_otp.CACHE_PREFIX}{session_data['verification_id']}")
+        code = cached['code']
+
+        # Confirm OTP
+        confirm_url = reverse('phone_login_confirm')
+        res = self.client.post(confirm_url, {'code': code}, follow=True)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(int(self.client.session.get('_auth_user_id')), self.user.id)
+

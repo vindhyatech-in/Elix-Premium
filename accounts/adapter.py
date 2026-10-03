@@ -97,4 +97,12 @@ class AccountAdapter(DefaultAccountAdapter):
         Profile.objects.filter(user=user).update(phone_verified=True)
 
     def get_user_by_phone(self, phone):
-        return User.objects.filter(profile__phone=phone).first()
+        if not phone:
+            return None
+        clean = phone.strip().replace(' ', '').replace('-', '')
+        variants = {clean}
+        if clean.startswith('+'):
+            variants.add(clean[1:])
+        else:
+            variants.add(f'+{clean}')
+        return User.objects.filter(profile__phone__in=variants).first()

@@ -100,6 +100,15 @@
                 🪜 Steps ({{ service.steps.count }})
               </button>
 
+              <!-- Manage After-Care Button -->
+              <button
+                type="button"
+                class="admin-btn admin-btn--ghost admin-btn--xs"
+                onclick="openAfterCareModal('{{ service.id }}', '{{ service.name|escapejs }}', '{{ service.aftercare.title|default:"Facial After-Care Tips"|escapejs }}', '{{ service.aftercare.tips|default:""|escapejs }}')"
+              >
+                🌿 After-Care{% if service.aftercare and service.aftercare.tips_list %} ({{ service.aftercare.tips_list|length }}){% endif %}
+              </button>
+
               <!-- Add Variant Button -->
               <button
                 type="button"
@@ -460,6 +469,48 @@
     </div>
   </div>
 
+  <!-- Manage After-Care Modal -->
+  <div id="manageAfterCareModal" class="admin-modal-backdrop" style="display: none;">
+    <div class="admin-modal">
+      <div class="admin-modal__head">
+        <h2 id="manageAfterCareModalTitle">After-Care Tips</h2>
+        <button type="button" class="admin-modal__close" onclick="document.getElementById('manageAfterCareModal').style.display='none'">×</button>
+      </div>
+
+      <form method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_aftercare">
+        <input type="hidden" name="service_id" id="aftercareServiceId">
+
+        <div class="admin-modal__body" style="gap: 1.25rem;">
+          <div class="admin-form-group">
+            <label>Section Header / Title</label>
+            <input type="text" name="title" id="aftercareTitleInput" class="admin-input" placeholder="e.g. Facial After-Care Tips">
+          </div>
+
+          <div class="admin-form-group">
+            <label>After-Care Tips (Single Box — Enter each tip on a new line)</label>
+            <textarea
+              name="tips"
+              id="aftercareTipsInput"
+              class="admin-textarea"
+              rows="6"
+              placeholder="Avoid using any face wash or soap for at least 24 hours.&#10;Do not apply makeup immediately to let your pores breathe.&#10;Stay away from direct sunlight and heavy sweat or steam for a day.&#10;Keep yourself hydrated by drinking plenty of water."
+            ></textarea>
+            <small class="admin-text-muted" style="display: block; margin-top: 0.35rem; font-size: 0.8rem;">
+              💡 <strong>How it works:</strong> Type or paste each tip on its own line. Use <code>**bold text**</code> to emphasize words (e.g. <code>**face wash or soap**</code>). They will automatically be displayed as a bulleted UL list. Leave blank to hide the section.
+            </small>
+          </div>
+        </div>
+
+        <div class="admin-modal__foot">
+          <button type="button" class="admin-btn admin-btn--ghost" onclick="document.getElementById('manageAfterCareModal').style.display='none'">Cancel</button>
+          <button type="submit" class="admin-btn admin-btn--primary">Save After-Care Tips</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Manage Steps Modal -->
   <div id="manageStepsModal" class="admin-modal-backdrop" style="display: none;">
     <div class="admin-modal admin-modal--large">
@@ -704,6 +755,14 @@
       document.getElementById('editVariantDuration').value = duration;
       document.getElementById('editVariantIsDefault').checked = isDefault;
       document.getElementById('editVariantModal').style.display = 'flex';
+    }
+
+    function openAfterCareModal(serviceId, serviceName, title, tips) {
+      document.getElementById('aftercareServiceId').value = serviceId;
+      document.getElementById('manageAfterCareModalTitle').innerText = '🌿 After-Care Tips — ' + serviceName;
+      document.getElementById('aftercareTitleInput').value = title || 'Facial After-Care Tips';
+      document.getElementById('aftercareTipsInput').value = tips || '';
+      document.getElementById('manageAfterCareModal').style.display = 'flex';
     }
 
     function addVariantRow(containerId) {

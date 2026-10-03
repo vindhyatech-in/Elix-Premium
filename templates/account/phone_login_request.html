@@ -5,9 +5,9 @@
 
 {% block content %}
   <div class="auth-card__header">
-    <h1 class="auth-card__title">{% trans "Sign In with WhatsApp" %}</h1>
+    <h1 class="auth-card__title">{% trans "Sign In with OTP" %}</h1>
     <p class="auth-card__text">
-      {% trans "We'll send a 6-digit verification code to your WhatsApp." %}
+      {% trans "Enter your phone number or email. We'll send a 6-digit verification code to your WhatsApp and Email." %}
     </p>
   </div>
 
@@ -23,19 +23,25 @@
     {% csrf_token %}
 
     <div class="auth-group">
-      <label for="id_phone" class="auth-label">{% trans "PHONE NUMBER:" %}</label>
+      <label for="id_login_identifier" class="auth-label">{% trans "PHONE NUMBER OR EMAIL:" %}</label>
       <input
         type="text"
-        name="phone"
-        id="id_phone"
-        class="auth-input {% if form.phone.errors %}is-invalid{% endif %}"
-        placeholder="9876543210"
-        value="{{ form.phone.value|default:'' }}"
+        name="login_identifier"
+        id="id_login_identifier"
+        class="auth-input {% if form.login_identifier.errors or form.phone.errors %}is-invalid{% endif %}"
+        placeholder="9876543210 or name@example.com"
+        value="{{ form.login_identifier.value|default:form.phone.value|default:'' }}"
         required
         autofocus
-        autocomplete="tel"
+        autocomplete="username tel email"
       >
-      {% if form.phone.errors %}
+      {% if form.login_identifier.errors %}
+        <ul class="auth-field-errors">
+          {% for error in form.login_identifier.errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% elif form.phone.errors %}
         <ul class="auth-field-errors">
           {% for error in form.phone.errors %}
             <li>{{ error }}</li>
@@ -45,7 +51,7 @@
     </div>
 
     <button type="submit" class="auth-submit-btn">
-      {% trans "Send WhatsApp Code" %}
+      {% trans "Send Verification Code" %}
     </button>
   </form>
 
