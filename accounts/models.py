@@ -64,11 +64,8 @@ class Employee(models.Model):
         ('inactive', 'Inactive'),
     ]
 
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='employee_profile')
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='employee_profile')
     slug = models.SlugField(max_length=110, unique=True, blank=True)
-    name = models.CharField(max_length=100)
-    phone = models.CharField(max_length=20)
-    email = models.EmailField(blank=True)
     specialties = models.CharField(max_length=200, help_text="e.g. Hair Spa, Facials, Makeup")
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='active')
     rating = models.DecimalField(max_digits=2, decimal_places=1, default=5.0)
@@ -96,7 +93,112 @@ class Employee(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['name']
+        ordering = ['user__first_name', 'user__last_name']
+
+    def __init__(self, *args, **kwargs):
+        name_val = kwargs.pop('name', None)
+        phone_val = kwargs.pop('phone', None)
+        email_val = kwargs.pop('email', None)
+        super().__init__(*args, **kwargs)
+        if name_val is not None:
+            if self.user_id and hasattr(self, 'user') and self.user:
+                self.name = name_val
+            else:
+                parts = str(name_val).strip().split(None, 1)
+                self._initial_first_name = parts[0]
+                self._initial_last_name = parts[1] if len(parts) > 1 else ''
+        if phone_val is not None:
+            if self.user_id and hasattr(self, 'user') and self.user:
+                self.phone = phone_val
+            else:
+                self._initial_phone = phone_val
+        if email_val is not None:
+            if self.user_id and hasattr(self, 'user') and self.user:
+                self.email = email_val
+            else:
+                self._initial_email = email_val
+
+    @property
+    def name(self):
+        if self.user_id and hasattr(self, 'user') and self.user:
+            full = self.user.get_full_name().strip()
+            return full or self.user.username
+        parts = [getattr(self, '_initial_first_name', ''), getattr(self, '_initial_last_name', '')]
+        joined = ' '.join(p for p in parts if p)
+        return joined or ''
+
+    @name.setter
+    def name(self, val):
+        if val is None:
+            val = ''
+        parts = str(val).strip().split(None, 1)
+        first = parts[0] if parts else ''
+        last = parts[1] if len(parts) > 1 else ''
+        self._initial_first_name = first
+        self._initial_last_name = last
+        if self.user_id and hasattr(self, 'user') and self.user:
+            self.user.first_name = first
+            self.user.last_name = last
+
+    @property
+    def phone(self):
+        if self.user_id and hasattr(self, 'user') and self.user:
+            try:
+                return self.user.profile.phone
+            except Exception:
+                return ''
+        return getattr(self, '_initial_phone', '')
+
+    @phone.setter
+    def phone(self, val):
+        self._initial_phone = val or ''
+        if self.user_id and hasattr(self, 'user') and self.user:
+            from accounts.models import Profile
+            profile, _ = Profile.objects.get_or_create(user=self.user)
+            profile.phone = val or ''
+            profile.save(update_fields=['phone'])
+
+    @property
+    def email(self):
+        if self.user_id and hasattr(self, 'user') and self.user:
+            return self.user.email
+        return getattr(self, '_initial_email', '')
+
+    @email.setter
+    def email(self, val):
+        self._initial_email = val or ''
+        if self.user_id and hasattr(self, 'user') and self.user:
+            self.user.email = val or ''
+
+    def save(self, *args, **kwargs):
+        if not self.user_id:
+            from django.contrib.auth.models import User, Group
+            from accounts.models import Profile
+            from accounts.utils import generate_username_from_name
+            import uuid
+            first = getattr(self, '_initial_first_name', '') or 'Staff'
+            last = getattr(self, '_initial_last_name', '')
+            uname = generate_username_from_name(first, last or str(uuid.uuid4())[:4])
+            email = getattr(self, '_initial_email', '')
+            user = User.objects.create_user(
+                username=uname,
+                first_name=first,
+                last_name=last,
+                email=email,
+            )
+            emp_group, _ = Group.objects.get_or_create(name='emp')
+            user.groups.add(emp_group)
+            phone = getattr(self, '_initial_phone', '')
+            if phone:
+                Profile.objects.update_or_create(user=user, defaults={'phone': phone})
+            self.user = user
+
+        if not self.slug:
+            from core.utils import generate_unique_slug
+            slug_base = self.name or (self.user.username if self.user else 'employee')
+            self.slug = generate_unique_slug(Employee, slug_base)
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.get_status_display()})"

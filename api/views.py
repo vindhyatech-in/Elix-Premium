@@ -129,7 +129,7 @@ def home_view(request):
     by catalog_view above, kind='package', not duplicated here).
     Public/anonymous, same as every other section it draws from."""
     hero = Hero.objects.filter(is_active=True).first()
-    beauticians = Employee.objects.filter(status='active').order_by('sort_order', 'name')
+    beauticians = Employee.objects.filter(status='active').select_related('user', 'user__profile').order_by('sort_order', 'user__first_name', 'user__last_name')
 
     return JsonResponse({
         'status': 'success',

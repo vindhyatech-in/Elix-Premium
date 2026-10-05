@@ -37,7 +37,7 @@
                     <span class="admin-staff-avatar">👩‍🎨</span>
                     <div>
                       <strong>{{ emp.name }}</strong>
-                      <small class="admin-text-muted">ID: #{{ emp.id }}</small>
+                      <small class="admin-text-muted">ID: #{{ emp.id }}{% if emp.user %} • @{{ emp.user.username }}{% endif %}</small>
                     </div>
                   </div>
                 </td>
@@ -142,9 +142,15 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="add_employee">
 
-        <div class="admin-form-group">
-          <label>Full Name *</label>
-          <input type="text" name="name" required class="admin-input" placeholder="e.g. Meera Nair">
+        <div class="admin-form-row">
+          <div class="admin-form-group">
+            <label>Full Name *</label>
+            <input type="text" name="name" required class="admin-input" placeholder="e.g. Meera Nair">
+          </div>
+          <div class="admin-form-group">
+            <label>Username <span class="admin-text-muted" style="font-weight: normal; font-size: 0.85em;">(Optional)</span></label>
+            <input type="text" name="username" class="admin-input" placeholder="e.g. meera (leave blank to auto-generate)" autocomplete="off">
+          </div>
         </div>
 
         <div class="admin-form-row">

@@ -1,6 +1,7 @@
 import calendar as calendar_module
 import csv
 import json
+import re
 import secrets
 from datetime import datetime, timedelta
 from datetime import time as dt_time
@@ -99,16 +100,12 @@ def _annotate_beautician_conflicts(bookings_page):
         booking.conflicting_beautician_ids = conflicting_ids
 
 
-def _create_employee_login(name):
+def _create_employee_login(name, custom_username=None):
     """
-    Auto-provisions a login for a newly added employee: username is
-    firstname+lastname (lowercased, collision-suffixed), password is
-    Firstname + 4 random digits — simple enough for the owner to read
-    off-screen and hand to a new hire without a separate invite flow,
-    but not computable by anyone who just knows the employee's first
-    name (the previous fixed "Firstname2026" scheme was — employee
-    first names are shown to customers throughout the app, so that
-    was a directly guessable login for every employee, every year).
+    Auto-provisions a login for a newly added employee.
+    If custom_username is provided, uses that username directly;
+    otherwise username is firstname+lastname (lowercased, collision-suffixed).
+    Password is Firstname + 4 random digits.
     Returns (user, plaintext_password) so the caller can show the password
     once, since it's never recoverable again after this (only the hash is
     stored).
@@ -117,19 +114,16 @@ def _create_employee_login(name):
     first_name = parts[0] if parts else 'user'
     last_name = ' '.join(parts[1:]) if len(parts) > 1 else ''
 
-    username = generate_username_from_name(first_name, last_name)
+    if custom_username:
+        username = custom_username.strip()
+    else:
+        username = generate_username_from_name(first_name, last_name)
     password = _generate_temp_password(first_name)
 
     user = User.objects.create_user(
         username=username, password=password,
         first_name=first_name, last_name=last_name,
     )
-    # 'emp' role group — see accounts/adapter.py::save_user for the
-    # self-signup 'customer' side of this, and core/decorators.py /
-    # core/middleware.py for how the three groups gate access. Never
-    # is_staff — that flag used to be (incorrectly) relied on for
-    # dashboard access; group membership is the only thing that matters
-    # now, and is_staff stays reserved for real Django-admin-site access.
     emp_group, _ = Group.objects.get_or_create(name='emp')
     user.groups.add(emp_group)
     return user, password
@@ -222,7 +216,7 @@ def dashboard_overview(request):
     range_start, range_end = month_dates[0], month_dates[-1]
 
     # Fetch all employees
-    employees = Employee.objects.all().order_by('name')
+    employees = Employee.objects.select_related('user', 'user__profile').all().order_by('user__first_name', 'user__last_name')
 
     # Fetch bookings in date range
     bookings_qs = Booking.objects.filter(
@@ -438,7 +432,7 @@ def dashboard_bookings(request):
 
         return redirect(request.get_full_path())
 
-    employees = Employee.objects.all()
+    employees = Employee.objects.select_related('user', 'user__profile').all()
 
     page_obj, other_params = paginate_queryset(request, bookings_qs)
     _annotate_beautician_conflicts(page_obj)
@@ -961,6 +955,7 @@ def dashboard_employees(request):
 
         if action == 'add_employee':
             name = request.POST.get('name', '').strip()[:100]
+            username = request.POST.get('username', '').strip()
             phone = request.POST.get('phone', '').strip()[:20]
             email = request.POST.get('email', '').strip()
             specialties = request.POST.get('specialties', '').strip()
@@ -976,6 +971,10 @@ def dashboard_employees(request):
                 error = 'Invalid status.'
             elif email and User.objects.filter(email__iexact=email).exists():
                 error = 'That email is already in use by another account.'
+            elif username and not re.match(r'^[a-zA-Z0-9_.@-]{3,150}$', username):
+                error = 'Username must be at least 3 characters and contain only letters, numbers, and @/./+/-/_ characters.'
+            elif username and User.objects.filter(username__iexact=username).exists():
+                error = f'Username "{username}" is already taken. Please choose another username.'
             else:
                 try:
                     experience_years = int(experience_raw)
@@ -989,16 +988,15 @@ def dashboard_employees(request):
                 messages.error(request, error)
             else:
                 with transaction.atomic():
-                    user, password = _create_employee_login(name)
+                    user, password = _create_employee_login(name, custom_username=username or None)
                     if email:
                         user.email = email
                         user.save(update_fields=['email'])
+                    from accounts.models import Profile
+                    Profile.objects.update_or_create(user=user, defaults={'phone': phone})
                     Employee.objects.create(
                         user=user,
                         slug=generate_unique_slug(Employee, name),
-                        name=name,
-                        phone=phone,
-                        email=email,
                         specialties=specialties or 'General Beauty',
                         experience_years=experience_years,
                         status=status,
@@ -1015,6 +1013,7 @@ def dashboard_employees(request):
 
             phone = request.POST.get('phone', employee.phone).strip()[:20]
             email = request.POST.get('email', employee.email).strip()
+            name = request.POST.get('name', employee.name).strip()[:100]
             status = request.POST.get('status', employee.status)
             exp_raw = request.POST.get('experience_years')
 
@@ -1038,17 +1037,16 @@ def dashboard_employees(request):
                 messages.error(request, error)
             else:
                 with transaction.atomic():
-                    employee.name = request.POST.get('name', employee.name).strip()[:100]
+                    employee.name = name
                     employee.phone = phone
                     employee.email = email
+                    if employee.user:
+                        employee.user.save(update_fields=['first_name', 'last_name', 'email'])
                     employee.specialties = request.POST.get('specialties', employee.specialties).strip()
                     employee.status = status
                     if exp_raw:
                         employee.experience_years = int(exp_raw)
                     employee.save()
-                    if employee.user and employee.user.email != email:
-                        employee.user.email = email
-                        employee.user.save(update_fields=['email'])
                 messages.success(request, f'Updated employee "{employee.name}".')
 
         elif action == 'generate_login':
@@ -1111,7 +1109,7 @@ def dashboard_employees(request):
 
         return redirect(request.get_full_path())
 
-    employees_qs = Employee.objects.prefetch_related(
+    employees_qs = Employee.objects.select_related('user', 'user__profile').prefetch_related(
         'assigned_bookings',
         Prefetch(
             'leaves',
@@ -1436,7 +1434,12 @@ def dashboard_reports(request):
     beautician_perf = (
         completed_qs
         .filter(assigned_beautician__isnull=False)
-        .values('assigned_beautician__name', 'assigned_beautician__id')
+        .values(
+            'assigned_beautician__user__first_name',
+            'assigned_beautician__user__last_name',
+            'assigned_beautician__user__username',
+            'assigned_beautician__id',
+        )
         .annotate(
             jobs=Count('id'),
             revenue=Sum('total_amount'),
@@ -1462,8 +1465,12 @@ def dashboard_reports(request):
     for b in beautician_perf:
         bid = b['assigned_beautician__id']
         avg_r = rating_map.get(bid)
+        fname = b.get('assigned_beautician__user__first_name') or ''
+        lname = b.get('assigned_beautician__user__last_name') or ''
+        uname = b.get('assigned_beautician__user__username') or ''
+        full_name = f"{fname} {lname}".strip() or uname
         beautician_rows.append({
-            'name':    b['assigned_beautician__name'],
+            'name':    full_name,
             'jobs':    b['jobs'],
             'revenue': b['revenue'] or 0,
             'rating':  round(avg_r, 1) if avg_r else None,
@@ -1604,13 +1611,21 @@ def dashboard_reports_export(request):
                 scheduled_date__lte=to_date,
                 assigned_beautician__isnull=False,
             )
-            .values('assigned_beautician__name')
+            .values(
+                'assigned_beautician__user__first_name',
+                'assigned_beautician__user__last_name',
+                'assigned_beautician__user__username',
+            )
             .annotate(jobs=Count('id'), revenue=Sum('total_amount'))
             .order_by('-jobs')
         )
         for r in rows:
+            fname = r.get('assigned_beautician__user__first_name') or ''
+            lname = r.get('assigned_beautician__user__last_name') or ''
+            uname = r.get('assigned_beautician__user__username') or ''
+            full_name = f"{fname} {lname}".strip() or uname
             writer.writerow([
-                r['assigned_beautician__name'],
+                full_name,
                 r['jobs'],
                 r['revenue'] or 0,
             ])

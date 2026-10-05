@@ -94,15 +94,33 @@ class AddressAdmin(admin.ModelAdmin):
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'status', 'specialties', 'experience_years', 'rating', 'reviews', 'sort_order')
+    list_display = ('get_name', 'get_username', 'status', 'get_phone', 'get_email', 'specialties', 'experience_years', 'rating', 'reviews', 'sort_order')
     list_filter = ('status',)
     list_editable = ('sort_order',)
-    search_fields = ('name', 'email', 'phone', 'specialties')
-    prepopulated_fields = {'slug': ('name',)}
+    search_fields = ('user__first_name', 'user__last_name', 'user__username', 'user__email', 'user__profile__phone', 'specialties')
+    raw_id_fields = ('user',)
+
+    def get_name(self, obj):
+        return obj.name
+    get_name.short_description = 'Name'
+    get_name.admin_order_field = 'user__first_name'
+
+    def get_username(self, obj):
+        return obj.user.username if obj.user else '—'
+    get_username.short_description = 'Username'
+    get_username.admin_order_field = 'user__username'
+
+    def get_phone(self, obj):
+        return obj.phone
+    get_phone.short_description = 'Phone'
+
+    def get_email(self, obj):
+        return obj.email
+    get_email.short_description = 'Email'
 
 
 @admin.register(EmployeeLeave)
 class EmployeeLeaveAdmin(admin.ModelAdmin):
     list_display = ('employee', 'start_date', 'end_date', 'reason')
     list_filter = ('start_date',)
-    search_fields = ('employee__name', 'reason')
+    search_fields = ('employee__user__first_name', 'employee__user__last_name', 'employee__user__username', 'reason')

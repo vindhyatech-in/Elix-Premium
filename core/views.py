@@ -45,7 +45,7 @@ def index(request):
         'how_it_works': HowItWorksStep.objects.all(),
         'trust_points': TrustPoint.objects.all(),
         'trust_badges': TrustBadge.objects.all(),
-        'beauticians': Employee.objects.filter(status='active').order_by('sort_order', 'name'),
+        'beauticians': Employee.objects.filter(status='active').select_related('user', 'user__profile').order_by('sort_order', 'user__first_name', 'user__last_name'),
         'testimonials': Testimonial.objects.all(),
         'gallery': {
             'before_after': GalleryBeforeAfter.objects.all(),
