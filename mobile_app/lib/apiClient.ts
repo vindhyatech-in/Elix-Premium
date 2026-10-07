@@ -1,47 +1,49 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 /**
  * apiClient — Axios instance pointed at the Django REST backend.
  *
- * Base URL:   change DEV_BASE_URL to your LAN IP while developing on a
- *             physical device (Expo Go on Android can't reach localhost).
- *             For a production release, swap to https://yourdomain.in/api/v1.
- *
- * Auth:       Reads the token from SecureStore (key: 'auth_token') and
- *             attaches `Authorization: Token <key>` to every request.  The
- *             Django side reads this in api/auth.py::token_required.
- *
- * Error:      Non-2xx responses reject with the full AxiosError so callers can
- *             inspect .response?.data?.error for a user-facing message.
+ * URL resolution (auto-detected by platform):
+ *   web (browser)      → http://localhost:8003/api/v1   (Django is running on same machine)
+ *   Android emulator   → http://10.0.2.2:8003/api/v1   (emulator host alias for localhost)
+ *   iOS simulator      → http://localhost:8003/api/v1
+ *   Physical device    → set DEVICE_LAN_IP below to your laptop's LAN IP (e.g. 192.168.1.10)
  */
 
-// NOTE: Replace '10.0.2.2' (Android emulator host alias for localhost) with
-// your machine's LAN IP when testing on a physical device.
-const DEV_BASE_URL = 'http://10.0.2.2:8003/api/v1';
+const PORT = 8003;
+const DEVICE_LAN_IP = '192.168.1.100'; // change this for physical Expo Go testing
+
+function getBaseUrl(): string {
+  if (Platform.OS === 'web') return `http://localhost:${PORT}/api/v1`;
+  if (Platform.OS === 'android') return `http://10.0.2.2:${PORT}/api/v1`;
+  return `http://localhost:${PORT}/api/v1`; // iOS simulator
+}
 
 export const apiClient = axios.create({
-  baseURL: DEV_BASE_URL,
+  baseURL: getBaseUrl(),
   timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach bearer token from secure storage on every request
+// Attach bearer token on every request
 apiClient.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync('auth_token');
-  if (token) {
-    config.headers.Authorization = `Token ${token}`;
-  }
+  let token: string | null = null;
+  try {
+    if (Platform.OS === 'web') {
+      token = localStorage.getItem('auth_token');
+    } else {
+      token = await SecureStore.getItemAsync('auth_token');
+    }
+  } catch {}
+  if (token) config.headers.Authorization = `Token ${token}`;
   return config;
 });
 
-// Optional: surface network errors cleanly
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Log in dev; in prod you'd send to a crash reporting service
     if (__DEV__) {
       console.warn('[API Error]', error.response?.status, error.response?.data ?? error.message);
     }

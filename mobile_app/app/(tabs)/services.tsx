@@ -16,10 +16,12 @@ import { Button } from '@/components/ui/Button';
 import { useCatalog } from '@/hooks/useCatalog';
 import { useCartStore } from '@/store/cartStore';
 import type { CatalogItem } from '@/types/api';
+import { BookingDrawer } from '@/components/booking/BookingDrawer';
 
 export default function ServicesScreen() {
   const [activeTab, setActiveTab] = useState<string>('all');
   const { data: catalog, isLoading, error } = useCatalog();
+  const [drawerVisible, setDrawerVisible] = useState(false);
   const { items: cartItems, totalItems, totalAmount, addItem, increment, decrement, getKey } = useCartStore();
 
   // Derive category tabs from live catalog data
@@ -198,12 +200,13 @@ export default function ServicesScreen() {
             <Text style={styles.cartBarItems}>{totalItems} item{totalItems !== 1 ? 's' : ''} added</Text>
             <Text style={styles.cartBarAmount}>Rs.{totalAmount.toFixed(0)}</Text>
           </View>
-          <Pressable style={styles.cartBarBtn}>
+          <Pressable style={styles.cartBarBtn} onPress={() => setDrawerVisible(true)}>
             <Text style={styles.cartBarBtnText}>Proceed to Booking</Text>
             <Ionicons name="arrow-forward" size={16} color="#fff" />
           </Pressable>
         </View>
       )}
+      <BookingDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} />
     </SafeAreaView>
   );
 }
