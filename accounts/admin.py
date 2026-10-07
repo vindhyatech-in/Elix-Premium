@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
@@ -12,14 +13,31 @@ if admin.site.is_registered(User):
     admin.site.unregister(User)
 
 
+class ProfileInline(admin.StackedInline):
+    model = Profile
+    can_delete = False
+    verbose_name_plural = 'Profile (Mobile No / Contact)'
+    fields = ('phone', 'phone_verified', 'age')
+    extra = 0
+
+
 @admin.register(User)
 class CustomUserAdmin(BaseUserAdmin):
+    inlines = [ProfileInline]
     list_display = (
-        'username', 'email', 'first_name', 'last_name',
+        'username', 'get_phone', 'email', 'first_name', 'last_name',
         'user_role_badge', 'is_active', 'is_staff', 'impersonate_action_button'
     )
+    search_fields = ('username', 'first_name', 'last_name', 'email', 'profile__phone')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'groups')
     actions = ['impersonate_selected_user']
+
+    def get_phone(self, obj):
+        try:
+            return obj.profile.phone or '—'
+        except Exception:
+            return '—'
+    get_phone.short_description = 'Phone / Mobile'
 
     def user_role_badge(self, obj):
         if obj.is_superuser:
@@ -92,8 +110,34 @@ class AddressAdmin(admin.ModelAdmin):
     search_fields = ('label', 'text', 'user__email')
 
 
+class EmployeeForm(forms.ModelForm):
+    phone = forms.CharField(
+        max_length=20,
+        required=False,
+        label='Mobile / Phone Number',
+        help_text='Staff contact number (stored on linked User Profile).'
+    )
+
+    class Meta:
+        model = Employee
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.user_id:
+            self.fields['phone'].initial = self.instance.phone
+
+    def save(self, commit=True):
+        instance = super().save(commit=commit)
+        phone = self.cleaned_data.get('phone')
+        if phone is not None:
+            instance.phone = phone
+        return instance
+
+
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
+    form = EmployeeForm
     list_display = ('get_name', 'get_username', 'status', 'get_phone', 'get_email', 'specialties', 'experience_years', 'rating', 'reviews', 'sort_order')
     list_filter = ('status',)
     list_editable = ('sort_order',)
