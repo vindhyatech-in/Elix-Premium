@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import razorpay_views, views
 
 urlpatterns = [
     path('serviceability/', views.verify_serviceability, name='api_serviceability'),
@@ -19,4 +19,10 @@ urlpatterns = [
     path('bookings/', views.bookings_view, name='api_bookings'),
     path('bookings/checkout/', views.checkout_view, name='api_bookings_checkout'),
     path('bookings/<str:booking_number>/cancel/', views.booking_cancel_view, name='api_booking_cancel'),
+
+    path('payments/razorpay/create-order/', views.razorpay_create_order, name='api_razorpay_create_order'),
+    path('payments/razorpay/verify/', views.razorpay_verify, name='api_razorpay_verify'),
+
+    path('create-order/', razorpay_views.create_order, name='api_v1_create_order'),
+    path('verify-payment/', razorpay_views.verify_payment, name='api_v1_verify_payment'),
 ]

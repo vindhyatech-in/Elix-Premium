@@ -8,7 +8,7 @@ import type { PaymentMethod } from '@/store/bookingFlowStore';
 
 const PAYMENT_OPTIONS: { key: PaymentMethod; label: string; sub: string; icon: string }[] = [
   { key: 'pay_at_home', label: 'Pay at Home',  sub: 'Cash / UPI when artist arrives',  icon: 'cash-outline' },
-  { key: 'pay_now',     label: 'Pay Now',       sub: 'Secure online via Razorpay (UPI, Cards)',        icon: 'card-outline' },
+  { key: 'pay_now',     label: 'Pay Now',       sub: 'UPI / Cards via Razorpay (requires device)',     icon: 'card-outline' },
 ];
 
 export function StepPayment({ onNext }: { onNext: () => void }) {
@@ -48,7 +48,7 @@ export function StepPayment({ onNext }: { onNext: () => void }) {
       {/* Payment options */}
       {PAYMENT_OPTIONS.map((opt) => {
         const active = paymentMethod === opt.key;
-        const comingSoon = opt.key === 'pay_now';
+        const comingSoon = false; // Pay Now enabled for native devices
         return (
           <Pressable
             key={opt.key}

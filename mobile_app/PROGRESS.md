@@ -113,13 +113,13 @@
 
 ---
 
-## Phase 4: Payments & Order Confirmation — TODO
+## Phase 4: Payments & Order Confirmation — COMPLETE
 
-- [ ] Install: `react-native-razorpay`
-- [ ] `components/payment/RazorpayCheckout.tsx` — Native Razorpay modal
-- [ ] Wire Pay Now path: `POST /api/v1/payments/razorpay/create-order/`
-- [ ] Pay at Home path: direct `POST /api/v1/bookings/checkout/` (already built)
-- [ ] `app/booking-confirmed.tsx` — Confirmation screen (Lottie animation + booking number)
+- [x] Install: `react-native-razorpay` (for bare builds) + razorpay Python SDK
+- [x] Razorpay flow built into `StepSummary.tsx` with native + web + Expo Go fallbacks — Native Razorpay modal
+- [x] Wire Pay Now path: `POST /api/v1/payments/razorpay/create-order/`
+- [x] Pay at Home path: direct `POST /api/v1/bookings/checkout/` (already built)
+- [x] `app/booking-confirmed.tsx` — Confirmation screen (Lottie animation + booking number)
 
 ---
 
@@ -180,4 +180,4 @@ npx expo install expo-notifications
 | `POST /api/v1/bookings/checkout/` | POST | Token | Ready (Pay at Home only) |
 | `POST /api/v1/bookings/<num>/cancel/` | POST | Token | Ready |
 | `GET /api/v1/bookings/urgent-slots/` | GET | Public | TODO (Phase 3) |
-| `POST /api/v1/payments/razorpay/create-order/` | POST | Token | TODO (Phase 4) |
+| `POST /api/v1/payments/razorpay/create-order/` | POST | Token | Ready |

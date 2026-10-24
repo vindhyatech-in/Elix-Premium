@@ -14,10 +14,13 @@ from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.fields import IndianPhoneField
 from accounts.models import Address, Employee, Profile
+from bookings import razorpay_client
 from bookings.models import Booking, BookingItem, Offer
+from bookings.notifications import notify_user
 from bookings.views import PAYMENT_METHOD_MAP, CartError, _resolve_cart_pricing
 from catalog.models import Category
 from core import booking_data
+from core.email_service import send_booking_email_all
 from core.models import (
     FAQ, GalleryBeforeAfter, Hero, HowItWorksStep, PromoBanner,
     Testimonial, TrustBadge, TrustPoint,
@@ -387,14 +390,60 @@ def bookings_view(request):
 @token_required
 @require_POST
 def booking_cancel_view(request, booking_number):
-    """POST /api/v1/bookings/<booking_number>/cancel/ — same can_cancel
-    gate as bookings/views.py::cancel_booking."""
+    """POST /api/v1/bookings/<booking_number>/cancel/ — cancels booking,
+    triggers auto-refund via Razorpay if paid online, and notifies user/admin."""
     booking = get_object_or_404(Booking, booking_number=booking_number, user=request.user)
     if not booking.can_cancel:
-        return JsonResponse({'ok': False, 'error': 'This booking can no longer be cancelled — the beautician is already on the way or it’s completed/cancelled.'}, status=400)
+        return JsonResponse({
+            'ok': False,
+            'error': 'This booking can no longer be cancelled — the beautician is already on the way or it’s completed/cancelled.'
+        }, status=400)
+
     booking.status = 'cancelled'
     booking.save(update_fields=['status', 'updated_at'])
-    return JsonResponse({'ok': True})
+
+    refund_status = None
+    refund_message = None
+
+    # Auto-refund for online-paid bookings (matching bookings/views.py::cancel_booking)
+    if booking.payment_status == 'paid' and booking.razorpay_payment_id:
+        try:
+            razorpay_client.create_refund(booking.razorpay_payment_id)
+            booking.payment_status = 'refunded'
+            booking.save(update_fields=['payment_status'])
+            refund_status = 'initiated'
+            refund_message = (
+                f'Your refund of ₹{booking.total_amount:,.0f} has been initiated '
+                f'and will appear in 5–7 business days.'
+            )
+        except Exception:
+            logger.error(
+                'Mobile cancel: refund FAILED for booking %s (payment_id=%s) — manual refund needed.',
+                booking.booking_number, booking.razorpay_payment_id,
+                exc_info=True,
+            )
+            refund_status = 'failed'
+            refund_message = 'Refund could not be processed automatically. Support will issue it manually.'
+
+    # Notifications (email & in-app)
+    try:
+        send_booking_email_all(
+            event_customer='booking_cancelled',
+            event_admin='admin_booking_cancelled',
+            event_beautician='beautician_job_cancelled' if booking.assigned_beautician_id else None,
+            booking=booking,
+        )
+        notify_user(booking, 'booking_cancelled')
+    except Exception:
+        logger.exception('Failed sending cancellation notifications for %s', booking.booking_number)
+
+    return JsonResponse({
+        'ok': True,
+        'message': f'Booking {booking.booking_number} has been cancelled.',
+        'refund_status': refund_status,
+        'refund_message': refund_message,
+        'payment_status': booking.payment_status,
+    })
 
 
 @csrf_exempt
@@ -507,3 +556,200 @@ def checkout_view(request):
         return JsonResponse({'ok': False, 'error': 'Something went wrong completing your booking — please try again.'}, status=500)
 
     return JsonResponse({'ok': True, 'booking_number': booking.booking_number})
+
+
+# ─── Phase 4: Razorpay Payment Endpoints ─────────────────────────────────────
+
+import hmac
+import hashlib
+import razorpay
+
+from django.conf import settings
+
+
+def _razorpay_client():
+    return razorpay.Client(
+        auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+    )
+
+
+@csrf_exempt
+@token_required
+@require_POST
+def razorpay_create_order(request):
+    """POST /api/v1/payments/razorpay/create-order/
+
+    Takes the same cart payload as checkout_view but only creates the
+    Razorpay order (does NOT create a Booking yet).  The Booking is
+    created in razorpay_verify after the payment is confirmed, so we
+    never create a booking for a failed payment.
+
+    Request body: {
+        "amount_paise": 129900,   # total in paise (e.g. Rs.1299 = 129900)
+        "receipt": "cart_<uuid>"  # short unique string, client-generated
+    }
+
+    Response: {
+        "ok": true,
+        "order_id": "order_XXXX",
+        "amount":   129900,
+        "currency": "INR",
+        "key_id":   "rzp_test_..."
+    }
+    """
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body.'}, status=400)
+
+    amount_paise = payload.get('amount_paise')
+    receipt = (payload.get('receipt') or '')[:40]
+
+    if not isinstance(amount_paise, int) or amount_paise <= 0:
+        return JsonResponse({'ok': False, 'error': 'Invalid amount.'}, status=400)
+
+    try:
+        client = _razorpay_client()
+        rzp_order = client.order.create({
+            'amount': amount_paise,
+            'currency': 'INR',
+            'receipt': receipt or f'mobile_{request.user.id}',
+            'payment_capture': 1,
+        })
+    except Exception:
+        logger.exception('Razorpay order creation failed for user=%s', request.user.id)
+        return JsonResponse({'ok': False, 'error': 'Payment gateway error. Please try again.'}, status=500)
+
+    return JsonResponse({
+        'ok': True,
+        'order_id': rzp_order['id'],
+        'amount': rzp_order['amount'],
+        'currency': rzp_order['currency'],
+        'key_id': settings.RAZORPAY_KEY_ID,
+    })
+
+
+@csrf_exempt
+@token_required
+@require_POST
+def razorpay_verify(request):
+    """POST /api/v1/payments/razorpay/verify/
+
+    Called after the Razorpay SDK fires its success callback on the mobile
+    client.  Verifies the HMAC-SHA256 signature, then creates the Booking
+    (same logic as checkout_view) and marks payment_status='paid'.
+
+    Request body: {
+        "razorpay_order_id":   "order_XXXX",
+        "razorpay_payment_id": "pay_XXXX",
+        "razorpay_signature":  "<hex>",
+        # --- all the same booking fields as checkout_view ---
+        "address": {...}, "cart": [...], "date": "...", ...
+    }
+    """
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body.'}, status=400)
+
+    order_id   = payload.get('razorpay_order_id', '')
+    payment_id = payload.get('razorpay_payment_id', '')
+    signature  = payload.get('razorpay_signature', '')
+
+    if not (order_id and payment_id and signature):
+        return JsonResponse({'ok': False, 'error': 'Missing payment verification fields.'}, status=400)
+
+    # ── Verify HMAC-SHA256 signature ──────────────────────────────────────────
+    body_str = f'{order_id}|{payment_id}'
+    expected = hmac.new(
+        settings.RAZORPAY_KEY_SECRET.encode('utf-8'),
+        body_str.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected, signature):
+        logger.warning(
+            'Razorpay signature mismatch: user=%s order=%s', request.user.id, order_id
+        )
+        return JsonResponse({'ok': False, 'error': 'Payment verification failed.'}, status=400)
+
+    # ── Signature valid — create the Booking ─────────────────────────────────
+    address      = payload.get('address') or {}
+    cart         = payload.get('cart') or []
+    booking_type = payload.get('booking_type')
+    payment_method = 'razorpay'
+
+    if not address.get('text'):
+        return JsonResponse({'ok': False, 'error': 'Address is required.'}, status=400)
+    if booking_type not in ('regular', 'urgent'):
+        return JsonResponse({'ok': False, 'error': 'Invalid booking type.'}, status=400)
+
+    scheduled_date = parse_date(payload.get('date') or '')
+    if not scheduled_date:
+        return JsonResponse({'ok': False, 'error': 'Invalid date.'}, status=400)
+
+    time_slot  = payload.get('time_slot') or ''
+    exact_time = parse_time(payload.get('exact_time') or '') if booking_type == 'urgent' else None
+
+    try:
+        address_lat = float(address['lat']) if address.get('lat') is not None else None
+        address_lng = float(address['lng']) if address.get('lng') is not None else None
+    except (TypeError, ValueError):
+        address_lat = address_lng = None
+
+    try:
+        line_items, subtotal, discount_amount, total_amount, coupon_code = _resolve_cart_pricing(
+            cart, payload.get('coupon_code')
+        )
+    except CartError as exc:
+        return JsonResponse({'ok': False, 'error': exc.message}, status=400)
+
+    # Add urgent fee to total if applicable
+    urgent_fee = 99 if booking_type == 'urgent' else 0
+    total_amount = total_amount + urgent_fee
+
+    try:
+        with transaction.atomic():
+            booking = Booking.objects.create(
+                user=request.user,
+                address_label=address.get('label') or 'Address',
+                address_text=address.get('text'),
+                address_pincode=address.get('pincode') or '',
+                address_lat=address_lat,
+                address_lng=address_lng,
+                scheduled_date=scheduled_date,
+                booking_type=booking_type,
+                time_slot=time_slot if booking_type == 'regular' else '',
+                exact_time=exact_time if booking_type == 'urgent' else None,
+                payment_method=payment_method,
+                payment_status='paid',
+                subtotal=subtotal,
+                discount_amount=discount_amount,
+                total_amount=total_amount,
+                coupon_code=coupon_code,
+                urgent_fee=urgent_fee,
+            )
+            BookingItem.objects.bulk_create([
+                BookingItem(
+                    booking=booking,
+                    service_variant=None if li['is_package'] else li['variant'],
+                    package=li['variant'] if li['is_package'] else None,
+                    name_snapshot=(
+                        li['item_name'] if li['is_package'] or not li['variant'].label
+                        else f"{li['item_name']} — {li['variant'].label}"
+                    ),
+                    price_snapshot=li['price'],
+                    duration_snapshot=li['duration'],
+                    included_snapshot=li['included_snapshot'],
+                    quantity=li['qty'],
+                )
+                for li in line_items
+            ])
+    except Exception:
+        logger.exception('Booking creation after Razorpay verify failed for user=%s.', request.user.id)
+        return JsonResponse({
+            'ok': False,
+            'error': 'Payment received but booking creation failed. Contact support with payment ID: ' + payment_id,
+        }, status=500)
+
+    return JsonResponse({'ok': True, 'booking_number': booking.booking_number, 'payment_id': payment_id})

@@ -1,0 +1,768 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Razorpay Standard Checkout — Elix Luxury Salon</title>
+  <meta name="description" content="Secure online checkout with Razorpay Standard Payment Gateway for Elix Salon bookings.">
+  <meta name="razorpay-key-id" content="{{ RAZORPAY_KEY_ID }}">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
+
+  <!-- Razorpay Standard Checkout Script -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0a0d14;
+      --bg-card: #121824;
+      --bg-card-hover: #172030;
+      --gold-primary: #c9a15a;
+      --gold-light: #e5c382;
+      --gold-gradient: linear-gradient(135deg, #c9a15a 0%, #e8cb93 50%, #b88f44 100%);
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border-subtle: rgba(201, 161, 90, 0.2);
+      --border-focus: rgba(201, 161, 90, 0.6);
+      --success-green: #10b981;
+      --danger-red: #ef4444;
+      --warning-amber: #f59e0b;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --shadow-card: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 50px rgba(201, 161, 90, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 15% 20%, rgba(201, 161, 90, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 80%, rgba(201, 161, 90, 0.05) 0%, transparent 40%);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    .brand-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .brand-title {
+      font-family: 'Cinzel', serif;
+      font-size: 28px;
+      letter-spacing: 4px;
+      color: var(--gold-light);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .brand-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+
+    .checkout-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 32px 28px;
+      box-shadow: var(--shadow-card);
+      backdrop-filter: blur(12px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .checkout-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--gold-gradient);
+    }
+
+    .badge-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .checkout-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gold-light);
+      background: rgba(201, 161, 90, 0.12);
+      border: 1px solid rgba(201, 161, 90, 0.3);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    .security-badge {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .security-badge svg {
+      width: 14px;
+      height: 14px;
+      fill: var(--gold-primary);
+    }
+
+    .order-summary-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: #fff;
+    }
+
+    .service-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: var(--radius-md);
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .service-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .service-name {
+      font-weight: 600;
+      font-size: 15px;
+      color: #fff;
+    }
+
+    .service-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .amount-selection-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: block;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .preset-chips {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .chip-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      padding: 8px 4px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .chip-btn:hover {
+      background: rgba(201, 161, 90, 0.15);
+      border-color: var(--gold-primary);
+      color: var(--gold-light);
+    }
+
+    .chip-btn.active {
+      background: var(--gold-gradient);
+      color: #0d1117;
+      border-color: transparent;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(201, 161, 90, 0.3);
+    }
+
+    .custom-amount-wrap {
+      position: relative;
+      margin-bottom: 24px;
+    }
+
+    .currency-prefix {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-weight: 700;
+      color: var(--gold-light);
+      font-size: 18px;
+      pointer-events: none;
+    }
+
+    .amount-input {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-md);
+      padding: 12px 14px 12px 34px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    .amount-input:focus {
+      outline: none;
+      border-color: var(--gold-primary);
+      box-shadow: 0 0 0 3px rgba(201, 161, 90, 0.2);
+    }
+
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .breakdown-total {
+      display: flex;
+      justify-content: space-between;
+      font-size: 17px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+      margin-bottom: 24px;
+    }
+
+    .breakdown-total .total-val {
+      color: var(--gold-light);
+      font-size: 20px;
+    }
+
+    /* Primary Checkout Button */
+    .btn-pay {
+      width: 100%;
+      background: var(--gold-gradient);
+      color: #0a0d14;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 15px 20px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s;
+      box-shadow: 0 6px 20px rgba(201, 161, 90, 0.35);
+    }
+
+    .btn-pay:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(201, 161, 90, 0.5);
+    }
+
+    .btn-pay:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .btn-pay:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(10, 13, 20, 0.25);
+      border-top-color: #0a0d14;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Status Notifications */
+    .status-alert {
+      margin-top: 20px;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      font-size: 13.5px;
+      line-height: 1.5;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .status-alert.visible {
+      display: block;
+    }
+
+    .alert-warning {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fbbf24;
+    }
+
+    .alert-error {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #f87171;
+    }
+
+    .alert-success-receipt {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--text-main);
+      padding: 22px 18px;
+      border-radius: var(--radius-md);
+      margin-top: 20px;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .alert-success-receipt.visible {
+      display: block;
+    }
+
+    .receipt-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .receipt-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--success-green);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 18px;
+    }
+
+    .receipt-title {
+      font-weight: 700;
+      font-size: 16px;
+      color: #34d399;
+    }
+
+    .receipt-meta {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 14px;
+      font-family: monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      word-break: break-all;
+    }
+
+    .receipt-meta strong {
+      color: var(--gold-light);
+    }
+
+    .btn-reset {
+      width: 100%;
+      background: transparent;
+      color: var(--gold-light);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-reset:hover {
+      background: rgba(201, 161, 90, 0.1);
+    }
+
+    .footer-note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 24px;
+    }
+
+    .footer-note a {
+      color: var(--gold-primary);
+      text-decoration: none;
+    }
+
+    .footer-note a:hover {
+      text-decoration: underline;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="brand-header">
+      <h1 class="brand-title">Elix</h1>
+      <p class="brand-subtitle">Standard Web Checkout • Razorpay</p>
+    </div>
+
+    <div class="checkout-card">
+      <div class="badge-bar">
+        <span class="checkout-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Test Mode Active
+        </span>
+        <span class="security-badge">
+          <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+          256-bit Secure
+        </span>
+      </div>
+
+      <div class="service-row">
+        <div class="service-info">
+          <span class="service-name">Salon & Beauty Service</span>
+          <span class="service-desc">Official Elix Standard Booking</span>
+        </div>
+        <span id="service-price-tag" style="font-weight: 700; color: var(--gold-light);">₹500</span>
+      </div>
+
+      <label class="amount-selection-label">Select or Enter Amount</label>
+      <div class="preset-chips">
+        <button type="button" class="chip-btn" data-val="100">₹100</button>
+        <button type="button" class="chip-btn active" data-val="500">₹500</button>
+        <button type="button" class="chip-btn" data-val="1299">₹1,299</button>
+        <button type="button" class="chip-btn" data-val="2499">₹2,499</button>
+      </div>
+
+      <div class="custom-amount-wrap">
+        <span class="currency-prefix">₹</span>
+        <input 
+          type="number" 
+          id="amount-input" 
+          class="amount-input" 
+          value="500" 
+          min="1" 
+          step="1"
+          placeholder="500"
+          aria-label="Amount in Rupees"
+        >
+      </div>
+
+      <div class="breakdown-row">
+        <span>Order Amount (INR)</span>
+        <span id="disp-rupees">₹500.00</span>
+      </div>
+      <div class="breakdown-row">
+        <span>Amount in Paise</span>
+        <span id="disp-paise">50,000 paise</span>
+      </div>
+
+      <div class="breakdown-total">
+        <span>Total Payable</span>
+        <span class="total-val" id="disp-total">₹500.00</span>
+      </div>
+
+      <!-- Checkout Button -->
+      <button type="button" id="pay-btn" class="btn-pay">
+        <span class="btn-spinner" id="pay-spinner"></span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+        </svg>
+        <span id="pay-btn-text">Pay ₹500 with Razorpay</span>
+      </button>
+
+      <!-- Status Alerts -->
+      <div id="alert-warning" class="status-alert alert-warning" role="alert"></div>
+      <div id="alert-error" class="status-alert alert-error" role="alert"></div>
+
+      <!-- Success Receipt Card -->
+      <div id="receipt-card" class="alert-success-receipt" role="region" aria-live="polite">
+        <div class="receipt-header">
+          <div class="receipt-icon">✓</div>
+          <div>
+            <div class="receipt-title">Payment Verified & Complete!</div>
+            <div style="font-size: 12px; color: var(--text-muted);">HMAC-SHA256 signature verified by server</div>
+          </div>
+        </div>
+
+        <div class="receipt-meta" id="receipt-details">
+          <!-- Filled dynamically -->
+        </div>
+
+        <button type="button" id="btn-reset" class="btn-reset">Make Another Payment</button>
+      </div>
+    </div>
+
+    <p class="footer-note">
+      Need assistance? <a href="/contact/">Contact Elix Support</a> or visit <a href="/booking/">Catalog Services</a>
+    </p>
+  </div>
+
+  <script>
+    (function () {
+      const amountInput = document.getElementById('amount-input');
+      const chipButtons = document.querySelectorAll('.chip-btn');
+      const dispRupees = document.getElementById('disp-rupees');
+      const dispPaise = document.getElementById('disp-paise');
+      const dispTotal = document.getElementById('disp-total');
+      const payBtn = document.getElementById('pay-btn');
+      const payBtnText = document.getElementById('pay-btn-text');
+      const paySpinner = document.getElementById('pay-spinner');
+      const alertWarning = document.getElementById('alert-warning');
+      const alertError = document.getElementById('alert-error');
+      const receiptCard = document.getElementById('receipt-card');
+      const receiptDetails = document.getElementById('receipt-details');
+      const btnReset = document.getElementById('btn-reset');
+      const servicePriceTag = document.getElementById('service-price-tag');
+
+      let currentAmountPaise = 50000;
+
+      function updateAmount(rupees) {
+        const num = Math.max(1, parseInt(rupees, 10) || 1);
+        currentAmountPaise = num * 100;
+        
+        amountInput.value = num;
+        dispRupees.textContent = '₹' + num.toLocaleString('en-IN') + '.00';
+        dispPaise.textContent = currentAmountPaise.toLocaleString('en-IN') + ' paise';
+        dispTotal.textContent = '₹' + num.toLocaleString('en-IN') + '.00';
+        servicePriceTag.textContent = '₹' + num.toLocaleString('en-IN');
+        payBtnText.textContent = 'Pay ₹' + num.toLocaleString('en-IN') + ' with Razorpay';
+
+        // Update active chip state
+        chipButtons.forEach(btn => {
+          if (parseInt(btn.dataset.val, 10) === num) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      }
+
+      chipButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          updateAmount(btn.dataset.val);
+        });
+      });
+
+      amountInput.addEventListener('input', (e) => {
+        updateAmount(e.target.value);
+      });
+
+      function hideAlerts() {
+        alertWarning.classList.remove('visible');
+        alertWarning.textContent = '';
+        alertError.classList.remove('visible');
+        alertError.textContent = '';
+      }
+
+      function showWarning(msg) {
+        hideAlerts();
+        alertWarning.textContent = msg;
+        alertWarning.classList.add('visible');
+      }
+
+      function showError(msg) {
+        hideAlerts();
+        alertError.textContent = msg;
+        alertError.classList.add('visible');
+      }
+
+      function setLoading(isLoading, text) {
+        payBtn.disabled = isLoading;
+        if (isLoading) {
+          paySpinner.style.display = 'inline-block';
+          payBtnText.textContent = text || 'Processing...';
+        } else {
+          paySpinner.style.display = 'none';
+          const num = currentAmountPaise / 100;
+          payBtnText.textContent = 'Pay ₹' + num.toLocaleString('en-IN') + ' with Razorpay';
+        }
+      }
+
+      btnReset.addEventListener('click', () => {
+        receiptCard.classList.remove('visible');
+        payBtn.style.display = 'flex';
+        hideAlerts();
+        setLoading(false);
+      });
+
+      // Checkout click handler
+      payBtn.addEventListener('click', async () => {
+        hideAlerts();
+        receiptCard.classList.remove('visible');
+
+        if (currentAmountPaise < 100) {
+          showError('Minimum payment amount is 100 paise (₹1.00).');
+          return;
+        }
+
+        setLoading(true, 'Creating Order...');
+
+        let orderData;
+        try {
+          // STEP 1: Call backend endpoint to create order
+          const response = await fetch('/api/create-order', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              amount: currentAmountPaise,
+              currency: 'INR',
+              receipt: 'elix_web_' + Date.now()
+            })
+          });
+
+          orderData = await response.json();
+
+          if (!response.ok || !orderData.ok) {
+            setLoading(false);
+            showError(orderData.error || 'Failed to create order on server. Please try again.');
+            return;
+          }
+        } catch (err) {
+          setLoading(false);
+          showError('Network error connecting to backend: ' + err.message);
+          return;
+        }
+
+        // STEP 2: Open Razorpay Checkout modal
+        setLoading(true, 'Opening Payment Modal...');
+
+        if (typeof window.Razorpay !== 'function') {
+          setLoading(false);
+          showError('Razorpay SDK failed to load. Please verify your internet connection and try again.');
+          return;
+        }
+
+        const options = {
+          key: orderData.key_id,
+          amount: orderData.amount,
+          currency: orderData.currency || 'INR',
+          name: 'Elix Luxury Salon',
+          description: 'Payment for Beauty Services',
+          image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
+          order_id: orderData.order_id,
+          theme: {
+            color: '#c9a15a'
+          },
+          // Success callback: payment completed by user in modal
+          handler: async function (paymentResponse) {
+            setLoading(true, 'Verifying Payment Signature...');
+            hideAlerts();
+
+            try {
+              // STEP 3: Verify payment signature on backend
+              const verifyRes = await fetch('/api/verify-payment', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  razorpay_order_id: paymentResponse.razorpay_order_id,
+                  razorpay_payment_id: paymentResponse.razorpay_payment_id,
+                  razorpay_signature: paymentResponse.razorpay_signature
+                })
+              });
+
+              const verifyData = await verifyRes.json();
+
+              setLoading(false);
+
+              if (verifyRes.ok && verifyData.ok) {
+                // Show verified success receipt
+                payBtn.style.display = 'none';
+                receiptDetails.innerHTML = `
+                  <div><strong>Status:</strong> PAID & SIGNATURE VERIFIED</div>
+                  <div><strong>Payment ID:</strong> ${paymentResponse.razorpay_payment_id}</div>
+                  <div><strong>Order ID:</strong> ${paymentResponse.razorpay_order_id}</div>
+                  <div><strong>Amount Paid:</strong> ₹${(orderData.amount / 100).toLocaleString('en-IN')}.00</div>
+                  <div><strong>Algorithm:</strong> HMAC-SHA256 Match Validated</div>
+                  <div><strong>Timestamp:</strong> ${new Date().toLocaleString('en-IN')}</div>
+                `;
+                receiptCard.classList.add('visible');
+              } else {
+                showError(verifyData.error || 'Payment signature verification failed. Please contact support.');
+              }
+            } catch (vErr) {
+              setLoading(false);
+              showError('Network error while verifying payment: ' + vErr.message);
+            }
+          },
+          modal: {
+            // Handle modal dismiss (user cancelled / closed the modal)
+            ondismiss: function () {
+              setLoading(false);
+              showWarning('Payment cancelled: The Razorpay checkout modal was closed.');
+            }
+          }
+        };
+
+        const rzp = new Razorpay(options);
+
+        // Handle payment failure event
+        rzp.on('payment.failed', function (failResponse) {
+          setLoading(false);
+          const reason = failResponse.error && failResponse.error.description 
+            ? failResponse.error.description 
+            : 'Payment could not be completed.';
+          showError('Payment Failed: ' + reason);
+        });
+
+        rzp.open();
+      });
+    })();
+  </script>
+</body>
+</html>

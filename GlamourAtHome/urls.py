@@ -19,10 +19,21 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
+from api import razorpay_views
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('i18n/', include('django.conf.urls.i18n')),
     path('accounts/', include('allauth.urls')),
+
+    # Razorpay Standard Checkout endpoints & page
+    path('api/create-order', razorpay_views.create_order, name='create_order_direct'),
+    path('api/create-order/', razorpay_views.create_order, name='create_order'),
+    path('api/verify-payment', razorpay_views.verify_payment, name='verify_payment_direct'),
+    path('api/verify-payment/', razorpay_views.verify_payment, name='verify_payment'),
+    path('checkout/', razorpay_views.checkout_page, name='checkout_page'),
+    path('razorpay-checkout/', razorpay_views.checkout_page, name='razorpay_checkout_page'),
+
     path('api/v1/', include('api.urls')),
     path('', include('accounts.urls')),
     path('', include('bookings.urls')),
