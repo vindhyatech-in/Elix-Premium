@@ -145,6 +145,76 @@ body.auth-page {
   font-size: 0.8rem;
 }
 
+.auth-label-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.auth-label-row .auth-label {
+  margin-bottom: 0 !important;
+}
+
+.auth-forgot-wrapper-inline {
+  font-size: 0.8125rem !important;
+}
+
+.auth-forgot-wrapper-inline .auth-forgot-link {
+  font-size: 0.8125rem !important;
+  color: var(--accent-gold) !important;
+}
+
+.auth-forgot-wrapper-inline .auth-forgot-link:hover {
+  text-decoration: underline !important;
+}
+
+.auth-password-wrapper {
+  position: relative !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.auth-password-wrapper .auth-input {
+  padding-right: 3.25rem !important;
+}
+
+.auth-password-toggle {
+  position: absolute !important;
+  right: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0.4rem !important;
+  cursor: pointer !important;
+  color: var(--ink-muted) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  transition: color 0.2s ease, background-color 0.2s ease !important;
+  z-index: 2 !important;
+}
+
+.auth-password-toggle:hover {
+  color: var(--accent-gold) !important;
+  background: rgba(201, 161, 90, 0.1) !important;
+}
+
+.auth-password-toggle:focus-visible {
+  outline: 2px solid var(--accent-gold) !important;
+  outline-offset: 1px !important;
+}
+
+.auth-password-toggle .eye-icon {
+  width: 20px !important;
+  height: 20px !important;
+  stroke: currentColor !important;
+  display: block !important;
+}
+
 .auth-forgot-wrapper {
   margin-top: -0.35rem;
   margin-bottom: 1.25rem;
@@ -211,6 +281,20 @@ body.auth-page {
 .auth-submit-btn:hover {
   transform: translateY(-2px) !important;
   box-shadow: 0 12px 28px rgba(170, 124, 40, 0.45) !important;
+}
+
+.auth-submit-btn--secondary {
+  background: var(--surface-1) !important;
+  color: var(--text-body) !important;
+  border: 1px solid var(--border-hairline) !important;
+  box-shadow: none !important;
+}
+
+.auth-submit-btn--secondary:hover {
+  background: var(--surface-3) !important;
+  border-color: var(--gold) !important;
+  color: var(--text-body) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Third-party section */
@@ -285,16 +369,17 @@ body.auth-page {
   margin: 0 !important;
 }
 
-/* "OR" divider between two alternative fields (password reset: username/email) */
+/* "OR" divider between alternative login methods or fields */
 .auth-tier3__divider {
   display: flex !important;
   align-items: center !important;
-  gap: 0.75rem !important;
-  margin: 0.25rem 0 1.1rem !important;
+  gap: 0.85rem !important;
+  margin: 1.6rem 0 1.35rem !important;
   color: var(--ink-muted) !important;
   font-size: 0.75rem !important;
   font-weight: 700 !important;
   letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
 }
 .auth-tier3__divider::before,
 .auth-tier3__divider::after {

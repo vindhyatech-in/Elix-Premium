@@ -8,8 +8,12 @@ urlpatterns = [
     path('offers/', views.offers_view, name='api_offers'),
     path('validate-coupon/', views.validate_coupon_view, name='api_validate_coupon'),
     path('home/', views.home_view, name='api_home'),
+    path('beauticians/', views.beauticians_view, name='api_beauticians'),
 
     path('auth/login/', views.auth_login, name='api_auth_login'),
+    path('auth/signup/', views.auth_signup, name='api_auth_signup'),
+    path('auth/phone/request/', views.auth_phone_request, name='api_auth_phone_request'),
+    path('auth/phone/verify/', views.auth_phone_verify, name='api_auth_phone_verify'),
     path('auth/logout/', views.auth_logout, name='api_auth_logout'),
 
     path('profile/', views.profile_view, name='api_profile'),

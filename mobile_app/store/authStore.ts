@@ -32,6 +32,28 @@ interface AuthState {
   isLoading: boolean;
   // Actions
   login: (identifier: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  signup: (payload: {
+    first_name: string;
+    last_name?: string;
+    email: string;
+    phone?: string;
+    age?: number;
+    password: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
+  requestPhoneOtp: (identifier: string) => Promise<{
+    ok: boolean;
+    verification_id?: string;
+    masked_identifier?: string;
+    dev_code?: string;
+    error?: string;
+  }>;
+  verifyPhoneOtp: (verification_id: string, code: string) => Promise<{
+    ok: boolean;
+    not_found?: boolean;
+    phone?: string;
+    email?: string;
+    error?: string;
+  }>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
 }
@@ -77,6 +99,63 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const error = err?.response?.data?.error ?? 'Network error. Check your connection.';
       set({ isLoading: false });
       return { ok: false, error };
+    }
+  },
+
+  /** POST /api/v1/auth/signup/ */
+  signup: async (payload) => {
+    set({ isLoading: true });
+    try {
+      const res = await apiClient.post('/auth/signup/', payload);
+      const { ok, token, user, error } = res.data as { ok: boolean; token?: string; user?: User; error?: string };
+      if (!ok || !token || !user) {
+        set({ isLoading: false });
+        return { ok: false, error: error ?? 'Registration failed.' };
+      }
+      await storage.setItem('auth_token', token);
+      await storage.setItem('auth_user', JSON.stringify(user));
+      set({ token, user, isLoggedIn: true, isLoading: false });
+      return { ok: true };
+    } catch (err: any) {
+      const error = err?.response?.data?.error ?? 'Network error. Check your connection.';
+      set({ isLoading: false });
+      return { ok: false, error };
+    }
+  },
+
+  /** POST /api/v1/auth/phone/request/ */
+  requestPhoneOtp: async (identifier) => {
+    set({ isLoading: true });
+    try {
+      const res = await apiClient.post('/auth/phone/request/', { identifier });
+      set({ isLoading: false });
+      return res.data;
+    } catch (err: any) {
+      const error = err?.response?.data?.error ?? 'Could not send verification code.';
+      set({ isLoading: false });
+      return { ok: false, error };
+    }
+  },
+
+  /** POST /api/v1/auth/phone/verify/ */
+  verifyPhoneOtp: async (verification_id, code) => {
+    set({ isLoading: true });
+    try {
+      const res = await apiClient.post('/auth/phone/verify/', { verification_id, code });
+      const { ok, token, user, error, not_found, phone, email } = res.data;
+      if (!ok || !token || !user) {
+        set({ isLoading: false });
+        return { ok: false, not_found, phone, email, error: error ?? 'Verification failed.' };
+      }
+      await storage.setItem('auth_token', token);
+      await storage.setItem('auth_user', JSON.stringify(user));
+      set({ token, user, isLoggedIn: true, isLoading: false });
+      return { ok: true };
+    } catch (err: any) {
+      const data = err?.response?.data;
+      const error = data?.error ?? 'Verification failed. Please check the code.';
+      set({ isLoading: false });
+      return { ok: false, not_found: data?.not_found, phone: data?.phone, email: data?.email, error };
     }
   },
 

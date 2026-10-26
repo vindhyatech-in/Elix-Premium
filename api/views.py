@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from django import forms
 from django.contrib.auth import authenticate
+from django.contrib.auth.models import Group, User
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
@@ -12,8 +13,13 @@ from django.utils.dateparse import parse_date, parse_time
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods, require_POST
 
+from django.conf import settings
+from django.core.cache import cache
+from accounts import whatsapp_otp
 from accounts.fields import IndianPhoneField
 from accounts.models import Address, Employee, Profile
+from accounts.utils import generate_username_from_name
+from allauth.account.adapter import get_adapter
 from bookings import razorpay_client
 from bookings.models import Booking, BookingItem, Offer
 from bookings.notifications import notify_user
@@ -188,6 +194,25 @@ def home_view(request):
     })
 
 
+def beauticians_view(request):
+    """GET /api/v1/beauticians/ — active verified beauticians list."""
+    beauticians = Employee.objects.filter(status='active').select_related('user', 'user__profile').order_by('sort_order', 'user__first_name', 'user__last_name')
+    data = [
+        {
+            'slug': e.slug,
+            'name': e.name,
+            'specialties': e.specialties,
+            'rating': float(e.rating),
+            'reviews': e.reviews,
+            'skills': e.skills or [],
+            'experience_years': e.experience_years,
+            'photo': e.display_photo_url,
+        }
+        for e in beauticians
+    ]
+    return JsonResponse({'status': 'success', 'beauticians': data})
+
+
 @csrf_exempt
 @require_POST
 def auth_login(request):
@@ -215,6 +240,7 @@ def auth_login(request):
         return JsonResponse({'ok': False, 'error': 'This account has been disabled.'}, status=400)
 
     token, _ = AuthToken.objects.get_or_create(user=user)
+    phone_val = user.profile.phone if hasattr(user, 'profile') else ''
     return JsonResponse({
         'ok': True,
         'token': token.key,
@@ -223,6 +249,225 @@ def auth_login(request):
             'email': user.email,
             'first_name': user.first_name,
             'last_name': user.last_name,
+            'phone': phone_val,
+        },
+    })
+
+
+@csrf_exempt
+@require_POST
+def auth_signup(request):
+    """POST /api/v1/auth/signup/ — Customer registration endpoint.
+    Accepts first_name, last_name, email, phone, age, password.
+    Creates user, customer group assignment, profile, and auth token."""
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body.'}, status=400)
+
+    first_name = (payload.get('first_name') or '').strip()
+    last_name = (payload.get('last_name') or '').strip()
+    email = (payload.get('email') or '').strip().lower()
+    phone_raw = (payload.get('phone') or '').strip()
+    age_raw = payload.get('age')
+    password = payload.get('password') or ''
+
+    if not first_name:
+        return JsonResponse({'ok': False, 'error': 'First name is required.'}, status=400)
+    if not email or '@' not in email:
+        return JsonResponse({'ok': False, 'error': 'A valid email address is required.'}, status=400)
+    if not password or len(password) < 6:
+        return JsonResponse({'ok': False, 'error': 'Password must be at least 6 characters long.'}, status=400)
+
+    if User.objects.filter(email__iexact=email).exists():
+        return JsonResponse({'ok': False, 'error': 'An account with this email already exists.'}, status=400)
+
+    normalized_phone = ''
+    if phone_raw:
+        try:
+            normalized_phone = IndianPhoneField(required=False).clean(phone_raw)
+        except forms.ValidationError:
+            return JsonResponse({'ok': False, 'error': 'Please enter a valid 10-digit Indian phone number.'}, status=400)
+
+        if normalized_phone and Profile.objects.filter(phone=normalized_phone).exists():
+            return JsonResponse({'ok': False, 'error': 'That phone number is already registered to another account.'}, status=400)
+
+    age = None
+    if age_raw is not None and str(age_raw).strip():
+        try:
+            age = int(age_raw)
+            if age < 13 or age > 120:
+                return JsonResponse({'ok': False, 'error': 'Age must be between 13 and 120.'}, status=400)
+        except ValueError:
+            return JsonResponse({'ok': False, 'error': 'Please enter a valid age.'}, status=400)
+
+    with transaction.atomic():
+        username = generate_username_from_name(first_name, last_name)
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+        )
+        customer_group, _ = Group.objects.get_or_create(name='customer')
+        user.groups.add(customer_group)
+
+        profile, _ = Profile.objects.get_or_create(user=user)
+        if normalized_phone:
+            profile.phone = normalized_phone
+        if age:
+            profile.age = age
+        profile.save()
+
+        token, _ = AuthToken.objects.get_or_create(user=user)
+
+    return JsonResponse({
+        'ok': True,
+        'token': token.key,
+        'user': {
+            'id': user.id,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'phone': profile.phone,
+        },
+    }, status=201)
+
+
+def _mask_phone_display(phone):
+    if not phone:
+        return ''
+    digits = ''.join(c for c in phone if c.isdigit())
+    if len(digits) >= 10:
+        return f'+91 ••••• •{digits[-4:]}'
+    return phone
+
+
+def _mask_email_display(email):
+    if not email or '@' not in email:
+        return email or ''
+    name, domain = email.split('@', 1)
+    if len(name) <= 2:
+        masked_name = name[0] + '*'
+    else:
+        masked_name = name[0] + '*' * (len(name) - 2) + name[-1]
+    return f'{masked_name}@{domain}'
+
+
+@csrf_exempt
+@require_POST
+def auth_phone_request(request):
+    """POST /api/v1/auth/phone/request/ — Request 6-digit OTP for phone/email login.
+    Accepts `identifier` (phone number or email).
+    Sends OTP via WhatsApp and Email."""
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body.'}, status=400)
+
+    raw_ident = (payload.get('identifier') or '').strip()
+    if not raw_ident:
+        return JsonResponse({'ok': False, 'error': 'Please enter your phone number or email address.'}, status=400)
+
+    phone = ''
+    email = ''
+    if '@' in raw_ident:
+        email = raw_ident.lower()
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if user and hasattr(user, 'profile') and user.profile.phone:
+            phone = user.profile.phone
+    else:
+        try:
+            phone = IndianPhoneField(required=False).clean(raw_ident)
+        except forms.ValidationError:
+            return JsonResponse({'ok': False, 'error': 'Please enter a valid 10-digit Indian phone number.'}, status=400)
+
+        user = get_adapter().get_user_by_phone(phone)
+        if user and user.email:
+            email = user.email
+
+    try:
+        verification_id = whatsapp_otp.send_otp(phone=phone, email=email)
+    except Exception as e:
+        logger.exception('send_otp failed for identifier=%s', raw_ident)
+        return JsonResponse({'ok': False, 'error': "Couldn't send verification code. Please try again shortly."}, status=500)
+
+    # In local development mode, expose the dev_code in response for quick testing
+    dev_code = None
+    if getattr(settings, 'DEBUG', False):
+        cached = cache.get(f'{whatsapp_otp.CACHE_PREFIX}{verification_id}')
+        if cached:
+            dev_code = cached.get('code')
+
+    masked = _mask_phone_display(phone) if phone else _mask_email_display(email)
+
+    return JsonResponse({
+        'ok': True,
+        'verification_id': verification_id,
+        'masked_identifier': masked,
+        'dev_code': dev_code,
+    })
+
+
+@csrf_exempt
+@require_POST
+def auth_phone_verify(request):
+    """POST /api/v1/auth/phone/verify/ — Validate 6-digit OTP and return AuthToken."""
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body.'}, status=400)
+
+    verification_id = (payload.get('verification_id') or '').strip()
+    code = (payload.get('code') or '').strip()
+
+    if not verification_id or not code:
+        return JsonResponse({'ok': False, 'error': 'Verification ID and code are required.'}, status=400)
+
+    cache_key = f'{whatsapp_otp.CACHE_PREFIX}{verification_id}'
+    stored = cache.get(cache_key)
+    if not stored or not isinstance(stored, dict):
+        return JsonResponse({'ok': False, 'error': 'Verification code has expired. Please request a new one.'}, status=400)
+
+    phone = stored.get('phone')
+    email = stored.get('email')
+
+    verified = whatsapp_otp.validate_otp(verification_id, code)
+    if not verified:
+        return JsonResponse({'ok': False, 'error': 'Incorrect or expired verification code.'}, status=400)
+
+    user = None
+    if phone:
+        user = get_adapter().get_user_by_phone(phone)
+    if not user and email:
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+
+    if not user:
+        return JsonResponse({
+            'ok': False,
+            'not_found': True,
+            'phone': phone,
+            'email': email,
+            'error': 'No existing account found for this phone or email. Please sign up first.',
+        }, status=404)
+
+    if not user.is_active:
+        return JsonResponse({'ok': False, 'error': 'This account has been disabled.'}, status=400)
+
+    if phone:
+        get_adapter().set_phone_verified(user, phone)
+
+    token, _ = AuthToken.objects.get_or_create(user=user)
+    return JsonResponse({
+        'ok': True,
+        'token': token.key,
+        'user': {
+            'id': user.id,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'phone': user.profile.phone if hasattr(user, 'profile') else '',
         },
     })
 

@@ -198,10 +198,13 @@ def send_otp(phone: str = None, purpose: str = 'Login to Elix Premium Salon', em
                 messages_sent = resp.get('messages', [])
                 wa_id = messages_sent[0].get('id') if messages_sent else 'sent'
                 logger.info('WhatsApp OTP successfully dispatched to %s (wa_id=%s)', clean_number, wa_id)
-                wa_dispatched = True
             except Exception as exc:
                 wa_error = exc
                 logger.warning('Failed to dispatch WhatsApp OTP to %s: %s', clean_number, exc)
+                if getattr(settings, 'DEBUG', False):
+                    logger.info('[DEV FALLBACK OTP] %s -> %s (verification_id=%s)', clean_number, code, verification_id)
+                    print(f'[DEV FALLBACK OTP] Phone: {clean_number} | Code: {code} | Verification ID: {verification_id}')
+                    wa_dispatched = True
 
     # 2. Dispatch via Email if email is available
     email_dispatched = False

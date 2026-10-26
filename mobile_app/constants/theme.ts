@@ -38,8 +38,10 @@ export const ElixColors = {
   borderHairlineMedium: 'rgba(15, 23, 42, 0.14)',
   borderHairlineDark: 'rgba(255, 255, 255, 0.12)',
 
-  // --- Star Ratings ---
+  // --- Star Ratings & Gold Accents ---
   starGold: '#F59E0B',
+  gold: '#D97706',
+  goldLight: '#FEF3C7',
 };
 
 export const ElixTypography = {
@@ -67,6 +69,7 @@ export const ElixRadii = {
   lg: 16,
   xl: 24,
   pill: 9999,
+  full: 9999,
 };
 
 export const ElixShadows = {
