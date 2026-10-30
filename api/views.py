@@ -7,7 +7,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import Group, User
 from django.db import transaction
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
 from django.views.decorators.csrf import csrf_exempt
@@ -384,8 +384,21 @@ def auth_phone_request(request):
             return JsonResponse({'ok': False, 'error': 'Please enter a valid 10-digit Indian phone number.'}, status=400)
 
         user = get_adapter().get_user_by_phone(phone)
+        if not user and phone:
+            digits = ''.join(c for c in str(phone) if c.isdigit())
+            if len(digits) >= 10:
+                user = User.objects.filter(profile__phone__endswith=digits[-10:]).first()
         if user and user.email:
             email = user.email
+
+    if not email:
+        if phone:
+            return JsonResponse({
+                'ok': False,
+                'not_found': True,
+                'error': 'No account found for this phone number. Please sign up or enter your registered email address.',
+            }, status=404)
+        return JsonResponse({'ok': False, 'error': 'Please enter a valid phone number or email address.'}, status=400)
 
     try:
         verification_id = whatsapp_otp.send_otp(phone=phone, email=email)
@@ -393,20 +406,12 @@ def auth_phone_request(request):
         logger.exception('send_otp failed for identifier=%s', raw_ident)
         return JsonResponse({'ok': False, 'error': "Couldn't send verification code. Please try again shortly."}, status=500)
 
-    # In local development mode, expose the dev_code in response for quick testing
-    dev_code = None
-    if getattr(settings, 'DEBUG', False):
-        cached = cache.get(f'{whatsapp_otp.CACHE_PREFIX}{verification_id}')
-        if cached:
-            dev_code = cached.get('code')
-
-    masked = _mask_phone_display(phone) if phone else _mask_email_display(email)
+    masked = _mask_email_display(email)
 
     return JsonResponse({
         'ok': True,
         'verification_id': verification_id,
         'masked_identifier': masked,
-        'dev_code': dev_code,
     })
 
 
@@ -440,6 +445,10 @@ def auth_phone_verify(request):
     user = None
     if phone:
         user = get_adapter().get_user_by_phone(phone)
+        if not user:
+            digits = ''.join(c for c in str(phone) if c.isdigit())
+            if len(digits) >= 10:
+                user = User.objects.filter(profile__phone__endswith=digits[-10:]).first()
     if not user and email:
         user = User.objects.filter(email__iexact=email, is_active=True).first()
 
@@ -480,6 +489,46 @@ def auth_logout(request):
     longer authenticate any further request."""
     AuthToken.objects.filter(user=request.user).delete()
     return JsonResponse({'ok': True})
+
+
+@require_http_methods(['GET'])
+def auth_social_callback(request):
+    """
+    GET /api/v1/auth/social-callback/
+    Dispatched when allauth finishes social OAuth (Google/Apple).
+    If the user authenticated successfully, generates an AuthToken and redirects
+    to return_url with token and user parameters.
+    """
+    from urllib.parse import urlencode, quote
+    return_url = request.GET.get('return_url') or 'http://localhost:8081/auth/callback'
+
+    if not request.user.is_authenticated:
+        sep = '&' if '?' in return_url else '?'
+        return redirect(f"{return_url}{sep}error=" + quote("Social authentication failed."))
+
+    token, _ = AuthToken.objects.get_or_create(user=request.user)
+    phone = ''
+    try:
+        if hasattr(request.user, 'profile') and request.user.profile.phone:
+            phone = request.user.profile.phone
+    except Exception:
+        pass
+
+    user_data = {
+        'id': request.user.id,
+        'email': request.user.email,
+        'first_name': request.user.first_name,
+        'last_name': request.user.last_name,
+        'phone': phone,
+    }
+
+    sep = '&' if '?' in return_url else '?'
+    params = urlencode({
+        'token': token.key,
+        'user': json.dumps(user_data),
+    })
+    return redirect(f"{return_url}{sep}{params}")
+
 
 
 @csrf_exempt
@@ -998,3 +1047,289 @@ def razorpay_verify(request):
         }, status=500)
 
     return JsonResponse({'ok': True, 'booking_number': booking.booking_number, 'payment_id': payment_id})
+
+
+# ---------------------------------------------------------------------------
+# Google Maps API Endpoints (Shared for Web & Mobile)
+# ---------------------------------------------------------------------------
+
+@require_http_methods(['GET'])
+def maps_reverse_geocode(request):
+    """
+    GET /api/v1/maps/reverse-geocode/?lat=...&lng=...
+    Uses Google Maps Geocoding API to resolve coordinates to formatted address,
+    pincode, locality, and city.
+    """
+    lat = request.GET.get('lat')
+    lng = request.GET.get('lng')
+    if not lat or not lng:
+        return JsonResponse({'ok': False, 'error': 'Latitude and longitude are required.'}, status=400)
+
+    api_key = getattr(settings, 'GOOGLE_MAPS_API_KEY', '')
+    if not api_key:
+        return JsonResponse({'ok': False, 'error': 'Google Maps API key is not configured.'}, status=500)
+
+    import urllib.request
+    import urllib.parse
+
+    url = f"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={api_key}"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'GlamourAtHome/1.0'})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+
+        status = data.get('status')
+        if status == 'OK' and data.get('results'):
+            first = data['results'][0]
+            formatted_address = first.get('formatted_address', '')
+            pincode = ''
+            locality = ''
+            for comp in first.get('address_components', []):
+                types = comp.get('types', [])
+                if 'postal_code' in types and not pincode:
+                    pincode = comp.get('long_name', '')
+                if ('locality' in types or 'sublocality' in types) and not locality:
+                    locality = comp.get('long_name', '')
+
+            return JsonResponse({
+                'ok': True,
+                'address': formatted_address,
+                'pincode': pincode,
+                'locality': locality,
+                'lat': float(lat),
+                'lng': float(lng),
+            })
+        else:
+            err_msg = data.get('error_message') or f"Google Maps returned status {status}"
+            return JsonResponse({'ok': False, 'status': status, 'error': err_msg}, status=400)
+    except Exception as exc:
+        logger.exception("Google Maps geocoding error")
+        return JsonResponse({'ok': False, 'error': f'Geocoding request failed: {str(exc)}'}, status=500)
+
+
+@require_http_methods(['GET'])
+def maps_places_autocomplete(request):
+    """
+    GET /api/v1/maps/places-autocomplete/?input=...
+    Uses Google Places API (New) with country:in restriction and legacy fallback.
+    """
+    query = request.GET.get('input', '').strip()
+    if not query:
+        return JsonResponse({'ok': True, 'predictions': []})
+
+    api_key = getattr(settings, 'GOOGLE_MAPS_API_KEY', '')
+    if not api_key:
+        return JsonResponse({'ok': False, 'error': 'Google Maps API key is not configured.'}, status=500)
+
+    import urllib.request
+    import urllib.parse
+
+    # 1. Try Google Places API (New)
+    try:
+        new_url = "https://places.googleapis.com/v1/places:autocomplete"
+        post_data = json.dumps({
+            "input": query,
+            "includedRegionCodes": ["in"]
+        }).encode('utf-8')
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': api_key,
+            'User-Agent': 'GlamourAtHome/1.0',
+        }
+        req = urllib.request.Request(new_url, data=post_data, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+
+        predictions = []
+        for s in data.get('suggestions', []):
+            pred = s.get('placePrediction', {})
+            place_id = pred.get('placeId') or pred.get('place', '').replace('places/', '')
+            structured = pred.get('structuredFormat', {})
+            main_text = structured.get('mainText', {}).get('text', '')
+            secondary_text = structured.get('secondaryText', {}).get('text', '')
+            full_text = pred.get('text', {}).get('text', '')
+
+            if place_id:
+                predictions.append({
+                    'place_id': place_id,
+                    'description': full_text or main_text,
+                    'main_text': main_text or full_text,
+                    'secondary_text': secondary_text,
+                })
+
+        return JsonResponse({'ok': True, 'predictions': predictions, 'status': 'OK'})
+    except Exception as exc:
+        logger.warning("Places API (New) autocomplete error, trying legacy fallback: %s", exc)
+
+    # 2. Legacy Places Autocomplete fallback
+    try:
+        encoded = urllib.parse.quote(query)
+        legacy_url = f"https://maps.googleapis.com/maps/api/place/autocomplete/json?input={encoded}&components=country:in&key={api_key}"
+        req = urllib.request.Request(legacy_url, headers={'User-Agent': 'GlamourAtHome/1.0'})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+
+        predictions = []
+        for p in data.get('predictions', []):
+            predictions.append({
+                'place_id': p.get('place_id'),
+                'description': p.get('description'),
+                'main_text': p.get('structured_formatting', {}).get('main_text', ''),
+                'secondary_text': p.get('structured_formatting', {}).get('secondary_text', ''),
+            })
+        return JsonResponse({'ok': True, 'predictions': predictions, 'status': data.get('status')})
+    except Exception as exc:
+        logger.exception("Google Places autocomplete error")
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=500)
+
+
+@require_http_methods(['GET'])
+def maps_place_details(request):
+    """
+    GET /api/v1/maps/place-details/?place_id=...
+    Resolves place_id to lat, lng, formatted_address, and pincode using Places API (New) / Legacy.
+    """
+    place_id = request.GET.get('place_id', '').strip()
+    if not place_id:
+        return JsonResponse({'ok': False, 'error': 'place_id is required.'}, status=400)
+
+    api_key = getattr(settings, 'GOOGLE_MAPS_API_KEY', '')
+    if not api_key:
+        return JsonResponse({'ok': False, 'error': 'Google Maps API key is not configured.'}, status=500)
+
+    import urllib.request
+    import urllib.parse
+    import re
+
+    # 1. Try Google Places API (New) details
+    try:
+        clean_id = place_id.replace('places/', '')
+        new_url = f"https://places.googleapis.com/v1/places/{clean_id}?fields=id,displayName,formattedAddress,location&key={api_key}"
+        headers = {'User-Agent': 'GlamourAtHome/1.0'}
+        req = urllib.request.Request(new_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+
+        formatted_address = data.get('formattedAddress', '')
+        loc = data.get('location', {})
+        lat = loc.get('latitude')
+        lng = loc.get('longitude')
+
+        pincode = ''
+        pin_match = re.search(r'\b(4\d{5})\b', formatted_address)
+        if pin_match:
+            pincode = pin_match.group(1)
+
+        if formatted_address and lat is not None and lng is not None:
+            return JsonResponse({
+                'ok': True,
+                'address': formatted_address,
+                'pincode': pincode,
+                'lat': lat,
+                'lng': lng,
+            })
+    except Exception as exc:
+        logger.warning("Places API (New) details failed, trying legacy fallback: %s", exc)
+
+    # 2. Legacy Places Details fallback
+    try:
+        encoded_id = urllib.parse.quote(place_id)
+        legacy_url = f"https://maps.googleapis.com/maps/api/place/details/json?place_id={encoded_id}&fields=formatted_address,geometry,address_components&key={api_key}"
+        req = urllib.request.Request(legacy_url, headers={'User-Agent': 'GlamourAtHome/1.0'})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+
+        result = data.get('result', {})
+        loc = result.get('geometry', {}).get('location', {})
+        pincode = ''
+        for comp in result.get('address_components', []):
+            if 'postal_code' in comp.get('types', []):
+                pincode = comp.get('long_name', '')
+                break
+
+        return JsonResponse({
+            'ok': True,
+            'address': result.get('formatted_address', ''),
+            'pincode': pincode,
+            'lat': loc.get('lat'),
+            'lng': loc.get('lng'),
+        })
+    except Exception as exc:
+        logger.exception("Google Places details error")
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=500)
+
+
+@require_http_methods(['GET'])
+def maps_search_nearby(request):
+    """
+    GET /api/v1/maps/nearby/?lat=...&lng=...&radius=...
+    Searches nearby places, landmarks, and localities around given coordinates using
+    Google Places API (New) searchNearby.
+    """
+    lat = request.GET.get('lat')
+    lng = request.GET.get('lng')
+    radius = float(request.GET.get('radius') or 2000.0)
+
+    try:
+        lat = float(lat) if lat else 22.7196
+        lng = float(lng) if lng else 75.8577
+    except (TypeError, ValueError):
+        lat, lng = 22.7196, 75.8577
+
+    api_key = getattr(settings, 'GOOGLE_MAPS_API_KEY', '')
+    if not api_key:
+        return JsonResponse({'ok': False, 'error': 'Google Maps API key is not configured.'}, status=500)
+
+    import urllib.request
+    import re
+
+    try:
+        url = "https://places.googleapis.com/v1/places:searchNearby"
+        post_data = json.dumps({
+            "locationRestriction": {
+                "circle": {
+                    "center": {
+                        "latitude": lat,
+                        "longitude": lng,
+                    },
+                    "radius": min(max(radius, 500.0), 10000.0)
+                }
+            },
+            "maxResultCount": 10
+        }).encode('utf-8')
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': api_key,
+            'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.types',
+            'User-Agent': 'GlamourAtHome/1.0',
+        }
+        req = urllib.request.Request(url, data=post_data, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+
+        places = []
+        for p in data.get('places', []):
+            name = p.get('displayName', {}).get('text', '')
+            addr = p.get('formattedAddress', '')
+            loc = p.get('location', {})
+            types = p.get('types', [])
+            pincode = ''
+            pin_match = re.search(r'\b(4\d{5})\b', addr)
+            if pin_match:
+                pincode = pin_match.group(1)
+
+            if name:
+                places.append({
+                    'name': name,
+                    'address': addr or name,
+                    'pincode': pincode,
+                    'lat': loc.get('latitude'),
+                    'lng': loc.get('longitude'),
+                    'types': types,
+                })
+
+        return JsonResponse({'ok': True, 'places': places})
+    except Exception as exc:
+        logger.exception("Google Places searchNearby error")
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=500)
+

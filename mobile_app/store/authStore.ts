@@ -13,15 +13,15 @@ import type { User } from '../types/api';
 const storage = {
   async getItem(key: string): Promise<string | null> {
     if (Platform.OS === 'web') return localStorage.getItem(key);
-    return storage.getItem(key);
+    return SecureStore.getItemAsync(key);
   },
   async setItem(key: string, value: string): Promise<void> {
     if (Platform.OS === 'web') { localStorage.setItem(key, value); return; }
-    return storage.setItem(key, value);
+    return SecureStore.setItemAsync(key, value);
   },
   async deleteItem(key: string): Promise<void> {
     if (Platform.OS === 'web') { localStorage.removeItem(key); return; }
-    return storage.deleteItem(key);
+    return SecureStore.deleteItemAsync(key);
   },
 };
 
@@ -56,6 +56,7 @@ interface AuthState {
   }>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
+  setSession: (token: string, user: User) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -166,8 +167,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // Even if the server request fails, wipe local state
     }
-    await storage.deleteItem('auth_token');
-    await storage.deleteItem('auth_user');
+    try {
+      await storage.deleteItem('auth_token');
+      await storage.deleteItem('auth_user');
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+      }
+    } catch {}
     set({ token: null, user: null, isLoggedIn: false });
+  },
+
+  /** Store session directly (e.g. after Google OAuth callback) */
+  setSession: async (token: string, user: User) => {
+    try {
+      await storage.setItem('auth_token', token);
+      await storage.setItem('auth_user', JSON.stringify(user));
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('auth_user', JSON.stringify(user));
+      }
+    } catch {}
+    set({ token, user, isLoggedIn: true, isLoading: false });
   },
 }));

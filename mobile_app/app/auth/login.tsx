@@ -5,19 +5,24 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { ElixColors, ElixRadii, ElixTypography, ElixShadows } from '@/constants/theme';
+import { ElixColors, ElixRadii, ElixShadows } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
+import { initiateSocialSignIn } from '@/lib/socialAuth';
+import { BottomNav } from '@/components/ui/BottomNav';
 
 export default function LoginScreen() {
+  // ── Tab Switcher State ─────────────────────────────────────────────────────
+  const [authMode, setAuthMode] = useState<'otp' | 'password'>('otp');
+
   // ── OTP State (First Priority) ─────────────────────────────────────────────
   const [otpStep, setOtpStep] = useState<'request' | 'verify'>('request');
   const [phoneOrEmail, setPhoneOrEmail] = useState('');
@@ -25,22 +30,20 @@ export default function LoginScreen() {
   const [maskedTarget, setMaskedTarget] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [countdown, setCountdown] = useState(60);
-  const [devCode, setDevCode] = useState<string | null>(null);
 
   // ── Password State (Secondary Method) ──────────────────────────────────────
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
-  // Focus & UI error states
+  // Focus & error states
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const { login, requestPhoneOtp, verifyPhoneOtp, isLoading } = useAuthStore();
 
-  // Countdown timer for resend OTP
+  // Resend cooldown timer
   useEffect(() => {
     let timer: any;
     if (otpStep === 'verify' && countdown > 0) {
@@ -49,12 +52,12 @@ export default function LoginScreen() {
     return () => clearInterval(timer);
   }, [otpStep, countdown]);
 
-  // ── OTP HANDLERS ───────────────────────────────────────────────────────────
+  // ── 1. SEND OTP ────────────────────────────────────────────────────────────
   async function handleSendOtp() {
     setError('');
     const target = phoneOrEmail.trim();
     if (!target) {
-      setError('Please enter your 10-digit phone number or email address.');
+      setError('Please enter your phone number or email address.');
       return;
     }
 
@@ -62,10 +65,7 @@ export default function LoginScreen() {
     if (res.ok && res.verification_id) {
       setVerificationId(res.verification_id);
       setMaskedTarget(res.masked_identifier || target);
-      if (res.dev_code) {
-        setDevCode(res.dev_code);
-        setOtpCode(res.dev_code); // Pre-fill in dev mode for instant friction-free testing
-      }
+      setOtpCode('');
       setOtpStep('verify');
       setCountdown(60);
     } else {
@@ -73,6 +73,7 @@ export default function LoginScreen() {
     }
   }
 
+  // ── 2. VERIFY OTP ──────────────────────────────────────────────────────────
   async function handleVerifyOtp() {
     setError('');
     const code = otpCode.trim();
@@ -87,38 +88,33 @@ export default function LoginScreen() {
     } else if (res.not_found) {
       Alert.alert(
         'Account Not Found',
-        'No existing account was found for this phone/email. Would you like to create a new account?',
+        'No existing account was found for this phone or email. Please sign up first.',
         [
           { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Sign Up',
-            onPress: () => router.push('/auth/signup'),
-          },
+          { text: 'Sign Up', onPress: () => router.push('/auth/signup') },
         ]
       );
     } else {
-      setError(res.error || 'Incorrect code. Please try again.');
+      setError(res.error || 'Incorrect or expired verification code.');
     }
   }
 
+  // ── 3. RESEND OTP ──────────────────────────────────────────────────────────
   async function handleResendOtp() {
     if (countdown > 0) return;
     setError('');
     const res = await requestPhoneOtp(phoneOrEmail.trim());
     if (res.ok && res.verification_id) {
       setVerificationId(res.verification_id);
-      if (res.dev_code) {
-        setDevCode(res.dev_code);
-        setOtpCode(res.dev_code);
-      }
+      setOtpCode('');
       setCountdown(60);
-      Alert.alert('Code Sent', 'A new verification code has been dispatched.');
+      Alert.alert('Code Sent', 'A new verification code has been dispatched to your WhatsApp and Email.');
     } else {
       setError(res.error || 'Failed to resend code.');
     }
   }
 
-  // ── PASSWORD HANDLER ───────────────────────────────────────────────────────
+  // ── 4. PASSWORD LOGIN ──────────────────────────────────────────────────────
   async function handlePasswordLogin() {
     setError('');
     if (!identifier.trim()) {
@@ -137,11 +133,12 @@ export default function LoginScreen() {
     }
   }
 
-  function handleThirdPartyNotice(provider: string) {
-    Alert.alert(
-      provider,
-      `${provider} authentication will launch your browser session. For quick testing, use the OTP login above.`
-    );
+  async function handleGoogleLogin() {
+    await initiateSocialSignIn('google');
+  }
+
+  async function handleAppleLogin() {
+    await initiateSocialSignIn('apple');
   }
 
   return (
@@ -155,225 +152,277 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Brand Logo Header */}
+        {/* Brand Logo Header with luxury badge */}
         <TouchableOpacity
-          style={styles.logoRow}
+          style={styles.logoWrap}
           onPress={() => router.replace('/(tabs)')}
           activeOpacity={0.8}
         >
           <Text style={styles.brandLogo}>
-            Elix<Text style={styles.brandLogoAccent}>.</Text>
+            <Text style={styles.brandLogoAccent}>E</Text>lix
           </Text>
+          <Text style={styles.brandTagline}>LUXURY SALON & SPA AT HOME</Text>
         </TouchableOpacity>
 
         {/* Auth Card */}
         <View style={styles.card}>
-          {/* Header */}
+          {/* Card Header */}
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Sign In</Text>
+            <Text style={styles.cardTitle}>
+              {otpStep === 'verify' ? 'Verification Code' : 'Welcome Back'}
+            </Text>
             <Text style={styles.cardSubtitle}>
-              If you have not created an account yet, then please{' '}
-              <Text
-                style={styles.inlineLink}
-                onPress={() => router.push('/auth/signup')}
-              >
-                sign up
-              </Text>{' '}
-              first.
+              {otpStep === 'verify' ? (
+                <>
+                  We sent a 6-digit code to{' '}
+                  <Text style={styles.boldText}>{maskedTarget}</Text>
+                </>
+              ) : (
+                'Sign in to book your beauty session'
+              )}
             </Text>
           </View>
 
           {/* Alert error box */}
           {error ? (
             <View style={styles.alertBox}>
-              <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />
+              <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
               <Text style={styles.alertText}>{error}</Text>
             </View>
           ) : null}
 
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          {/* ── 1. FIRST PRIORITY: SIGN IN WITH OTP (WHATSAPP / SMS) ─────────── */}
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          <View style={styles.otpSection}>
-            <View style={styles.priorityBadgeRow}>
-              <View style={styles.priorityBadge}>
-                <Ionicons name="flash" size={12} color="#D97706" />
-                <Text style={styles.priorityBadgeText}>RECOMMENDED • FASTEST</Text>
-              </View>
-            </View>
-
-            {otpStep === 'request' ? (
-              // Step 1: Request OTP
-              <View>
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>PHONE NUMBER OR EMAIL (OTP):</Text>
-                  <View
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* ── SEGMENTED TAB SWITCHER (Quick OTP vs Password) ───────────── */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {otpStep === 'request' && (
+            <View style={styles.segmentContainer}>
+              <TouchableOpacity
+                style={[styles.segmentBtn, authMode === 'otp' && styles.segmentBtnActive]}
+                onPress={() => {
+                  setAuthMode('otp');
+                  setError('');
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons
+                  name="flash"
+                  size={14}
+                  color={authMode === 'otp' ? ElixColors.blue : ElixColors.inkMuted}
+                  style={{ marginRight: 5 }}
+                />
+                <Text
+                  style={[
+                    styles.segmentText,
+                    authMode === 'otp' && styles.segmentTextActive,
+                  ]}
+                >
+                  Quick OTP
+                </Text>
+                <View
+                  style={[
+                    styles.recomBadge,
+                    authMode === 'otp' && styles.recomBadgeActive,
+                  ]}
+                >
+                  <Text
                     style={[
-                      styles.inputContainer,
-                      focusedField === 'phoneOrEmail' && styles.inputFocused,
+                      styles.recomBadgeText,
+                      authMode === 'otp' && styles.recomBadgeTextActive,
                     ]}
                   >
-                    <Ionicons
-                      name="phone-portrait-outline"
-                      size={18}
-                      color={ElixColors.inkMuted}
-                      style={{ marginRight: 8 }}
-                    />
-                    <TextInput
-                      style={styles.input}
-                      value={phoneOrEmail}
-                      onChangeText={setPhoneOrEmail}
-                      placeholder="9876543210 or name@example.com"
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      onFocus={() => setFocusedField('phoneOrEmail')}
-                      onBlur={() => setFocusedField(null)}
-                      returnKeyType="done"
-                      onSubmitEditing={handleSendOtp}
-                      editable={!isLoading}
-                    />
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.submitBtn, isLoading && styles.submitBtnDisabled]}
-                  onPress={handleSendOtp}
-                  disabled={isLoading}
-                  activeOpacity={0.85}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator color="#16120F" size="small" />
-                  ) : (
-                    <View style={styles.btnContentRow}>
-                      <Ionicons name="chatbubble-ellipses-outline" size={18} color="#16120F" />
-                      <Text style={styles.submitBtnText}>Send Verification Code</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </View>
-            ) : (
-              // Step 2: Verify OTP
-              <View>
-                <View style={styles.sentNoticeBox}>
-                  <Ionicons name="checkmark-circle-outline" size={18} color="#059669" />
-                  <Text style={styles.sentNoticeText}>
-                    Code sent to <Text style={{ fontWeight: '700' }}>{maskedTarget}</Text>
+                    Recommended
                   </Text>
                 </View>
+              </TouchableOpacity>
 
-                {devCode ? (
-                  <View style={styles.devBanner}>
-                    <Text style={styles.devBannerText}>
-                      Demo/Dev Code: <Text style={{ fontWeight: '800' }}>{devCode}</Text>
-                    </Text>
-                  </View>
-                ) : null}
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>ENTER 6-DIGIT CODE:</Text>
-                  <View
-                    style={[
-                      styles.inputContainer,
-                      focusedField === 'otpCode' && styles.inputFocused,
-                    ]}
-                  >
-                    <TextInput
-                      style={[styles.input, styles.otpInput]}
-                      value={otpCode}
-                      onChangeText={setOtpCode}
-                      placeholder="••••••"
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="number-pad"
-                      maxLength={6}
-                      onFocus={() => setFocusedField('otpCode')}
-                      onBlur={() => setFocusedField(null)}
-                      returnKeyType="done"
-                      onSubmitEditing={handleVerifyOtp}
-                      editable={!isLoading}
-                    />
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.submitBtn, isLoading && styles.submitBtnDisabled]}
-                  onPress={handleVerifyOtp}
-                  disabled={isLoading}
-                  activeOpacity={0.85}
+              <TouchableOpacity
+                style={[
+                  styles.segmentBtn,
+                  authMode === 'password' && styles.segmentBtnActive,
+                ]}
+                onPress={() => {
+                  setAuthMode('password');
+                  setError('');
+                }}
+                activeOpacity={0.85}
+              >
+                <Ionicons
+                  name="key-outline"
+                  size={14}
+                  color={authMode === 'password' ? ElixColors.blue : ElixColors.inkMuted}
+                  style={{ marginRight: 5 }}
+                />
+                <Text
+                  style={[
+                    styles.segmentText,
+                    authMode === 'password' && styles.segmentTextActive,
+                  ]}
                 >
-                  {isLoading ? (
-                    <ActivityIndicator color="#16120F" size="small" />
-                  ) : (
-                    <Text style={styles.submitBtnText}>Verify & Sign In</Text>
-                  )}
-                </TouchableOpacity>
+                  Password
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-                <View style={styles.otpActionRow}>
-                  <TouchableOpacity
-                    onPress={handleResendOtp}
-                    disabled={countdown > 0}
-                  >
-                    <Text
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* ── TAB 1: OTP FLOW ───────────────────────────────────────────── */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {authMode === 'otp' && (
+            <>
+              {otpStep === 'request' ? (
+                <View style={styles.formSection}>
+                  <View style={styles.authGroup}>
+                    <Text style={styles.fieldLabel}>Phone Number or Email</Text>
+                    <View
                       style={[
-                        styles.resendText,
-                        countdown > 0 && styles.resendTextDisabled,
+                        styles.inputContainer,
+                        focusedField === 'phoneOrEmail' && styles.inputFocused,
                       ]}
                     >
-                      {countdown > 0 ? `Resend code in ${countdown}s` : 'Resend code'}
+                      <Ionicons
+                        name={phoneOrEmail.includes('@') ? 'mail-outline' : 'call-outline'}
+                        size={18}
+                        color={focusedField === 'phoneOrEmail' ? ElixColors.blue : ElixColors.inkMuted}
+                        style={styles.inputLeadingIcon}
+                      />
+                      <TextInput
+                        style={styles.textInput}
+                        value={phoneOrEmail}
+                        onChangeText={setPhoneOrEmail}
+                        placeholder="9876543210 or name@example.com"
+                        placeholderTextColor={ElixColors.inkMuted}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        onFocus={() => setFocusedField('phoneOrEmail')}
+                        onBlur={() => setFocusedField(null)}
+                        returnKeyType="done"
+                        onSubmitEditing={handleSendOtp}
+                        editable={!isLoading}
+                      />
+                    </View>
+                    <Text style={styles.helperText}>
+                      We'll send a 6-digit code via WhatsApp & Email
                     </Text>
-                  </TouchableOpacity>
+                  </View>
 
                   <TouchableOpacity
-                    onPress={() => {
-                      setOtpStep('request');
-                      setOtpCode('');
-                      setError('');
-                    }}
+                    style={[styles.primaryBtn, isLoading && styles.btnDisabled]}
+                    onPress={handleSendOtp}
+                    disabled={isLoading}
+                    activeOpacity={0.88}
                   >
-                    <Text style={styles.changeTargetText}>Change number</Text>
+                    {isLoading ? (
+                      <ActivityIndicator color={ElixColors.white} size="small" />
+                    ) : (
+                      <View style={styles.btnRow}>
+                        <Ionicons
+                          name="paper-plane-outline"
+                          size={17}
+                          color={ElixColors.white}
+                          style={{ marginRight: 8 }}
+                        />
+                        <Text style={styles.primaryBtnText}>Get Verification Code</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 </View>
-              </View>
-            )}
-          </View>
+              ) : (
+                <View style={styles.formSection}>
+                  <View style={styles.authGroup}>
+                    <Text style={styles.fieldLabel}>6-Digit Code</Text>
+                    <View
+                      style={[
+                        styles.inputContainer,
+                        styles.otpInputContainer,
+                        focusedField === 'otpCode' && styles.inputFocused,
+                      ]}
+                    >
+                      <TextInput
+                        style={styles.otpTextInput}
+                        value={otpCode}
+                        onChangeText={setOtpCode}
+                        placeholder="••••••"
+                        placeholderTextColor={ElixColors.inkMuted}
+                        keyboardType="number-pad"
+                        maxLength={6}
+                        onFocus={() => setFocusedField('otpCode')}
+                        onBlur={() => setFocusedField(null)}
+                        returnKeyType="done"
+                        onSubmitEditing={handleVerifyOtp}
+                        editable={!isLoading}
+                        autoFocus
+                      />
+                    </View>
+                  </View>
 
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          {/* ── 2. SECONDARY: SIGN IN WITH PASSWORD ─────────────────────────── */}
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          <View style={styles.dividerWrap}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR SIGN IN WITH PASSWORD</Text>
-            <View style={styles.dividerLine} />
-          </View>
+                  <TouchableOpacity
+                    style={[styles.primaryBtn, isLoading && styles.btnDisabled]}
+                    onPress={handleVerifyOtp}
+                    disabled={isLoading}
+                    activeOpacity={0.88}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color={ElixColors.white} size="small" />
+                    ) : (
+                      <Text style={styles.primaryBtnText}>Confirm & Sign In</Text>
+                    )}
+                  </TouchableOpacity>
 
-          {!showPasswordForm ? (
-            <TouchableOpacity
-              style={styles.togglePasswordBtn}
-              onPress={() => setShowPasswordForm(true)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="key-outline" size={18} color={ElixColors.ink} />
-              <Text style={styles.togglePasswordText}>Use Username & Password</Text>
-              <Ionicons name="chevron-down" size={16} color={ElixColors.inkMuted} />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.passwordForm}>
-              {/* USERNAME OR EMAIL */}
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>USERNAME OR EMAIL:</Text>
+                  <View style={styles.resendWrapper}>
+                    <TouchableOpacity
+                      onPress={handleResendOtp}
+                      disabled={countdown > 0}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.inlineLink, countdown > 0 && styles.linkMuted]}>
+                        {countdown > 0 ? `Resend code in ${countdown}s` : 'Resend code'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        setOtpStep('request');
+                        setOtpCode('');
+                        setError('');
+                      }}
+                      activeOpacity={0.7}
+                      style={{ marginTop: 10 }}
+                    >
+                      <Text style={styles.changeTargetLink}>← Change phone or email</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* ── TAB 2: PASSWORD FLOW ──────────────────────────────────────── */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {authMode === 'password' && otpStep === 'request' && (
+            <View style={styles.formSection}>
+              {/* Username or Email */}
+              <View style={styles.authGroup}>
+                <Text style={styles.fieldLabel}>Username or Email</Text>
                 <View
                   style={[
                     styles.inputContainer,
                     focusedField === 'identifier' && styles.inputFocused,
                   ]}
                 >
+                  <Ionicons
+                    name="person-outline"
+                    size={18}
+                    color={focusedField === 'identifier' ? ElixColors.blue : ElixColors.inkMuted}
+                    style={styles.inputLeadingIcon}
+                  />
                   <TextInput
-                    style={styles.input}
+                    style={styles.textInput}
                     value={identifier}
                     onChangeText={setIdentifier}
-                    placeholder="Username or email address"
-                    placeholderTextColor="#94A3B8"
+                    placeholder="Enter your username or email"
+                    placeholderTextColor={ElixColors.inkMuted}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -385,15 +434,15 @@ export default function LoginScreen() {
                 </View>
               </View>
 
-              {/* PASSWORD WITH SHOW/HIDE TOGGLE */}
-              <View style={styles.fieldGroup}>
-                <View style={styles.labelRow}>
-                  <Text style={styles.fieldLabel}>PASSWORD:</Text>
+              {/* Password */}
+              <View style={styles.authGroup}>
+                <View style={styles.authLabelRow}>
+                  <Text style={styles.fieldLabel}>Password</Text>
                   <TouchableOpacity
                     onPress={() =>
                       Alert.alert(
                         'Forgot Password',
-                        'You can log in instantly above using WhatsApp / SMS OTP without entering your password.'
+                        'You can switch to the "Quick OTP" tab above to sign in instantly without needing your password.'
                       )
                     }
                     hitSlop={6}
@@ -408,12 +457,18 @@ export default function LoginScreen() {
                     focusedField === 'password' && styles.inputFocused,
                   ]}
                 >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={18}
+                    color={focusedField === 'password' ? ElixColors.blue : ElixColors.inkMuted}
+                    style={styles.inputLeadingIcon}
+                  />
                   <TextInput
-                    style={styles.input}
+                    style={styles.textInput}
                     value={password}
                     onChangeText={setPassword}
-                    placeholder="Password"
-                    placeholderTextColor="#94A3B8"
+                    placeholder="Enter your password"
+                    placeholderTextColor={ElixColors.inkMuted}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -424,89 +479,108 @@ export default function LoginScreen() {
                     editable={!isLoading}
                   />
                   <TouchableOpacity
-                    style={styles.toggleBtn}
+                    style={styles.passwordToggle}
                     onPress={() => setShowPassword((prev) => !prev)}
-                    hitSlop={10}
-                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                    hitSlop={8}
                   >
                     <Ionicons
                       name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                      size={20}
+                      size={19}
                       color={ElixColors.inkMuted}
                     />
                   </TouchableOpacity>
                 </View>
               </View>
 
-              {/* REMEMBER ME */}
+              {/* Remember Me */}
               <TouchableOpacity
                 style={styles.rememberRow}
                 onPress={() => setRememberMe((v) => !v)}
                 activeOpacity={0.8}
               >
-                <View
-                  style={[
-                    styles.checkbox,
-                    rememberMe && styles.checkboxActive,
-                  ]}
-                >
-                  {rememberMe && (
-                    <Ionicons name="checkmark" size={13} color="#FFFFFF" />
-                  )}
+                <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
+                  {rememberMe && <Ionicons name="checkmark" size={13} color={ElixColors.white} />}
                 </View>
                 <Text style={styles.rememberText}>Remember Me</Text>
               </TouchableOpacity>
 
-              {/* SUBMIT BUTTON */}
+              {/* Submit Button */}
               <TouchableOpacity
-                style={[styles.secondarySubmitBtn, isLoading && styles.submitBtnDisabled]}
+                style={[styles.primaryBtn, isLoading && styles.btnDisabled]}
                 onPress={handlePasswordLogin}
                 disabled={isLoading}
-                activeOpacity={0.85}
+                activeOpacity={0.88}
               >
                 {isLoading ? (
-                  <ActivityIndicator color={ElixColors.ink} size="small" />
+                  <ActivityIndicator color={ElixColors.white} size="small" />
                 ) : (
-                  <Text style={styles.secondarySubmitBtnText}>Sign In with Password</Text>
+                  <Text style={styles.primaryBtnText}>Sign In with Password</Text>
                 )}
               </TouchableOpacity>
             </View>
           )}
 
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          {/* ── 3. SOCIAL LOGINS (GOOGLE / APPLE) ───────────────────────────── */}
-          {/* ═══════════════════════════════════════════════════════════════════ */}
-          <View style={styles.dividerWrap}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR SIGN IN WITH</Text>
-            <View style={styles.dividerLine} />
-          </View>
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* ── SOCIAL LOGINS (Compact Side-by-Side) ──────────────────────── */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {otpStep === 'request' && (
+            <>
+              <View style={styles.tierDivider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
+                <View style={styles.dividerLine} />
+              </View>
 
-          <View style={styles.socialList}>
-            {/* GOOGLE */}
-            <TouchableOpacity
-              style={styles.socialBtn}
-              onPress={() => handleThirdPartyNotice('Google')}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="logo-google" size={18} color="#EA4335" />
-              <Text style={styles.socialBtnText}>Continue with Google</Text>
-            </TouchableOpacity>
+              <View style={styles.socialRow}>
+                {/* GOOGLE */}
+                <TouchableOpacity
+                  style={styles.socialPillBtn}
+                  onPress={handleGoogleLogin}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="logo-google" size={17} color="#EA4335" />
+                  <Text style={styles.socialPillText}>Google</Text>
+                </TouchableOpacity>
 
-            {/* APPLE */}
-            <TouchableOpacity
-              style={styles.socialBtn}
-              onPress={() => handleThirdPartyNotice('Apple')}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="logo-apple" size={19} color={ElixColors.ink} />
-              <Text style={styles.socialBtnText}>Continue with Apple</Text>
-            </TouchableOpacity>
+                {/* APPLE */}
+                <TouchableOpacity
+                  style={styles.socialPillBtn}
+                  onPress={handleAppleLogin}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="logo-apple" size={18} color={ElixColors.ink} />
+                  <Text style={styles.socialPillText}>Apple</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {/* Footer Signup Link */}
+          <View style={styles.cardFooter}>
+            <Text style={styles.cardFooterText}>
+              Don't have an account?{' '}
+              <Text
+                style={styles.footerLink}
+                onPress={() => router.push('/auth/signup')}
+              >
+                Sign up
+              </Text>
+            </Text>
           </View>
         </View>
 
+        {/* Back to Home Link */}
+        <TouchableOpacity
+          style={styles.backLinkWrap}
+          onPress={() => router.replace('/(tabs)')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backLinkText}>← Back to Elix</Text>
+        </TouchableOpacity>
+
         <View style={{ height: 32 }} />
       </ScrollView>
+      <BottomNav activeTab="profile" />
     </KeyboardAvoidingView>
   );
 }
@@ -514,69 +588,89 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: ElixColors.surface1,
+    backgroundColor: ElixColors.surface1, // #F8FAFC
   },
   scroll: {
     flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 48,
+    paddingHorizontal: 16,
+    paddingTop: 36,
     paddingBottom: 40,
     alignItems: 'center',
   },
-  logoRow: {
-    marginBottom: 24,
+
+  // Shell Logo
+  logoWrap: {
+    marginBottom: 20,
     alignItems: 'center',
   },
   brandLogo: {
-    fontSize: 32,
-    fontWeight: ElixTypography.weights.bold,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    fontSize: 30,
+    fontWeight: '700',
     color: ElixColors.ink,
     letterSpacing: -0.5,
   },
   brandLogoAccent: {
-    color: ElixColors.gold,
+    color: ElixColors.blue, // #4F46E5
+    fontStyle: 'italic',
+  },
+  brandTagline: {
+    marginTop: 4,
+    fontSize: 10,
+    fontWeight: '700',
+    color: ElixColors.inkMuted,
+    letterSpacing: 1.5,
   },
 
   // Auth Card
   card: {
     width: '100%',
-    maxWidth: 440,
-    backgroundColor: ElixColors.white,
-    borderRadius: ElixRadii.xl,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
+    maxWidth: 420,
+    backgroundColor: ElixColors.surface2, // #FFFFFF
+    borderRadius: 24,
+    paddingHorizontal: 22,
+    paddingVertical: 24,
     borderWidth: 1,
     borderColor: ElixColors.borderHairline,
-    ...ElixShadows.sm,
+    ...ElixShadows.md,
   },
   cardHeader: {
     marginBottom: 16,
   },
   cardTitle: {
-    fontSize: 28,
-    fontWeight: ElixTypography.weights.bold,
+    fontSize: 24,
+    fontWeight: '700',
     color: ElixColors.ink,
-    marginBottom: 6,
+    lineHeight: 30,
+    marginBottom: 4,
   },
   cardSubtitle: {
     fontSize: 14,
     color: ElixColors.inkMuted,
     lineHeight: 20,
   },
+  boldText: {
+    color: ElixColors.ink,
+    fontWeight: '600',
+  },
   inlineLink: {
-    color: ElixColors.gold,
-    fontWeight: ElixTypography.weights.bold,
+    color: ElixColors.blue,
+    fontWeight: '600',
     textDecorationLine: 'underline',
   },
+  linkMuted: {
+    color: ElixColors.inkMuted,
+    textDecorationLine: 'none',
+  },
 
-  // Alert
+  // Alert Box
   alertBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
     borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: ElixRadii.md,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 16,
@@ -586,193 +680,144 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     color: '#DC2626',
-    fontWeight: ElixTypography.weights.medium,
+    fontWeight: '500',
   },
 
-  // OTP Priority Section
-  otpSection: {
-    marginBottom: 4,
-  },
-  priorityBadgeRow: {
+  // ── Segmented Switcher ──────────────────────────────────────────────────────
+  segmentContainer: {
     flexDirection: 'row',
-    marginBottom: 12,
-  },
-  priorityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: ElixRadii.full,
-    gap: 4,
-  },
-  priorityBadgeText: {
-    fontSize: 10,
-    fontWeight: ElixTypography.weights.bold,
-    color: '#92400E',
-    letterSpacing: 0.5,
-  },
-  sentNoticeBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#F1F5F9', // light slate fill
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
-    borderRadius: ElixRadii.md,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 14,
-    gap: 8,
+    borderColor: 'rgba(15, 23, 42, 0.06)',
   },
-  sentNoticeText: {
-    fontSize: 13,
-    color: '#065F46',
-  },
-  devBanner: {
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    borderRadius: ElixRadii.md,
-    padding: 8,
-    marginBottom: 12,
-  },
-  devBannerText: {
-    fontSize: 12,
-    color: '#1E40AF',
-  },
-  otpInput: {
-    fontSize: 22,
-    letterSpacing: 6,
-    textAlign: 'center',
-    fontWeight: ElixTypography.weights.bold,
-  },
-  otpActionRow: {
+  segmentBtn: {
+    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 14,
+    justifyContent: 'center',
+    height: 40,
+    borderRadius: 10,
   },
-  resendText: {
+  segmentBtnActive: {
+    backgroundColor: '#FFFFFF',
+    ...ElixShadows.sm,
+  },
+  segmentText: {
     fontSize: 13,
-    color: ElixColors.gold,
-    fontWeight: ElixTypography.weights.bold,
-  },
-  resendTextDisabled: {
+    fontWeight: '600',
     color: ElixColors.inkMuted,
-    fontWeight: ElixTypography.weights.medium,
   },
-  changeTargetText: {
-    fontSize: 13,
+  segmentTextActive: {
+    color: ElixColors.ink,
+    fontWeight: '700',
+  },
+  recomBadge: {
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: 'transparent',
+  },
+  recomBadgeActive: {
+    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+  },
+  recomBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
     color: ElixColors.inkMuted,
-    textDecorationLine: 'underline',
-  },
-
-  // Form Fields
-  fieldGroup: {
-    marginBottom: 14,
-  },
-  fieldLabel: {
-    fontSize: 11,
-    fontWeight: ElixTypography.weights.bold,
-    color: ElixColors.inkMuted,
-    letterSpacing: 0.8,
-    marginBottom: 6,
     textTransform: 'uppercase',
   },
-  labelRow: {
+  recomBadgeTextActive: {
+    color: ElixColors.blue,
+  },
+
+  // Form Section
+  formSection: {
+    width: '100%',
+  },
+  authGroup: {
+    marginBottom: 16,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: ElixColors.ink,
+    marginBottom: 7,
+  },
+  authLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 7,
   },
   forgotLink: {
     fontSize: 12,
-    color: ElixColors.gold,
-    fontWeight: ElixTypography.weights.semiBold,
+    color: ElixColors.blue,
+    fontWeight: '600',
   },
+  helperText: {
+    fontSize: 12,
+    color: ElixColors.inkMuted,
+    marginTop: 6,
+  },
+
+  // Input Container with leading icons
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 50,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: ElixColors.borderHairlineMedium,
-    borderRadius: ElixRadii.md,
-    backgroundColor: ElixColors.surface1,
+    borderRadius: 12,
+    backgroundColor: ElixColors.surface1, // #F8FAFC
     paddingHorizontal: 14,
   },
   inputFocused: {
-    borderColor: ElixColors.gold,
+    borderColor: ElixColors.blue,
     backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
   },
-  input: {
+  inputLeadingIcon: {
+    marginRight: 10,
+  },
+  textInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     color: ElixColors.ink,
     height: '100%',
   },
-  toggleBtn: {
+
+  // OTP specific input
+  otpInputContainer: {
+    height: 54,
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  otpTextInput: {
+    flex: 1,
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 8,
+    textAlign: 'center',
+    color: ElixColors.ink,
+  },
+  passwordToggle: {
     padding: 6,
   },
 
-  // Submit Buttons
-  submitBtn: {
-    height: 52,
-    backgroundColor: '#D97706', // Rich Gold
-    borderRadius: ElixRadii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#D97706',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  submitBtnDisabled: {
-    opacity: 0.7,
-  },
-  submitBtnText: {
-    color: '#16120F',
-    fontSize: 15,
-    fontWeight: ElixTypography.weights.bold,
-    letterSpacing: 0.2,
-  },
-  btnContentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-
-  // Secondary Password Form
-  togglePasswordBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 50,
-    borderRadius: ElixRadii.pill,
-    backgroundColor: ElixColors.surface1,
-    borderWidth: 1,
-    borderColor: ElixColors.borderHairlineMedium,
-    paddingHorizontal: 18,
-  },
-  togglePasswordText: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 14,
-    fontWeight: ElixTypography.weights.semiBold,
-    color: ElixColors.ink,
-  },
-  passwordForm: {
-    marginTop: 4,
-  },
+  // Remember Me
   rememberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
     gap: 8,
   },
   checkbox: {
-    width: 18,
-    height: 18,
+    width: 17,
+    height: 17,
     borderRadius: 4,
     borderWidth: 1.5,
     borderColor: ElixColors.borderHairlineMedium,
@@ -781,34 +826,58 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxActive: {
-    backgroundColor: ElixColors.gold,
-    borderColor: ElixColors.gold,
+    backgroundColor: ElixColors.blue,
+    borderColor: ElixColors.blue,
   },
   rememberText: {
     fontSize: 13,
-    fontWeight: ElixTypography.weights.medium,
+    fontWeight: '500',
     color: ElixColors.inkSoft,
   },
-  secondarySubmitBtn: {
+
+  // Primary Action Button
+  primaryBtn: {
     height: 50,
-    borderRadius: ElixRadii.pill,
-    backgroundColor: ElixColors.surface1,
-    borderWidth: 1,
-    borderColor: ElixColors.borderHairlineMedium,
+    backgroundColor: ElixColors.blue, // #4F46E5
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: ElixColors.blue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  secondarySubmitBtnText: {
-    fontSize: 14,
-    fontWeight: ElixTypography.weights.bold,
-    color: ElixColors.ink,
+  primaryBtnText: {
+    color: ElixColors.white,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
-
-  // Divider
-  dividerWrap: {
+  btnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+  },
+  btnDisabled: {
+    opacity: 0.7,
+  },
+
+  // Resend Wrapper
+  resendWrapper: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  changeTargetLink: {
+    fontSize: 13,
+    color: ElixColors.blue,
+    fontWeight: '600',
+  },
+
+  // Tier Divider
+  tierDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 18,
     gap: 10,
   },
   dividerLine: {
@@ -818,30 +887,61 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: 10,
-    fontWeight: ElixTypography.weights.bold,
+    fontWeight: '700',
     color: ElixColors.inkMuted,
     letterSpacing: 0.8,
   },
 
-  // Social
-  socialList: {
-    gap: 10,
+  // Compact Social Row (Side-by-side)
+  socialRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  socialBtn: {
+  socialPillBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 50,
-    borderRadius: ElixRadii.pill,
-    backgroundColor: ElixColors.surface1,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: ElixColors.borderHairlineMedium,
-    paddingHorizontal: 16,
-    gap: 10,
+    paddingHorizontal: 12,
+    gap: 8,
   },
-  socialBtnText: {
-    fontSize: 14,
-    fontWeight: ElixTypography.weights.semiBold,
+  socialPillText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: ElixColors.ink,
+  },
+
+  // Card Footer
+  cardFooter: {
+    alignItems: 'center',
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: ElixColors.borderHairline,
+  },
+  cardFooterText: {
+    fontSize: 13,
+    color: ElixColors.inkMuted,
+  },
+  footerLink: {
+    color: ElixColors.blue,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+
+  // Back to home
+  backLinkWrap: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  backLinkText: {
+    fontSize: 13,
+    color: ElixColors.inkMuted,
+    fontWeight: '500',
   },
 });

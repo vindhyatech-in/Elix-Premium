@@ -99,10 +99,17 @@ class AccountAdapter(DefaultAccountAdapter):
     def get_user_by_phone(self, phone):
         if not phone:
             return None
-        clean = phone.strip().replace(' ', '').replace('-', '')
+        import re
+        clean = str(phone).strip().replace(' ', '').replace('-', '')
         variants = {clean}
         if clean.startswith('+'):
             variants.add(clean[1:])
         else:
             variants.add(f'+{clean}')
+
+        digits = re.sub(r'\D', '', clean)
+        if len(digits) >= 10:
+            last10 = digits[-10:]
+            variants.update({last10, f'+91{last10}', f'91{last10}', f'0{last10}'})
+
         return User.objects.filter(profile__phone__in=variants).first()
