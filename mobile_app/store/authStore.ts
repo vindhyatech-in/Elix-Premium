@@ -13,7 +13,9 @@ import { useCartStore } from './cartStore';
  */
 const storage = {
   async getItem(key: string): Promise<string | null> {
-    if (Platform.OS === 'web') return localStorage.getItem(key);
+    if (Platform.OS === 'web') {
+      return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+    }
     try {
       return await SecureStore.getItemAsync(key);
     } catch {
@@ -21,13 +23,19 @@ const storage = {
     }
   },
   async setItem(key: string, value: string): Promise<void> {
-    if (Platform.OS === 'web') { localStorage.setItem(key, value); return; }
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
+      return;
+    }
     try {
       await SecureStore.setItemAsync(key, value);
     } catch {}
   },
   async deleteItem(key: string): Promise<void> {
-    if (Platform.OS === 'web') { localStorage.removeItem(key); return; }
+    if (Platform.OS === 'web') {
+      if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
+      return;
+    }
     try {
       await SecureStore.deleteItemAsync(key);
     } catch {}
@@ -65,6 +73,7 @@ interface AuthState {
   }>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
+  setSession: (token: string, user: User) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -187,8 +196,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Even if the server request fails, wipe local state
     }
     useCartStore.getState().onUserLogout();
-    await storage.deleteItem('auth_token');
-    await storage.deleteItem('auth_user');
+    try {
+      await storage.deleteItem('auth_token');
+      await storage.deleteItem('auth_user');
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+      }
+    } catch {}
     set({ token: null, user: null, isLoggedIn: false });
+  },
+
+  /** Store session directly (e.g. after Google OAuth callback) */
+  setSession: async (token: string, user: User) => {
+    try {
+      await storage.setItem('auth_token', token);
+      await storage.setItem('auth_user', JSON.stringify(user));
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('auth_user', JSON.stringify(user));
+      }
+    } catch {}
+    set({ token, user, isLoggedIn: true, isLoading: false });
+    // Merge guest cart with saved user cart
+    useCartStore.getState().onUserLogin(user.id);
   },
 }));
