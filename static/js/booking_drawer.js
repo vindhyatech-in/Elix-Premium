@@ -94,7 +94,6 @@
     let calendarMonth, calendarYear;
     let map, marker, geocoder;
     let pendingPin = null;
-    const useGoogleMaps = document.body.dataset.useGoogleMaps === 'true';
     let justConfirmed = false; // true from confirmBooking() until resetState() — see the cart-changed listener below
 
     const addressListEl = drawer.querySelector('[data-address-list]');
@@ -176,64 +175,102 @@
     });
     drawer.querySelector('[data-address-cancel]').addEventListener('click', () => { addressForm.hidden = true; });
 
-    const MAP_CENTER = { lat: 22.7196, lng: 75.8577 }; // Indore — the only city this service currently covers
+    const MAP_CENTER = { lat: 22.7196, lng: 75.8577 }; // Indore — primary service region
+    let placesAutocomplete = null;
 
     function initMap() {
       if (map) return;
-      if (useGoogleMaps) initGoogleMap(); else initLeafletMap();
+      initGoogleMap();
     }
 
     function initGoogleMap() {
-      if (typeof google === 'undefined' || !google.maps) return; // script blocked/unavailable — form still works without a map
+      const mapEl = document.getElementById('booking-map');
+      if (!mapEl || typeof google === 'undefined' || !google.maps) return;
 
-      map = new google.maps.Map(document.getElementById('booking-map'), {
-        center: MAP_CENTER, zoom: 12, streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
+      map = new google.maps.Map(mapEl, {
+        center: MAP_CENTER,
+        zoom: 13,
+        streetViewControl: false,
+        mapTypeControl: false,
+        fullscreenControl: false,
       });
       geocoder = new google.maps.Geocoder();
+
+      // Enable Google Places Autocomplete on the address input
+      const textInput = drawer.querySelector('[data-address-text]');
+      if (textInput && google.maps.places && google.maps.places.Autocomplete) {
+        placesAutocomplete = new google.maps.places.Autocomplete(textInput, {
+          componentRestrictions: { country: 'in' },
+          fields: ['address_components', 'geometry', 'formatted_address', 'name'],
+        });
+
+        placesAutocomplete.addListener('place_changed', () => {
+          const place = placesAutocomplete.getPlace();
+          if (!place.geometry || !place.geometry.location) return;
+
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          pendingPin = { lat, lng };
+
+          if (marker) {
+            marker.setPosition(place.geometry.location);
+          } else {
+            marker = new google.maps.Marker({
+              position: place.geometry.location,
+              map,
+              draggable: true,
+            });
+            attachMarkerDragListener();
+          }
+
+          map.setCenter(place.geometry.location);
+          map.setZoom(16);
+
+          const pincodeInput = drawer.querySelector('[data-address-pincode]');
+          if (pincodeInput && place.address_components) {
+            const postal = place.address_components.find((c) => c.types.includes('postal_code'));
+            if (postal) pincodeInput.value = postal.long_name;
+          }
+        });
+      }
+
+      function attachMarkerDragListener() {
+        if (!marker) return;
+        marker.addListener('dragend', (e) => {
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+          pendingPin = { lat, lng };
+          reverseGeocodeGoogle(lat, lng);
+        });
+      }
+
       map.addListener('click', (e) => {
         const lat = e.latLng.lat();
         const lng = e.latLng.lng();
         pendingPin = { lat, lng };
-        if (marker) marker.setPosition(e.latLng); else marker = new google.maps.Marker({ position: e.latLng, map });
-        reverseGeocodePin(lat, lng);
+        if (marker) {
+          marker.setPosition(e.latLng);
+        } else {
+          marker = new google.maps.Marker({
+            position: e.latLng,
+            map,
+            draggable: true,
+          });
+          attachMarkerDragListener();
+        }
+        reverseGeocodeGoogle(lat, lng);
       });
     }
 
-    function initLeafletMap() {
-      if (typeof L === 'undefined') return; // CDN unavailable — form still works without a map
-
-      // Leaflet's default marker icon uses relative image paths resolved
-      // against the CSS file's own location — broken when leaflet.css is
-      // loaded from a CDN link tag, a well-known Leaflet+CDN gotcha. Point
-      // it at the same CDN's image assets explicitly.
-      delete L.Icon.Default.prototype._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      });
-
-      map = L.map('booking-map', { attributionControl: false }).setView([MAP_CENTER.lat, MAP_CENTER.lng], 12);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
-      map.on('click', (e) => {
-        pendingPin = { lat: e.latlng.lat, lng: e.latlng.lng };
-        if (marker) marker.setLatLng(e.latlng); else marker = L.marker(e.latlng).addTo(map);
-        reverseGeocodePin(e.latlng.lat, e.latlng.lng);
-      });
-    }
-
-    // Fills the address/pincode fields as a starting point on every pin
-    // drop; both stay fully editable, so a bad/missing match just means
-    // the customer types it themselves like before this existed. Silent on
-    // failure — a flaky geocode lookup must never block dropping a pin.
-    async function reverseGeocodePin(lat, lng) {
-      return useGoogleMaps ? reverseGeocodeGoogle(lat, lng) : reverseGeocodeNominatim(lat, lng);
-    }
-
+    // Reverse geocodes coordinates into formatted address and pincode using Google Geocoder
     async function reverseGeocodeGoogle(lat, lng) {
       const textInput = drawer.querySelector('[data-address-text]');
       const pincodeInput = drawer.querySelector('[data-address-pincode]');
-      if (!textInput || !pincodeInput || !geocoder) return;
+      if (!textInput || !pincodeInput) return;
+      if (!geocoder && typeof google !== 'undefined' && google.maps) {
+        geocoder = new google.maps.Geocoder();
+      }
+      if (!geocoder) return;
 
       try {
         const response = await geocoder.geocode({ location: { lat, lng } });
@@ -244,32 +281,7 @@
         const postal = result.address_components.find((c) => c.types.includes('postal_code'));
         if (postal) pincodeInput.value = postal.long_name;
       } catch (err) {
-        // Network hiccup, no match (ZERO_RESULTS), or billing/key issue — leave fields as-is.
-      }
-    }
-
-    async function reverseGeocodeNominatim(lat, lng) {
-      const textInput = drawer.querySelector('[data-address-text]');
-      const pincodeInput = drawer.querySelector('[data-address-pincode]');
-      if (!textInput || !pincodeInput) return;
-
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`,
-          { headers: { Accept: 'application/json' } },
-        );
-        if (!response.ok) return;
-        const data = await response.json();
-        const addr = data.address || {};
-
-        const parts = [
-          addr.house_number, addr.road || addr.pedestrian,
-          addr.suburb || addr.neighbourhood, addr.city || addr.town || addr.village,
-        ].filter(Boolean);
-        textInput.value = parts.length ? parts.join(', ') : (data.display_name || textInput.value);
-        if (addr.postcode) pincodeInput.value = addr.postcode;
-      } catch (err) {
-        // Network hiccup or Nominatim unavailable — leave fields as-is.
+        // Geocode failure or billing pending — fields remain directly editable by customer
       }
     }
 
@@ -277,11 +289,7 @@
     if (locateMeBtn) {
       locateMeBtn.addEventListener('click', () => {
         if (!navigator.geolocation) {
-          GB.showToast('Location isn’t available in this browser — drop a pin manually.');
-          return;
-        }
-        if (!map) {
-          GB.showToast('Map isn’t ready yet — please drop a pin manually.');
+          GB.showToast('Geolocation is not supported by your browser.');
           return;
         }
 
@@ -293,22 +301,35 @@
           (position) => {
             const { latitude: lat, longitude: lng } = position.coords;
             pendingPin = { lat, lng };
-            if (useGoogleMaps) {
+
+            if (map && typeof google !== 'undefined' && google.maps) {
               const latlng = { lat, lng };
-              if (marker) marker.setPosition(latlng); else marker = new google.maps.Marker({ position: latlng, map });
+              if (marker) {
+                marker.setPosition(latlng);
+              } else {
+                marker = new google.maps.Marker({
+                  position: latlng,
+                  map,
+                  draggable: true,
+                });
+                marker.addListener('dragend', (e) => {
+                  const dlat = e.latLng.lat();
+                  const dlng = e.latLng.lng();
+                  pendingPin = { lat: dlat, lng: dlng };
+                  reverseGeocodeGoogle(dlat, dlng);
+                });
+              }
               map.setCenter(latlng);
               map.setZoom(16);
-            } else {
-              const latlng = L.latLng(lat, lng);
-              if (marker) marker.setLatLng(latlng); else marker = L.marker(latlng).addTo(map);
-              map.setView(latlng, 16);
             }
-            reverseGeocodePin(lat, lng);
+
+            reverseGeocodeGoogle(lat, lng);
             locateMeBtn.disabled = false;
             locateMeBtn.textContent = originalLabel;
+            GB.showToast('Location updated from GPS.');
           },
           () => {
-            GB.showToast('Couldn’t get your location — please drop a pin on the map manually.');
+            GB.showToast('Could not fetch current location. Please select on map or enter manually.');
             locateMeBtn.disabled = false;
             locateMeBtn.textContent = originalLabel;
           },
@@ -360,8 +381,10 @@
       state.addressId = data.address.id;
       addressForm.hidden = true;
       labelInput.value = ''; textInput.value = ''; pincodeInput.value = '';
-      pendingPin = null;
-      if (marker) { marker.remove(); marker = null; }
+      if (marker) {
+        if (typeof marker.setMap === 'function') marker.setMap(null);
+        marker = null;
+      }
       renderAddressList();
       updateNextButtonState();
       GB.showToast('Address saved');

@@ -16,10 +16,16 @@ urlpatterns = [
     path('auth/phone/verify/', views.auth_phone_verify, name='api_auth_phone_verify'),
     path('auth/verify-code/', views.auth_verify_code, name='api_auth_verify_code'),
     path('auth/logout/', views.auth_logout, name='api_auth_logout'),
+    path('auth/social-callback/', views.auth_social_callback, name='api_auth_social_callback'),
 
     path('profile/', views.profile_view, name='api_profile'),
     path('addresses/', views.addresses_view, name='api_addresses'),
     path('addresses/<int:address_id>/', views.address_delete_view, name='api_address_delete'),
+
+    path('maps/reverse-geocode/', views.maps_reverse_geocode, name='api_maps_reverse_geocode'),
+    path('maps/places-autocomplete/', views.maps_places_autocomplete, name='api_maps_places_autocomplete'),
+    path('maps/place-details/', views.maps_place_details, name='api_maps_place_details'),
+    path('maps/nearby/', views.maps_search_nearby, name='api_maps_search_nearby'),
 
     path('bookings/', views.bookings_view, name='api_bookings'),
     path('bookings/checkout/', views.checkout_view, name='api_bookings_checkout'),

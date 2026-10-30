@@ -16,6 +16,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ElixColors, ElixRadii, ElixTypography, ElixShadows } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
+import { initiateSocialSignIn } from '@/lib/socialAuth';
+import { BottomNav } from '@/components/ui/BottomNav';
 
 export default function SignupScreen() {
   const { redirect } = useLocalSearchParams<{ redirect?: string }>();
@@ -130,18 +132,16 @@ export default function SignupScreen() {
 
   // ── CONFIRM OTP IN POPUP ──────────────────────────────────────────────────
   async function handleConfirmCode() {
-    setModalError('');
-    const code = otpInput.trim();
-    if (!code || code.length < 4) {
+    if (!otpInput || otpInput.trim().length < 6) {
       setModalError('Please enter the 6-digit verification code.');
       return;
     }
-
+    setModalError('');
     setIsVerifyingCode(true);
-    const res = await verifyCode(verificationId, code);
+    const res = await verifyCode(verificationId, otpInput.trim());
     setIsVerifyingCode(false);
 
-    if (res.ok || res.verified) {
+    if (res.ok && res.verified) {
       if (verifyChannel === 'phone') {
         setIsPhoneVerified(true);
         setVerifiedToast('Mobile Number verified successfully! ✓');
@@ -256,11 +256,12 @@ export default function SignupScreen() {
     }
   }
 
-  function handleThirdPartyNotice(provider: string) {
-    Alert.alert(
-      provider,
-      `${provider} sign up will link your profile securely. For instant testing, you can sign up directly below.`
-    );
+  async function handleGoogleLogin() {
+    await initiateSocialSignIn('google');
+  }
+
+  async function handleAppleLogin() {
+    await initiateSocialSignIn('apple');
   }
 
   const anyVerified = isPhoneVerified || isEmailVerified;
@@ -277,13 +278,14 @@ export default function SignupScreen() {
       >
         {/* Brand Logo Header */}
         <TouchableOpacity
-          style={styles.logoRow}
+          style={styles.logoWrap}
           onPress={() => router.replace('/(tabs)')}
           activeOpacity={0.8}
         >
           <Text style={styles.brandLogo}>
             <Text style={styles.brandLogoAccent}>E</Text>LIX
           </Text>
+          <Text style={styles.brandTagline}>LUXURY SALON & SPA AT HOME</Text>
         </TouchableOpacity>
 
         {/* Auth Card */}
@@ -293,7 +295,10 @@ export default function SignupScreen() {
             <Text style={styles.cardTitle}>Create Account</Text>
             <Text style={styles.cardSubtitle}>
               Already have an account?{' '}
-              <Text style={styles.inlineLink} onPress={() => router.push('/auth/login')}>
+              <Text
+                style={styles.inlineLink}
+                onPress={() => router.push('/auth/login')}
+              >
                 Sign In
               </Text>
             </Text>
@@ -310,7 +315,7 @@ export default function SignupScreen() {
           {/* Alert error box */}
           {error ? (
             <View style={styles.alertBox}>
-              <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
+              <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
               <Text style={styles.alertText}>{error}</Text>
             </View>
           ) : null}
@@ -333,24 +338,24 @@ export default function SignupScreen() {
             </Text>
           </View>
 
-          {/* Social Quick Signup */}
-          <View style={styles.socialList}>
+          {/* Compact Side-by-Side Social */}
+          <View style={styles.socialRow}>
             <TouchableOpacity
-              style={styles.socialBtn}
-              onPress={() => handleThirdPartyNotice('Apple')}
+              style={styles.socialPillBtn}
+              onPress={handleGoogleLogin}
               activeOpacity={0.85}
             >
-              <Ionicons name="logo-apple" size={19} color={ElixColors.ink} />
-              <Text style={styles.socialBtnText}>Continue with Apple</Text>
+              <Ionicons name="logo-google" size={17} color="#EA4335" />
+              <Text style={styles.socialPillText}>Google</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.socialBtn}
-              onPress={() => handleThirdPartyNotice('Google')}
+              style={styles.socialPillBtn}
+              onPress={handleAppleLogin}
               activeOpacity={0.85}
             >
-              <Ionicons name="logo-google" size={18} color="#EA4335" />
-              <Text style={styles.socialBtnText}>Continue with Google</Text>
+              <Ionicons name="logo-apple" size={18} color={ElixColors.ink} />
+              <Text style={styles.socialPillText}>Apple</Text>
             </TouchableOpacity>
           </View>
 
@@ -378,7 +383,7 @@ export default function SignupScreen() {
                     value={firstName}
                     onChangeText={setFirstName}
                     placeholder="Priya"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={ElixColors.inkMuted}
                     autoCapitalize="words"
                     onFocus={() => setFocusedField('firstName')}
                     onBlur={() => setFocusedField(null)}
@@ -400,7 +405,7 @@ export default function SignupScreen() {
                     value={lastName}
                     onChangeText={setLastName}
                     placeholder="Sharma"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={ElixColors.inkMuted}
                     autoCapitalize="words"
                     onFocus={() => setFocusedField('lastName')}
                     onBlur={() => setFocusedField(null)}
@@ -447,7 +452,7 @@ export default function SignupScreen() {
                     if (isEmailVerified) setIsEmailVerified(false);
                   }}
                   placeholder="name@example.com"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={ElixColors.inkMuted}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -506,7 +511,7 @@ export default function SignupScreen() {
                     if (isPhoneVerified) setIsPhoneVerified(false);
                   }}
                   placeholder="9876543210"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={ElixColors.inkMuted}
                   keyboardType="phone-pad"
                   maxLength={10}
                   onFocus={() => setFocusedField('phone')}
@@ -538,7 +543,7 @@ export default function SignupScreen() {
                   value={age}
                   onChangeText={setAge}
                   placeholder="24"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={ElixColors.inkMuted}
                   keyboardType="number-pad"
                   maxLength={3}
                   onFocus={() => setFocusedField('age')}
@@ -562,7 +567,7 @@ export default function SignupScreen() {
                   value={password}
                   onChangeText={setPassword}
                   placeholder="At least 6 characters"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={ElixColors.inkMuted}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   onFocus={() => setFocusedField('password')}
@@ -572,12 +577,11 @@ export default function SignupScreen() {
                 <TouchableOpacity
                   style={styles.toggleBtn}
                   onPress={() => setShowPassword((prev) => !prev)}
-                  hitSlop={10}
-                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                  hitSlop={8}
                 >
                   <Ionicons
                     name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={20}
+                    size={19}
                     color={ElixColors.inkMuted}
                   />
                 </TouchableOpacity>
@@ -598,7 +602,7 @@ export default function SignupScreen() {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Re-enter password"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={ElixColors.inkMuted}
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
                   onFocus={() => setFocusedField('confirmPassword')}
@@ -608,12 +612,11 @@ export default function SignupScreen() {
                 <TouchableOpacity
                   style={styles.toggleBtn}
                   onPress={() => setShowConfirmPassword((prev) => !prev)}
-                  hitSlop={10}
-                  accessibilityLabel={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  hitSlop={8}
                 >
                   <Ionicons
                     name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={20}
+                    size={19}
                     color={ElixColors.inkMuted}
                   />
                 </TouchableOpacity>
@@ -628,13 +631,22 @@ export default function SignupScreen() {
               activeOpacity={0.85}
             >
               {isLoading || isSendingCode ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
+                <ActivityIndicator color={ElixColors.white} size="small" />
               ) : (
                 <Text style={styles.submitBtnText}>Create Account</Text>
               )}
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Back link */}
+        <TouchableOpacity
+          style={styles.backLinkWrap}
+          onPress={() => router.replace('/(tabs)')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.backLinkText}>← Back to Elix</Text>
+        </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -748,6 +760,8 @@ export default function SignupScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <BottomNav activeTab="profile" />
     </KeyboardAvoidingView>
   );
 }
@@ -755,37 +769,46 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: ElixColors.surface1,
+    backgroundColor: ElixColors.surface1, // #F8FAFC
   },
   scroll: {
     flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 48,
+    paddingHorizontal: 16,
+    paddingTop: 36,
     paddingBottom: 40,
     alignItems: 'center',
   },
-  logoRow: {
+  logoWrap: {
     marginBottom: 20,
     alignItems: 'center',
   },
   brandLogo: {
-    fontSize: 32,
-    fontWeight: '900',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    fontSize: 28,
+    fontWeight: '700',
     color: ElixColors.ink,
     letterSpacing: 2,
   },
   brandLogoAccent: {
     color: ElixColors.blue,
+    fontStyle: 'italic',
+  },
+  brandTagline: {
+    marginTop: 4,
+    fontSize: 10,
+    fontWeight: '700',
+    color: ElixColors.inkMuted,
+    letterSpacing: 1.5,
   },
 
   // Card
   card: {
     width: '100%',
-    maxWidth: 440,
-    backgroundColor: ElixColors.white,
-    borderRadius: ElixRadii.xl,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
+    maxWidth: 420,
+    backgroundColor: ElixColors.surface2, // #FFFFFF
+    borderRadius: 24,
+    paddingHorizontal: 22,
+    paddingVertical: 26,
     borderWidth: 1,
     borderColor: ElixColors.borderHairline,
     ...ElixShadows.sm,
@@ -795,8 +818,9 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 26,
-    fontWeight: ElixTypography.weights.bold,
+    fontWeight: '700',
     color: ElixColors.ink,
+    lineHeight: 32,
     marginBottom: 6,
   },
   cardSubtitle: {
@@ -862,10 +886,10 @@ const styles = StyleSheet.create({
   alertBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
     borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: ElixRadii.md,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 16,
@@ -874,30 +898,32 @@ const styles = StyleSheet.create({
   alertText: {
     flex: 1,
     fontSize: 13,
-    color: '#B91C1C',
+    color: '#DC2626',
     fontWeight: ElixTypography.weights.medium,
     lineHeight: 18,
   },
 
-  // Social
-  socialList: {
-    gap: 10,
+  // Compact Social Row (Side-by-side)
+  socialRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  socialBtn: {
+  socialPillBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     height: 48,
     borderRadius: ElixRadii.pill,
-    backgroundColor: ElixColors.surface1,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: ElixColors.borderHairlineMedium,
-    paddingHorizontal: 16,
-    gap: 10,
+    paddingHorizontal: 12,
+    gap: 8,
   },
-  socialBtnText: {
-    fontSize: 14,
-    fontWeight: ElixTypography.weights.semiBold,
+  socialPillText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: ElixColors.ink,
   },
 
@@ -914,8 +940,8 @@ const styles = StyleSheet.create({
     backgroundColor: ElixColors.borderHairline,
   },
   dividerText: {
-    fontSize: 10,
-    fontWeight: ElixTypography.weights.bold,
+    fontSize: 11,
+    fontWeight: '700',
     color: ElixColors.inkMuted,
     letterSpacing: 0.8,
   },
@@ -939,7 +965,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 11,
-    fontWeight: ElixTypography.weights.bold,
+    fontWeight: '700',
     color: ElixColors.inkMuted,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
@@ -978,13 +1004,14 @@ const styles = StyleSheet.create({
     height: 48,
     borderWidth: 1.5,
     borderColor: ElixColors.borderHairlineMedium,
-    borderRadius: ElixRadii.md,
+    borderRadius: 12,
     backgroundColor: ElixColors.surface1,
     paddingHorizontal: 14,
   },
   inputFocused: {
     borderColor: ElixColors.blue,
     backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
   },
   inputContainerVerified: {
     borderColor: ElixColors.green,
@@ -1004,7 +1031,7 @@ const styles = StyleSheet.create({
   },
   phonePrefixText: {
     fontSize: 14,
-    fontWeight: ElixTypography.weights.bold,
+    fontWeight: '700',
     color: ElixColors.ink,
   },
   toggleBtn: {
@@ -1023,7 +1050,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28,
     shadowRadius: 10,
-    elevation: 4,
+    elevation: 3,
   },
   submitBtnDisabled: {
     opacity: 0.7,
@@ -1031,8 +1058,19 @@ const styles = StyleSheet.create({
   submitBtnText: {
     color: ElixColors.white,
     fontSize: 15,
-    fontWeight: ElixTypography.weights.bold,
-    letterSpacing: 0.2,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
+
+  // Back link
+  backLinkWrap: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  backLinkText: {
+    fontSize: 13,
+    color: ElixColors.inkMuted,
+    fontWeight: '500',
   },
 
   // ── POPUP MODAL STYLES ────────────────────────────────────────────────────

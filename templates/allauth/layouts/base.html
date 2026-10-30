@@ -21,13 +21,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{% static 'css/auth.css' %}">
+  <link rel="stylesheet" href="{% static 'css/auth.css' %}?v=20261030_v2">
   {% block extra_head %}{% endblock extra_head %}
 </head>
 <body class="auth-page">
   {% block body %}
     <div class="auth-shell">
-      <a href="{% url 'index' %}" class="auth-shell__logo"><span>E</span>lix</a>
+      <div class="auth-shell__brand">
+        <a href="{% url 'index' %}" class="auth-shell__logo"><span>E</span>lix</a>
+        <div class="auth-shell__tagline">LUXURY SALON & SPA AT HOME</div>
+      </div>
 
       {% if messages %}
         <div class="auth-messages">

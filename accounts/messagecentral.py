@@ -122,7 +122,7 @@ def send_otp(phone, country_code='91'):
         code = ''.join(secrets.choice('0123456789') for _ in range(6))
         verification_id = f'console-{secrets.token_hex(8)}'
         cache.set(f'{_CONSOLE_CODE_CACHE_PREFIX}{verification_id}', code, _CONSOLE_CODE_TTL_SECONDS)
-        print(f'[DEV OTP] {phone}: {code}')
+        logger.info('Mock OTP generated for verification_id=%s', verification_id)
         return verification_id
 
     response = _request_with_token_retry(

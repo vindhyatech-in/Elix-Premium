@@ -4,181 +4,704 @@
 
 {% block head_title %}{% trans "Sign In" %}{% endblock head_title %}
 
+{% block extra_head %}
+<style>
+  /* Pixel-perfect alignment with mobile app login */
+  .auth-shell {
+    width: 100% !important;
+    max-width: 420px !important;
+    margin: 0 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 1.25rem !important;
+  }
+
+  .auth-shell__brand {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  .auth-shell__logo {
+    font-family: Georgia, 'Times New Roman', serif !important;
+    font-size: 2.25rem !important;
+    font-weight: 600 !important;
+    color: #0F172A !important;
+    text-decoration: none !important;
+    letter-spacing: -0.5px !important;
+    line-height: 1.1 !important;
+  }
+
+  .auth-shell__logo span {
+    color: #4F46E5 !important;
+    font-style: italic !important;
+  }
+
+  .auth-shell__tagline {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    color: #64748B !important;
+    letter-spacing: 1.5px !important;
+    text-transform: uppercase !important;
+    margin-top: 4px !important;
+  }
+
+  /* Card */
+  .auth-card {
+    width: 100% !important;
+    background: #FFFFFF !important;
+    border: 1px solid rgba(15, 23, 42, 0.08) !important;
+    border-radius: 28px !important;
+    padding: 32px 24px 28px !important;
+    box-shadow: 0 10px 30px -4px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.03) !important;
+    box-sizing: border-box !important;
+  }
+
+  .auth-card__header {
+    margin-bottom: 20px !important;
+  }
+
+  .auth-card__title {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    font-size: 26px !important;
+    font-weight: 700 !important;
+    color: #0F172A !important;
+    margin: 0 0 6px 0 !important;
+    line-height: 32px !important;
+    letter-spacing: -0.5px !important;
+  }
+
+  .auth-card__text {
+    font-size: 14px !important;
+    color: #64748B !important;
+    margin: 0 !important;
+    line-height: 20px !important;
+  }
+
+  /* Error Alert */
+  .auth-card__alert {
+    padding: 10px 14px !important;
+    border-radius: 12px !important;
+    background: rgba(239, 68, 68, 0.08) !important;
+    border: 1px solid rgba(239, 68, 68, 0.25) !important;
+    color: #EF4444 !important;
+    font-size: 13px !important;
+    margin-bottom: 18px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+  .auth-card__alert p {
+    margin: 0 !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Segmented Switcher */
+  .auth-tabs {
+    display: flex !important;
+    background: #F1F5F9 !important;
+    border-radius: 14px !important;
+    padding: 5px !important;
+    margin-bottom: 22px !important;
+    gap: 6px !important;
+  }
+
+  .auth-tab {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    height: 44px !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #64748B !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    font-family: inherit !important;
+    padding: 0 8px !important;
+  }
+
+  .auth-tab.is-active {
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  }
+
+  .auth-tab-icon {
+    width: 16px !important;
+    height: 16px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .auth-tab.is-active .auth-tab-icon {
+    color: #4F46E5 !important;
+  }
+
+  .auth-tab-badge {
+    background: #EEF2FF !important;
+    color: #4F46E5 !important;
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    padding: 3px 6px !important;
+    border-radius: 6px !important;
+    letter-spacing: 0.5px !important;
+    text-transform: uppercase !important;
+    line-height: 1 !important;
+    margin-left: 2px !important;
+  }
+
+  /* Form Elements */
+  .auth-group {
+    margin-bottom: 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .auth-label {
+    display: block !important;
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    color: #0F172A !important;
+    margin-bottom: 8px !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+  }
+
+  .auth-label-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 8px !important;
+  }
+  .auth-label-row .auth-label {
+    margin-bottom: 0 !important;
+  }
+
+  .auth-forgot-link {
+    font-size: 12.5px !important;
+    color: #4F46E5 !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+  }
+  .auth-forgot-link:hover {
+    text-decoration: underline !important;
+  }
+
+  /* Input Container with Inside Icon */
+  .auth-input-container {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: 52px !important;
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px !important;
+    padding: 0 14px !important;
+    box-sizing: border-box !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .auth-input-container:focus-within {
+    border-color: #4F46E5 !important;
+    background: #FFFFFF !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12) !important;
+  }
+
+  .auth-input-container.is-invalid {
+    border-color: #EF4444 !important;
+  }
+
+  .auth-input-icon {
+    width: 18px !important;
+    height: 18px !important;
+    color: #64748B !important;
+    margin-right: 10px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .auth-input-container:focus-within .auth-input-icon {
+    color: #4F46E5 !important;
+  }
+
+  .auth-input-container .auth-input {
+    flex: 1 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    font-size: 14px !important;
+    color: #0F172A !important;
+    font-family: inherit !important;
+    outline: none !important;
+  }
+
+  .auth-input-container .auth-input::placeholder {
+    color: #94A3B8 !important;
+    opacity: 1 !important;
+  }
+
+  .auth-helper-text {
+    font-size: 12px !important;
+    color: #64748B !important;
+    margin: 6px 0 0 0 !important;
+    line-height: 16px !important;
+  }
+
+  .auth-password-toggle {
+    background: transparent !important;
+    border: none !important;
+    padding: 4px !important;
+    cursor: pointer !important;
+    color: #64748B !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-left: 8px !important;
+  }
+
+  /* Remember Me */
+  .auth-remember-wrapper {
+    margin: 4px 0 16px !important;
+  }
+  .auth-remember-label {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    cursor: pointer !important;
+  }
+  .auth-remember-checkbox {
+    width: 16px !important;
+    height: 16px !important;
+    border-radius: 4px !important;
+    accent-color: #4F46E5 !important;
+    cursor: pointer !important;
+  }
+  .auth-remember-text {
+    font-size: 13px !important;
+    color: #0F172A !important;
+    font-weight: 500 !important;
+  }
+
+  /* Primary Button */
+  .auth-submit-btn {
+    width: 100% !important;
+    height: 50px !important;
+    border-radius: 14px !important;
+    background: #4F46E5 !important;
+    color: #FFFFFF !important;
+    font-family: inherit !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+    letter-spacing: 0.2px !important;
+    border: none !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35) !important;
+    transition: all 0.2s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    text-decoration: none !important;
+    margin-top: 14px !important;
+  }
+
+  .auth-submit-btn:hover {
+    background: #4338CA !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.42) !important;
+  }
+
+  .auth-submit-btn:active {
+    transform: translateY(0) !important;
+    opacity: 0.95 !important;
+  }
+
+  .auth-btn-icon {
+    width: 18px !important;
+    height: 18px !important;
+    stroke: currentColor !important;
+    fill: none !important;
+  }
+
+  /* Hairline Divider */
+  .auth-tier-divider {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin: 22px 0 18px !important;
+    color: #64748B !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.8px !important;
+    text-transform: uppercase !important;
+  }
+  .auth-tier-divider::before,
+  .auth-tier-divider::after {
+    content: '' !important;
+    flex: 1 !important;
+    height: 1px !important;
+    background: #E2E8F0 !important;
+  }
+
+  /* Social Row */
+  .auth-social-row {
+    display: flex !important;
+    gap: 12px !important;
+    width: 100% !important;
+    margin-bottom: 20px !important;
+  }
+
+  .auth-social-pill {
+    flex: 1 !important;
+    height: 48px !important;
+    border-radius: 12px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    color: #0F172A !important;
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    box-sizing: border-box !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .auth-social-pill:hover {
+    background: #F8FAFC !important;
+    border-color: #CBD5E1 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+  }
+
+  /* Card Footer */
+  .auth-card__footer {
+    text-align: center !important;
+    padding-top: 16px !important;
+    border-top: 1px solid #F1F5F9 !important;
+  }
+
+  .auth-card__footer p {
+    margin: 0 !important;
+    font-size: 13px !important;
+    color: #64748B !important;
+  }
+
+  .auth-card__footer a {
+    color: #4F46E5 !important;
+    font-weight: 700 !important;
+    text-decoration: underline !important;
+    margin-left: 4px !important;
+  }
+
+  /* Back to home */
+  .auth-shell__back {
+    font-size: 13px !important;
+    color: #64748B !important;
+    text-decoration: none !important;
+    font-weight: 500 !important;
+    transition: color 0.2s ease !important;
+  }
+  .auth-shell__back:hover {
+    color: #4F46E5 !important;
+  }
+</style>
+{% endblock extra_head %}
+
 {% block content %}
   <div class="auth-card__header">
-    <h1 class="auth-card__title">{% trans "Sign In" %}</h1>
+    <h1 class="auth-card__title">{% trans "Welcome Back" %}</h1>
     <p class="auth-card__text">
-      {% blocktranslate %}If you have not created an account yet, then please <a href="{{ signup_url }}">sign up</a> first.{% endblocktranslate %}
+      {% trans "Sign in to book your beauty session" %}
     </p>
   </div>
 
   {% if form.non_field_errors %}
-    <div class="auth-card__alert">
-      {% for error in form.non_field_errors %}
-        <p>{{ error }}</p>
-      {% endfor %}
-    </div>
-  {% endif %}
-
-  {% if form.errors and not form.non_field_errors %}
-    <div class="auth-card__alert">
-      {% trans "Please check your login details and try again." %}
-    </div>
-  {% endif %}
-
-  <!-- FIRST PRIORITY: SIGN IN WITH OTP (WHATSAPP / SMS / EMAIL) -->
-  <form method="post" action="{% url 'phone_login_request' %}" class="auth-card__form auth-card__form--otp" novalidate>
-    {% csrf_token %}
-    <div class="auth-group">
-      <label for="id_phone_otp_identifier" class="auth-label">{% trans "PHONE NUMBER OR EMAIL (OTP):" %}</label>
-      <input
-        type="text"
-        name="login_identifier"
-        id="id_phone_otp_identifier"
-        class="auth-input"
-        placeholder="{% trans 'Enter 10-digit phone number or email' %}"
-        required
-        autofocus
-        autocomplete="username tel email"
-      >
-    </div>
-
-    <button type="submit" class="auth-submit-btn">
-      <svg class="auth-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;" aria-hidden="true">
-        <rect x="7" y="2" width="10" height="20" rx="2"/>
-        <line x1="11" y1="18" x2="13" y2="18"/>
+    <div class="auth-card__alert" id="authErrorAlert">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
       </svg>
-      {% trans "Send Verification Code via OTP" %}
-    </button>
-  </form>
+      <div>
+        {% for error in form.non_field_errors %}
+          <p>{{ error }}</p>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
 
-  <!-- EQUAL PRIORITY DIVIDER -->
-  <div class="auth-tier3__divider">
-    <span>{% trans "OR SIGN IN WITH PASSWORD" %}</span>
+  <!-- SEGMENTED SWITCHER (Option 1: Quick OTP vs Password) -->
+  <div class="auth-tabs" role="tablist" aria-label="Sign in method">
+    <!-- TAB 1: QUICK OTP -->
+    <button
+      type="button"
+      class="auth-tab is-active"
+      id="tabOtp"
+      role="tab"
+      aria-selected="true"
+      aria-controls="panelOtp"
+    >
+      <svg class="auth-tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+      <span>{% trans "Quick OTP" %}</span>
+      <span class="auth-tab-badge">{% trans "RECOMMENDED" %}</span>
+    </button>
+
+    <!-- TAB 2: PASSWORD -->
+    <button
+      type="button"
+      class="auth-tab"
+      id="tabPassword"
+      role="tab"
+      aria-selected="false"
+      aria-controls="panelPassword"
+    >
+      <svg class="auth-tab-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 2l-2 2m-1.5 1.5L12 11l4 4 5.5-5.5a2.121 2.121 0 0 0 0-3l-2-2z"/>
+        <circle cx="7.5" cy="16.5" r="4.5"/>
+      </svg>
+      <span>{% trans "Password" %}</span>
+    </button>
   </div>
 
-  <!-- SECONDARY METHOD: CREDENTIAL LOGIN (USERNAME / EMAIL + PASSWORD) -->
-  <form method="post" action="{% url 'account_login' %}" class="auth-card__form" novalidate>
-    {% csrf_token %}
-    {% if redirect_field_value %}
-      <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
-    {% endif %}
+  <!-- TAB PANEL 1: QUICK OTP (PRIMARY METHOD) -->
+  <div id="panelOtp" role="tabpanel" aria-labelledby="tabOtp">
+    <form method="post" action="{% url 'phone_login_request' %}" novalidate>
+      {% csrf_token %}
+      <div class="auth-group">
+        <label for="id_phone_otp_identifier" class="auth-label">{% trans "Phone Number or Email" %}</label>
+        <div class="auth-input-container">
+          <!-- Outline Phone Icon -->
+          <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+          <input
+            type="text"
+            name="login_identifier"
+            id="id_phone_otp_identifier"
+            class="auth-input"
+            placeholder="9876543210 or name@example.com"
+            required
+            autofocus
+            autocomplete="username tel email"
+          >
+        </div>
+        <p class="auth-helper-text">{% trans "We'll send a 6-digit code via WhatsApp & Email" %}</p>
+      </div>
 
-    <!-- USERNAME OR EMAIL -->
-    <div class="auth-group">
-      <label for="id_login" class="auth-label">{% trans "USERNAME OR EMAIL:" %}</label>
-      <input
-        type="text"
-        name="login"
-        id="id_login"
-        class="auth-input {% if form.login.errors %}is-invalid{% endif %}"
-        placeholder="{% trans 'Username or email address' %}"
-        value="{{ form.login.value|default:'' }}"
-        required
-        autocomplete="username email"
-      >
-      {% if form.login.errors %}
-        <ul class="auth-field-errors">
-          {% for error in form.login.errors %}
-            <li>{{ error }}</li>
-          {% endfor %}
-        </ul>
+      <button type="submit" class="auth-submit-btn">
+        <!-- Paper airplane tilted send icon -->
+        <svg class="auth-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+        <span>{% trans "Get Verification Code" %}</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- TAB PANEL 2: PASSWORD (SECONDARY METHOD) -->
+  <div id="panelPassword" role="tabpanel" aria-labelledby="tabPassword" style="display: none;">
+    <form method="post" action="{% url 'account_login' %}" novalidate>
+      {% csrf_token %}
+      {% if redirect_field_value %}
+        <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
       {% endif %}
-    </div>
 
-    <!-- PASSWORD WITH SHOW PASSWORD OPTION -->
-    <div class="auth-group">
-      <div class="auth-label-row">
-        <label for="id_password" class="auth-label">{% trans "PASSWORD:" %}</label>
-        <div class="auth-forgot-wrapper-inline">
+      <!-- USERNAME OR EMAIL -->
+      <div class="auth-group">
+        <label for="id_login" class="auth-label">{% trans "Username or Email" %}</label>
+        <div class="auth-input-container {% if form.login.errors %}is-invalid{% endif %}">
+          <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <input
+            type="text"
+            name="login"
+            id="id_login"
+            class="auth-input"
+            placeholder="{% trans 'Enter your username or email' %}"
+            value="{{ form.login.value|default:'' }}"
+            required
+            autocomplete="username email"
+          >
+        </div>
+        {% if form.login.errors %}
+          <ul class="auth-field-errors" style="list-style: none; padding: 0; margin: 4px 0 0; color: #EF4444; font-size: 12px;">
+            {% for error in form.login.errors %}
+              <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+      <!-- PASSWORD -->
+      <div class="auth-group">
+        <div class="auth-label-row">
+          <label for="id_password" class="auth-label">{% trans "Password" %}</label>
           <a href="{% url 'account_reset_password' %}" class="auth-forgot-link">
             {% trans "Forgot password?" %}
           </a>
         </div>
-      </div>
-      <div class="auth-password-wrapper">
-        <input
-          type="password"
-          name="password"
-          id="id_password"
-          class="auth-input auth-input--password {% if form.password.errors %}is-invalid{% endif %}"
-          placeholder="{% trans 'Password' %}"
-          required
-          autocomplete="current-password"
-        >
-        <button
-          type="button"
-          class="auth-password-toggle"
-          id="togglePassword"
-          aria-label="{% trans 'Show password' %}"
-          title="{% trans 'Show password' %}"
-        >
-          <!-- Eye Icon (Show) -->
-          <svg class="eye-icon eye-show" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
+        <div class="auth-input-container {% if form.password.errors %}is-invalid{% endif %}">
+          <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
-          <!-- Eye Off Icon (Hide) -->
-          <svg class="eye-icon eye-hide" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: none;">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-            <line x1="1" y1="1" x2="23" y2="23"/>
-          </svg>
-        </button>
+          <input
+            type="password"
+            name="password"
+            id="id_password"
+            class="auth-input"
+            placeholder="{% trans 'Enter your password' %}"
+            required
+            autocomplete="current-password"
+          >
+          <button
+            type="button"
+            class="auth-password-toggle"
+            id="togglePassword"
+            aria-label="{% trans 'Show password' %}"
+            title="{% trans 'Show password' %}"
+          >
+            <!-- Eye Icon (Show) -->
+            <svg class="eye-show" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <!-- Eye Off Icon (Hide) -->
+            <svg class="eye-hide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: none;">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          </button>
+        </div>
+        {% if form.password.errors %}
+          <ul class="auth-field-errors" style="list-style: none; padding: 0; margin: 4px 0 0; color: #EF4444; font-size: 12px;">
+            {% for error in form.password.errors %}
+              <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
       </div>
-      {% if form.password.errors %}
-        <ul class="auth-field-errors">
-          {% for error in form.password.errors %}
-            <li>{{ error }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    </div>
 
-    <!-- REMEMBER ME -->
-    <div class="auth-remember-wrapper">
-      <label for="id_remember" class="auth-remember-label">
-        <input type="checkbox" name="remember" id="id_remember" class="auth-remember-checkbox" {% if form.remember.value %}checked{% endif %}>
-        <span class="auth-remember-text">{% trans "Remember Me" %}</span>
-      </label>
-    </div>
+      <!-- REMEMBER ME -->
+      <div class="auth-remember-wrapper">
+        <label for="id_remember" class="auth-remember-label">
+          <input type="checkbox" name="remember" id="id_remember" class="auth-remember-checkbox" {% if form.remember.value %}checked{% endif %}>
+          <span class="auth-remember-text">{% trans "Remember Me" %}</span>
+        </label>
+      </div>
 
-    <!-- SUBMIT BUTTON -->
-    <button type="submit" class="auth-submit-btn auth-submit-btn--secondary">
-      {% trans "Sign In with Password" %}
-    </button>
-  </form>
+      <!-- SUBMIT BUTTON -->
+      <button type="submit" class="auth-submit-btn">
+        <svg class="auth-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <span>{% trans "Sign In with Password" %}</span>
+      </button>
+    </form>
+  </div>
 
-  <!-- EQUAL PRIORITY DIVIDER -->
-  <div class="auth-tier3__divider">
-    <span>{% trans "OR SIGN IN WITH" %}</span>
+  <!-- EQUAL PRIORITY DIVIDER (Compact side-by-side social) -->
+  <div class="auth-tier-divider">
+    <span>{% trans "OR CONTINUE WITH" %}</span>
   </div>
 
   <!-- OTHER LOGIN METHODS (GOOGLE / APPLE) -->
-  <div class="auth-social-list">
+  <div class="auth-social-row">
     <!-- GOOGLE -->
-    <a href="{% provider_login_url 'google' process='login' %}" class="auth-social-btn">
-      <svg class="auth-social-icon" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+    <a href="{% provider_login_url 'google' process='login' %}" class="auth-social-pill">
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
         <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.5 29.6 4.5 24 4.5 13.2 4.5 4.5 13.2 4.5 24S13.2 43.5 24 43.5 43.5 34.8 43.5 24c0-1.2-.1-2.4-.4-3.5z"/>
         <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.5 29.6 4.5 24 4.5c-7.5 0-13.9 4.1-17.4 10.2z"/>
         <path fill="#4CAF50" d="M24 43.5c5.5 0 10.4-2.1 14.1-5.5l-6.5-5.5c-2 1.5-4.6 2.5-7.6 2.5-5.2 0-9.7-3.3-11.3-8l-6.5 5C9.9 39.3 16.4 43.5 24 43.5z"/>
         <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.3-4.1 5.7l6.5 5.5C41.4 36.5 43.5 30.6 43.5 24c0-1.2-.1-2.4-.4-3.5z"/>
       </svg>
-      <span class="auth-social-text">{% trans "Continue with Google" %}</span>
+      <span>{% trans "Google" %}</span>
     </a>
 
     <!-- APPLE -->
-    <a href="{% provider_login_url 'apple' process='login' %}" class="auth-social-btn">
-      <svg class="auth-social-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <a href="{% provider_login_url 'apple' process='login' %}" class="auth-social-pill">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M16.365 1.43c0 1.14-.42 2.07-1.06 2.83-.75.86-1.96 1.55-3.13 1.44-.15-1.13.4-2.27 1.06-3 .77-.87 2.06-1.5 3.13-1.27zm2.9 17.86c-.47 1.05-.7 1.52-1.31 2.44-.85 1.29-2.05 2.9-3.53 2.91-1.32.02-1.66-.86-3.45-.85-1.79.01-2.16.87-3.48.85-1.48-.02-2.62-1.47-3.47-2.76-2.37-3.62-2.62-7.86-1.16-10.13.98-1.55 2.53-2.46 4-2.46 1.51 0 2.45.86 3.7.86 1.21 0 1.94-.87 3.68-.87 1.32 0 2.71.72 3.71 1.96-3.26 1.79-2.73 6.44.3 7.75z"/>
       </svg>
-      <span class="auth-social-text">{% trans "Continue with Apple" %}</span>
+      <span>{% trans "Apple" %}</span>
     </a>
+  </div>
+
+  <!-- CARD FOOTER -->
+  <div class="auth-card__footer">
+    <p>
+      {% trans "Don't have an account?" %}
+      <a href="{{ signup_url }}">{% trans "Sign up" %}</a>
+    </p>
   </div>
 {% endblock content %}
 
 {% block extra_body %}
 <script>
   (function() {
+    var tabOtp = document.getElementById('tabOtp');
+    var tabPassword = document.getElementById('tabPassword');
+    var panelOtp = document.getElementById('panelOtp');
+    var panelPassword = document.getElementById('panelPassword');
+
+    function switchTab(mode) {
+      if (mode === 'password') {
+        tabPassword.classList.add('is-active');
+        tabPassword.setAttribute('aria-selected', 'true');
+        tabOtp.classList.remove('is-active');
+        tabOtp.setAttribute('aria-selected', 'false');
+        panelPassword.style.display = 'block';
+        panelOtp.style.display = 'none';
+        var pwLoginInput = document.getElementById('id_login');
+        if (pwLoginInput && !pwLoginInput.value) {
+          pwLoginInput.focus();
+        }
+      } else {
+        tabOtp.classList.add('is-active');
+        tabOtp.setAttribute('aria-selected', 'true');
+        tabPassword.classList.remove('is-active');
+        tabPassword.setAttribute('aria-selected', 'false');
+        panelOtp.style.display = 'block';
+        panelPassword.style.display = 'none';
+        var otpInput = document.getElementById('id_phone_otp_identifier');
+        if (otpInput) {
+          otpInput.focus();
+        }
+      }
+    }
+
+    if (tabOtp && tabPassword) {
+      tabOtp.addEventListener('click', function() { switchTab('otp'); });
+      tabPassword.addEventListener('click', function() { switchTab('password'); });
+    }
+
+    // Auto-select tab if password error or tab=password in URL
+    var hasPasswordErrors = {% if form.login.errors or form.password.errors or form.non_field_errors %}true{% else %}false{% endif %};
+    var urlParams = new URLSearchParams(window.location.search);
+    if (hasPasswordErrors || urlParams.get('tab') === 'password') {
+      switchTab('password');
+    }
+
+    // Password show/hide toggle
     var toggleBtn = document.getElementById('togglePassword');
     var passwordInput = document.getElementById('id_password');
     if (toggleBtn && passwordInput) {
