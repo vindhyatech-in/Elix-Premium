@@ -14,6 +14,7 @@ urlpatterns = [
     path('auth/signup/', views.auth_signup, name='api_auth_signup'),
     path('auth/phone/request/', views.auth_phone_request, name='api_auth_phone_request'),
     path('auth/phone/verify/', views.auth_phone_verify, name='api_auth_phone_verify'),
+    path('auth/verify-code/', views.auth_verify_code, name='api_auth_verify_code'),
     path('auth/logout/', views.auth_logout, name='api_auth_logout'),
 
     path('profile/', views.profile_view, name='api_profile'),

@@ -1,0 +1,9 @@
+Your {{ site_name|default:"Elix" }} Email Verification Code is: {{ code }}
+
+Valid for 10 minutes.
+Purpose: {{ purpose|default:"Account Sign Up Verification" }}
+
+Use this code to verify your email address and complete your registration with Elix Premium Salon.
+
+If you did not request this, you can safely ignore this email. Never share your OTP with anyone.
+

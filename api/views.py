@@ -358,37 +358,50 @@ def _mask_email_display(email):
 @csrf_exempt
 @require_POST
 def auth_phone_request(request):
-    """POST /api/v1/auth/phone/request/ — Request 6-digit OTP for phone/email login.
-    Accepts `identifier` (phone number or email).
-    Sends OTP via WhatsApp and Email."""
+    """POST /api/v1/auth/phone/request/ — Request 6-digit OTP for phone/email login or verification.
+    Accepts `identifier` (phone number or email), optional `channel` ('phone'|'email'),
+    and optional `purpose`."""
     try:
         payload = json.loads(request.body)
     except (json.JSONDecodeError, TypeError):
         return JsonResponse({'ok': False, 'error': 'Invalid request body.'}, status=400)
 
     raw_ident = (payload.get('identifier') or '').strip()
+    channel = (payload.get('channel') or '').strip().lower()
+    purpose = (payload.get('purpose') or 'Login to Elix Premium Salon').strip()
+
     if not raw_ident:
         return JsonResponse({'ok': False, 'error': 'Please enter your phone number or email address.'}, status=400)
 
+    is_signup = any(k in purpose.lower() for k in ['signup', 'sign up', 'register', 'verification'])
+
     phone = ''
     email = ''
-    if '@' in raw_ident:
+
+    if channel == 'email' or ('@' in raw_ident and channel != 'phone'):
         email = raw_ident.lower()
-        user = User.objects.filter(email__iexact=email, is_active=True).first()
-        if user and hasattr(user, 'profile') and user.profile.phone:
-            phone = user.profile.phone
+        if not email or '@' not in email:
+            return JsonResponse({'ok': False, 'error': 'Please enter a valid email address.'}, status=400)
+        if is_signup and User.objects.filter(email__iexact=email).exists():
+            return JsonResponse({'ok': False, 'error': 'An account with this email already exists. Please log in.'}, status=400)
+        if not is_signup:
+            user = User.objects.filter(email__iexact=email, is_active=True).first()
+            if user and hasattr(user, 'profile') and user.profile.phone:
+                phone = user.profile.phone
     else:
         try:
             phone = IndianPhoneField(required=False).clean(raw_ident)
         except forms.ValidationError:
             return JsonResponse({'ok': False, 'error': 'Please enter a valid 10-digit Indian phone number.'}, status=400)
-
-        user = get_adapter().get_user_by_phone(phone)
-        if user and user.email:
-            email = user.email
+        if is_signup and Profile.objects.filter(phone=phone).exists():
+            return JsonResponse({'ok': False, 'error': 'This phone number is already registered. Please log in.'}, status=400)
+        if not is_signup:
+            user = get_adapter().get_user_by_phone(phone)
+            if user and user.email:
+                email = user.email
 
     try:
-        verification_id = whatsapp_otp.send_otp(phone=phone, email=email)
+        verification_id = whatsapp_otp.send_otp(phone=phone, email=email, purpose=purpose)
     except Exception as e:
         logger.exception('send_otp failed for identifier=%s', raw_ident)
         return JsonResponse({'ok': False, 'error': "Couldn't send verification code. Please try again shortly."}, status=500)
@@ -407,6 +420,44 @@ def auth_phone_request(request):
         'verification_id': verification_id,
         'masked_identifier': masked,
         'dev_code': dev_code,
+    })
+
+
+@csrf_exempt
+@require_POST
+def auth_verify_code(request):
+    """POST /api/v1/auth/verify-code/ — Validate 6-digit OTP code without requiring an existing user.
+    Used for on-page mobile or email verification during sign up.
+    """
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body.'}, status=400)
+
+    verification_id = (payload.get('verification_id') or '').strip()
+    code = (payload.get('code') or '').strip()
+
+    if not verification_id or not code:
+        return JsonResponse({'ok': False, 'error': 'Verification ID and code are required.'}, status=400)
+
+    cache_key = f'{whatsapp_otp.CACHE_PREFIX}{verification_id}'
+    stored = cache.get(cache_key)
+    if not stored or not isinstance(stored, dict):
+        return JsonResponse({'ok': False, 'error': 'Verification code has expired. Please request a new one.'}, status=400)
+
+    phone = stored.get('phone')
+    email = stored.get('email')
+
+    verified = whatsapp_otp.validate_otp(verification_id, code)
+    if not verified:
+        return JsonResponse({'ok': False, 'error': 'Incorrect or expired verification code.'}, status=400)
+
+    return JsonResponse({
+        'ok': True,
+        'verified': True,
+        'phone': phone,
+        'email': email,
+        'message': 'Verification code confirmed successfully.',
     })
 
 

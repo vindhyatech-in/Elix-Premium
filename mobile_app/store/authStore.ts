@@ -56,6 +56,18 @@ interface AuthState {
     dev_code?: string;
     error?: string;
   }>;
+  requestVerificationCode: (identifier: string, channel: 'phone' | 'email', purpose?: string) => Promise<{
+    ok: boolean;
+    verification_id?: string;
+    masked_identifier?: string;
+    dev_code?: string;
+    error?: string;
+  }>;
+  verifyCode: (verification_id: string, code: string) => Promise<{
+    ok: boolean;
+    verified?: boolean;
+    error?: string;
+  }>;
   verifyPhoneOtp: (verification_id: string, code: string) => Promise<{
     ok: boolean;
     not_found?: boolean;
@@ -151,6 +163,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (err: any) {
       const error = err?.response?.data?.error ?? 'Could not send verification code.';
       set({ isLoading: false });
+      return { ok: false, error };
+    }
+  },
+
+  /** Request OTP specifically for phone or email verification */
+  requestVerificationCode: async (identifier, channel, purpose) => {
+    try {
+      const res = await apiClient.post('/auth/phone/request/', { identifier, channel, purpose });
+      return res.data;
+    } catch (err: any) {
+      const error = err?.response?.data?.error ?? 'Could not send verification code.';
+      return { ok: false, error };
+    }
+  },
+
+  /** POST /api/v1/auth/verify-code/ */
+  verifyCode: async (verification_id, code) => {
+    try {
+      const res = await apiClient.post('/auth/verify-code/', { verification_id, code });
+      return res.data;
+    } catch (err: any) {
+      const error = err?.response?.data?.error ?? 'Invalid or expired verification code.';
       return { ok: false, error };
     }
   },

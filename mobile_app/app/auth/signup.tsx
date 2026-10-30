@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { ElixColors, ElixRadii, ElixTypography, ElixShadows } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
@@ -33,9 +33,157 @@ export default function SignupScreen() {
   // Focus states
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [verifiedToast, setVerifiedToast] = useState<string | null>(null);
 
-  const { signup, isLoading } = useAuthStore();
+  // ── Verification States (At least ONE required: Phone OR Email) ───────────
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
 
+  // ── OTP Popup Modal States ────────────────────────────────────────────────
+  const [isVerifyModalVisible, setIsVerifyModalVisible] = useState(false);
+  const [verifyChannel, setVerifyChannel] = useState<'phone' | 'email'>('phone');
+  const [targetValue, setTargetValue] = useState('');
+  const [verificationId, setVerificationId] = useState('');
+  const [otpInput, setOtpInput] = useState('');
+  const [modalError, setModalError] = useState('');
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(60);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+
+  const { signup, requestVerificationCode, verifyCode, isLoading } = useAuthStore();
+
+  // Countdown timer for OTP resend in popup
+  useEffect(() => {
+    let timer: any;
+    if (isVerifyModalVisible && countdown > 0) {
+      timer = setInterval(() => setCountdown((c) => c - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isVerifyModalVisible, countdown]);
+
+  // Auto-dismiss verified toast
+  useEffect(() => {
+    if (verifiedToast) {
+      const timer = setTimeout(() => setVerifiedToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [verifiedToast]);
+
+  // ── REQUEST VERIFICATION CODE ─────────────────────────────────────────────
+  async function handleStartVerification(channel: 'phone' | 'email') {
+    setError('');
+    setModalError('');
+
+    if (channel === 'phone') {
+      const cleanPhone = phone.replace(/\D/g, '');
+      if (!cleanPhone || cleanPhone.length < 10) {
+        setError('Please enter a valid 10-digit Indian phone number first.');
+        return;
+      }
+      setIsSendingCode(true);
+      const res = await requestVerificationCode(
+        cleanPhone,
+        'phone',
+        'Mobile Verification for Elix Signup'
+      );
+      setIsSendingCode(false);
+
+      if (res.ok && res.verification_id) {
+        setVerificationId(res.verification_id);
+        setVerifyChannel('phone');
+        setTargetValue(cleanPhone);
+        setDevCode(res.dev_code || null);
+        setOtpInput(res.dev_code || '');
+        setCountdown(60);
+        setIsVerifyModalVisible(true);
+      } else {
+        setError(res.error || 'Failed to dispatch SMS/WhatsApp verification code.');
+      }
+    } else {
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.includes('@')) {
+        setError('Please enter a valid email address first.');
+        return;
+      }
+      setIsSendingCode(true);
+      const res = await requestVerificationCode(
+        cleanEmail,
+        'email',
+        'Email Verification for Elix Signup'
+      );
+      setIsSendingCode(false);
+
+      if (res.ok && res.verification_id) {
+        setVerificationId(res.verification_id);
+        setVerifyChannel('email');
+        setTargetValue(cleanEmail);
+        setDevCode(res.dev_code || null);
+        setOtpInput(res.dev_code || '');
+        setCountdown(60);
+        setIsVerifyModalVisible(true);
+      } else {
+        setError(res.error || 'Failed to dispatch email verification code.');
+      }
+    }
+  }
+
+  // ── CONFIRM OTP IN POPUP ──────────────────────────────────────────────────
+  async function handleConfirmCode() {
+    setModalError('');
+    const code = otpInput.trim();
+    if (!code || code.length < 4) {
+      setModalError('Please enter the 6-digit verification code.');
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    const res = await verifyCode(verificationId, code);
+    setIsVerifyingCode(false);
+
+    if (res.ok || res.verified) {
+      if (verifyChannel === 'phone') {
+        setIsPhoneVerified(true);
+        setVerifiedToast('Mobile Number verified successfully! ✓');
+      } else {
+        setIsEmailVerified(true);
+        setVerifiedToast('Email Address verified successfully! ✓');
+      }
+      setIsVerifyModalVisible(false);
+      setError('');
+    } else {
+      setModalError(res.error || 'Incorrect or expired code. Please try again.');
+    }
+  }
+
+  // ── RESEND OTP IN POPUP ───────────────────────────────────────────────────
+  async function handleResendCode() {
+    if (countdown > 0) return;
+    setModalError('');
+    setIsSendingCode(true);
+    const res = await requestVerificationCode(
+      targetValue,
+      verifyChannel,
+      verifyChannel === 'phone'
+        ? 'Mobile Verification for Elix Signup'
+        : 'Email Verification for Elix Signup'
+    );
+    setIsSendingCode(false);
+
+    if (res.ok && res.verification_id) {
+      setVerificationId(res.verification_id);
+      if (res.dev_code) {
+        setDevCode(res.dev_code);
+        setOtpInput(res.dev_code);
+      }
+      setCountdown(60);
+      Alert.alert('Code Sent', `A new verification code has been dispatched to ${targetValue}.`);
+    } else {
+      setModalError(res.error || 'Failed to resend code.');
+    }
+  }
+
+  // ── SIGNUP SUBMIT ──────────────────────────────────────────────────────────
   async function handleSignup() {
     setError('');
 
@@ -55,6 +203,15 @@ export default function SignupScreen() {
       setError('Please enter a valid 10-digit phone number.');
       return;
     }
+
+    // ── ANY ONE VERIFICATION REQUIRED ────────────────────────────────────────
+    if (!isPhoneVerified && !isEmailVerified) {
+      setError(
+        'Verification required: Please verify either your Mobile Number or Email Address to complete sign up.'
+      );
+      return;
+    }
+
     if (age && (parseInt(age, 10) < 13 || parseInt(age, 10) > 120)) {
       setError('Age must be between 13 and 120.');
       return;
@@ -106,16 +263,17 @@ export default function SignupScreen() {
     );
   }
 
+  const anyVerified = isPhoneVerified || isEmailVerified;
+
   return (
     <KeyboardAvoidingView
-      style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.root}
     >
-      <StatusBar style="dark" />
       <ScrollView
         contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Brand Logo Header */}
         <TouchableOpacity
@@ -124,36 +282,58 @@ export default function SignupScreen() {
           activeOpacity={0.8}
         >
           <Text style={styles.brandLogo}>
-            Elix<Text style={styles.brandLogoAccent}>.</Text>
+            <Text style={styles.brandLogoAccent}>E</Text>LIX
           </Text>
         </TouchableOpacity>
 
-        {/* Auth Card matching Web .auth-card */}
+        {/* Auth Card */}
         <View style={styles.card}>
           {/* Card Header */}
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Sign Up</Text>
+            <Text style={styles.cardTitle}>Create Account</Text>
             <Text style={styles.cardSubtitle}>
-              Already have an account? Then please{' '}
-              <Text
-                style={styles.inlineLink}
-                onPress={() => router.push('/auth/login')}
-              >
-                sign in
+              Already have an account?{' '}
+              <Text style={styles.inlineLink} onPress={() => router.push('/auth/login')}>
+                Sign In
               </Text>
-              .
             </Text>
           </View>
 
-          {/* Alert error box matching web .auth-card__alert */}
+          {/* Toast / Success Notification */}
+          {verifiedToast ? (
+            <View style={styles.toastBox}>
+              <Ionicons name="checkmark-circle" size={18} color={ElixColors.greenDeep} />
+              <Text style={styles.toastText}>{verifiedToast}</Text>
+            </View>
+          ) : null}
+
+          {/* Alert error box */}
           {error ? (
             <View style={styles.alertBox}>
-              <Ionicons name="alert-circle-outline" size={18} color={ElixColors.ink} />
+              <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
               <Text style={styles.alertText}>{error}</Text>
             </View>
           ) : null}
 
-          {/* Social Quick Signup matching Web .auth-social-list */}
+          {/* Verification Rule Notice */}
+          <View style={[styles.ruleNotice, anyVerified && styles.ruleNoticeDone]}>
+            <Ionicons
+              name={anyVerified ? 'shield-checkmark' : 'information-circle'}
+              size={18}
+              color={anyVerified ? ElixColors.greenDeep : ElixColors.blue}
+            />
+            <Text style={[styles.ruleNoticeText, anyVerified && styles.ruleNoticeTextDone]}>
+              {isPhoneVerified && isEmailVerified
+                ? 'Both Mobile and Email are verified!'
+                : isPhoneVerified
+                ? 'Mobile verified! Email verification is optional.'
+                : isEmailVerified
+                ? 'Email verified! Mobile verification is optional.'
+                : 'Verify at least one: Mobile Number or Email Address to complete sign up.'}
+            </Text>
+          </View>
+
+          {/* Social Quick Signup */}
           <View style={styles.socialList}>
             <TouchableOpacity
               style={styles.socialBtn}
@@ -174,16 +354,16 @@ export default function SignupScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Divider matching web .auth-divider */}
+          {/* Divider */}
           <View style={styles.dividerWrap}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR SIGN UP WITH EMAIL</Text>
+            <Text style={styles.dividerText}>OR SIGN UP WITH DETAILS</Text>
             <View style={styles.dividerLine} />
           </View>
 
           {/* Signup Form */}
           <View style={styles.form}>
-            {/* NAME ROW (FIRST NAME + LAST NAME) */}
+            {/* NAME ROW */}
             <View style={styles.row}>
               <View style={[styles.fieldGroup, { flex: 1 }]}>
                 <Text style={styles.fieldLabel}>FIRST NAME:</Text>
@@ -230,19 +410,42 @@ export default function SignupScreen() {
               </View>
             </View>
 
-            {/* EMAIL */}
+            {/* EMAIL (WITH INLINE VERIFY ACTION) */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>EMAIL:</Text>
+              <View style={styles.labelActionRow}>
+                <Text style={styles.fieldLabel}>EMAIL ADDRESS:</Text>
+                {isEmailVerified ? (
+                  <View style={styles.verifiedChip}>
+                    <Ionicons name="checkmark-circle" size={13} color={ElixColors.greenDeep} />
+                    <Text style={styles.verifiedChipText}>Verified</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.verifyBtn}
+                    onPress={() => handleStartVerification('email')}
+                    disabled={isSendingCode}
+                    hitSlop={6}
+                  >
+                    <Ionicons name="shield-outline" size={12} color={ElixColors.blue} />
+                    <Text style={styles.verifyBtnText}>Verify Email</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <View
                 style={[
                   styles.inputContainer,
                   focusedField === 'email' && styles.inputFocused,
+                  isEmailVerified && styles.inputContainerVerified,
                 ]}
               >
                 <TextInput
                   style={styles.input}
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(t) => {
+                    setEmail(t);
+                    if (isEmailVerified) setIsEmailVerified(false);
+                  }}
                   placeholder="name@example.com"
                   placeholderTextColor="#94A3B8"
                   keyboardType="email-address"
@@ -252,16 +455,44 @@ export default function SignupScreen() {
                   onBlur={() => setFocusedField(null)}
                   editable={!isLoading}
                 />
+                {isEmailVerified && (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={20}
+                    color={ElixColors.green}
+                    style={{ marginLeft: 6 }}
+                  />
+                )}
               </View>
             </View>
 
-            {/* PHONE NUMBER */}
+            {/* PHONE NUMBER (WITH INLINE VERIFY ACTION) */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>PHONE NUMBER:</Text>
+              <View style={styles.labelActionRow}>
+                <Text style={styles.fieldLabel}>PHONE NUMBER:</Text>
+                {isPhoneVerified ? (
+                  <View style={styles.verifiedChip}>
+                    <Ionicons name="checkmark-circle" size={13} color={ElixColors.greenDeep} />
+                    <Text style={styles.verifiedChipText}>Verified</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.verifyBtn}
+                    onPress={() => handleStartVerification('phone')}
+                    disabled={isSendingCode}
+                    hitSlop={6}
+                  >
+                    <Ionicons name="shield-outline" size={12} color={ElixColors.blue} />
+                    <Text style={styles.verifyBtnText}>Verify Mobile</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <View
                 style={[
                   styles.inputContainer,
                   focusedField === 'phone' && styles.inputFocused,
+                  isPhoneVerified && styles.inputContainerVerified,
                 ]}
               >
                 <View style={styles.phonePrefix}>
@@ -270,7 +501,10 @@ export default function SignupScreen() {
                 <TextInput
                   style={styles.input}
                   value={phone}
-                  onChangeText={setPhone}
+                  onChangeText={(t) => {
+                    setPhone(t);
+                    if (isPhoneVerified) setIsPhoneVerified(false);
+                  }}
                   placeholder="9876543210"
                   placeholderTextColor="#94A3B8"
                   keyboardType="phone-pad"
@@ -279,12 +513,20 @@ export default function SignupScreen() {
                   onBlur={() => setFocusedField(null)}
                   editable={!isLoading}
                 />
+                {isPhoneVerified && (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={20}
+                    color={ElixColors.green}
+                    style={{ marginLeft: 6 }}
+                  />
+                )}
               </View>
             </View>
 
             {/* AGE */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>AGE:</Text>
+              <Text style={styles.fieldLabel}>AGE (OPTIONAL):</Text>
               <View
                 style={[
                   styles.inputContainer,
@@ -378,17 +620,17 @@ export default function SignupScreen() {
               </View>
             </View>
 
-            {/* SUBMIT BUTTON matching .auth-submit-btn */}
+            {/* SUBMIT BUTTON */}
             <TouchableOpacity
               style={[styles.submitBtn, isLoading && styles.submitBtnDisabled]}
               onPress={handleSignup}
-              disabled={isLoading}
+              disabled={isLoading || isSendingCode}
               activeOpacity={0.85}
             >
-              {isLoading ? (
-                <ActivityIndicator color="#16120F" size="small" />
+              {isLoading || isSendingCode ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.submitBtnText}>Sign Up</Text>
+                <Text style={styles.submitBtnText}>Create Account</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -396,6 +638,116 @@ export default function SignupScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* ── ON-PAGE OTP VERIFICATION POPUP MODAL ────────────────────────────── */}
+      <Modal
+        visible={isVerifyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsVerifyModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalCard}>
+            {/* Modal Header */}
+            <View style={styles.modalTopRow}>
+              <View style={styles.modalIconCircle}>
+                <Ionicons
+                  name={verifyChannel === 'phone' ? 'call' : 'mail'}
+                  size={22}
+                  color={ElixColors.blue}
+                />
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setIsVerifyModalVisible(false)}
+                hitSlop={10}
+                accessibilityLabel="Close verification modal"
+              >
+                <Ionicons name="close" size={20} color={ElixColors.inkMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalTitle}>
+              Verify {verifyChannel === 'phone' ? 'Mobile Number' : 'Email Address'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              We sent a 6-digit verification code to{' '}
+              <Text style={{ fontWeight: '700', color: ElixColors.ink }}>
+                {verifyChannel === 'phone' ? `+91 ${targetValue}` : targetValue}
+              </Text>
+              . Enter it below to verify.
+            </Text>
+
+            {modalError ? (
+              <View style={styles.modalAlert}>
+                <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                <Text style={styles.modalAlertText}>{modalError}</Text>
+              </View>
+            ) : null}
+
+            {/* OTP 6-Digit Input */}
+            <View style={styles.modalInputWrap}>
+              <TextInput
+                style={styles.modalOtpInput}
+                value={otpInput}
+                onChangeText={setOtpInput}
+                placeholder="000000"
+                placeholderTextColor="#94A3B8"
+                keyboardType="number-pad"
+                maxLength={6}
+                autoFocus
+                returnKeyType="done"
+              />
+            </View>
+
+            {devCode ? (
+              <View style={styles.devHintWrap}>
+                <Text style={styles.devHintText}>
+                  Dev auto-fill: <Text style={{ fontWeight: '800' }}>{devCode}</Text>
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Resend Row */}
+            <View style={styles.resendRow}>
+              <Text style={styles.resendText}>Didn't receive code? </Text>
+              {countdown > 0 ? (
+                <Text style={styles.countdownText}>Resend in {countdown}s</Text>
+              ) : (
+                <TouchableOpacity onPress={handleResendCode} disabled={isSendingCode}>
+                  <Text style={styles.resendBtnText}>Resend Code</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Modal Actions */}
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.modalVerifyBtn}
+                onPress={handleConfirmCode}
+                disabled={isVerifyingCode}
+                activeOpacity={0.85}
+              >
+                {isVerifyingCode ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.modalVerifyBtnText}>Verify & Confirm</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setIsVerifyModalVisible(false)}
+                disabled={isVerifyingCode}
+              >
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -413,14 +765,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoRow: {
-    marginBottom: 24,
+    marginBottom: 20,
     alignItems: 'center',
   },
   brandLogo: {
     fontSize: 32,
-    fontWeight: ElixTypography.weights.bold,
+    fontWeight: '900',
     color: ElixColors.ink,
-    letterSpacing: -0.5,
+    letterSpacing: 2,
   },
   brandLogoAccent: {
     color: ElixColors.blue,
@@ -439,13 +791,13 @@ const styles = StyleSheet.create({
     ...ElixShadows.sm,
   },
   cardHeader: {
-    marginBottom: 18,
+    marginBottom: 16,
   },
   cardTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: ElixTypography.weights.bold,
     color: ElixColors.ink,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   cardSubtitle: {
     fontSize: 14,
@@ -458,11 +810,59 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
 
+  // Rule Notice
+  ruleNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: ElixColors.blueLight,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: ElixRadii.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  ruleNoticeDone: {
+    backgroundColor: ElixColors.greenLight,
+    borderColor: '#A7F3D0',
+  },
+  ruleNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: ElixColors.blue,
+    lineHeight: 16,
+  },
+  ruleNoticeTextDone: {
+    color: ElixColors.greenDeep,
+  },
+
+  // Toast
+  toastBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: ElixColors.greenLight,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: ElixRadii.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  toastText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: ElixColors.greenDeep,
+  },
+
   // Alert
   alertBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: ElixColors.surface3,
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FECACA',
     borderRadius: ElixRadii.md,
@@ -474,8 +874,9 @@ const styles = StyleSheet.create({
   alertText: {
     flex: 1,
     fontSize: 13,
-    color: ElixColors.ink,
+    color: '#B91C1C',
     fontWeight: ElixTypography.weights.medium,
+    lineHeight: 18,
   },
 
   // Social
@@ -486,7 +887,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 50,
+    height: 48,
     borderRadius: ElixRadii.pill,
     backgroundColor: ElixColors.surface1,
     borderWidth: 1,
@@ -504,7 +905,7 @@ const styles = StyleSheet.create({
   dividerWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 18,
     gap: 10,
   },
   dividerLine: {
@@ -530,18 +931,51 @@ const styles = StyleSheet.create({
   fieldGroup: {
     marginBottom: 14,
   },
+  labelActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
   fieldLabel: {
     fontSize: 11,
     fontWeight: ElixTypography.weights.bold,
     color: ElixColors.inkMuted,
     letterSpacing: 0.8,
-    marginBottom: 6,
     textTransform: 'uppercase',
+  },
+  verifyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: ElixColors.blueLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: ElixRadii.pill,
+  },
+  verifyBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: ElixColors.blue,
+  },
+  verifiedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: ElixColors.greenLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: ElixRadii.pill,
+  },
+  verifiedChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: ElixColors.greenDeep,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 50,
+    height: 48,
     borderWidth: 1.5,
     borderColor: ElixColors.borderHairlineMedium,
     borderRadius: ElixRadii.md,
@@ -552,9 +986,13 @@ const styles = StyleSheet.create({
     borderColor: ElixColors.blue,
     backgroundColor: '#FFFFFF',
   },
+  inputContainerVerified: {
+    borderColor: ElixColors.green,
+    backgroundColor: '#F0FDF4',
+  },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     color: ElixColors.ink,
     height: '100%',
   },
@@ -576,7 +1014,7 @@ const styles = StyleSheet.create({
   // Submit Button
   submitBtn: {
     marginTop: 8,
-    height: 52,
+    height: 50,
     backgroundColor: ElixColors.blue,
     borderRadius: ElixRadii.pill,
     alignItems: 'center',
@@ -595,5 +1033,154 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: ElixTypography.weights.bold,
     letterSpacing: 0.2,
+  },
+
+  // ── POPUP MODAL STYLES ────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+    ...ElixShadows.md,
+  },
+  modalTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  modalIconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: ElixColors.blueLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: ElixColors.ink,
+    marginBottom: 6,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: ElixColors.inkMuted,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  modalAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 14,
+  },
+  modalAlertText: {
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '600',
+    flex: 1,
+  },
+  modalInputWrap: {
+    borderWidth: 2,
+    borderColor: ElixColors.blue,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  modalOtpInput: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: ElixColors.ink,
+    letterSpacing: 10,
+    textAlign: 'center',
+    width: '100%',
+    height: '100%',
+    paddingVertical: 0,
+  },
+  devHintWrap: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  devHintText: {
+    fontSize: 11,
+    color: ElixColors.blue,
+  },
+  resendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+    gap: 4,
+  },
+  resendText: {
+    fontSize: 12,
+    color: ElixColors.inkMuted,
+  },
+  countdownText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: ElixColors.inkMuted,
+  },
+  resendBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: ElixColors.blue,
+    textDecorationLine: 'underline',
+  },
+  modalBtnRow: {
+    gap: 8,
+  },
+  modalVerifyBtn: {
+    height: 48,
+    borderRadius: ElixRadii.pill,
+    backgroundColor: ElixColors.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalVerifyBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalCancelBtn: {
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: ElixColors.inkMuted,
   },
 });

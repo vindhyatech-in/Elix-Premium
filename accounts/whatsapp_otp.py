@@ -122,16 +122,25 @@ def send_email_otp(email: str, code: str, purpose: str = 'Login to Elix Premium 
                 'site_email': getattr(settings, 'SITE_EMAIL', 'support@elix.in'),
                 'site_phone': getattr(settings, 'SITE_PHONE', '+91 95849 79324'),
             }
-            subject = f'[{site_name}] Your Login Verification Code: {code}'
+            is_verification = any(kw in (purpose or '').lower() for kw in ['verif', 'signup', 'sign up', 'register'])
+            if is_verification:
+                subject = f'[{site_name}] Your Email Verification Code: {code}'
+                tpl_html = 'emails/email_verification.html'
+                tpl_txt = 'emails/email_verification.txt'
+            else:
+                subject = f'[{site_name}] Your Login Verification Code: {code}'
+                tpl_html = 'emails/login_otp.html'
+                tpl_txt = 'emails/login_otp.txt'
+
             try:
-                html_body = render_to_string('emails/login_otp.html', context)
+                html_body = render_to_string(tpl_html, context)
             except Exception:
                 html_body = f'<p>Your verification code for {purpose} is <strong>{code}</strong>. Valid for 10 minutes.</p>'
 
             try:
-                txt_body = render_to_string('emails/login_otp.txt', context)
+                txt_body = render_to_string(tpl_txt, context)
             except Exception:
-                txt_body = f'Your verification code for {purpose} is: {code}\nValid for 10 minutes.'
+                txt_body = f'Your verification code for {purpose} is: {code}\\nValid for 10 minutes.'
 
             msg = EmailMultiAlternatives(
                 subject=subject,
