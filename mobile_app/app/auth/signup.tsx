@@ -11,13 +11,14 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { ElixColors, ElixRadii, ElixTypography, ElixShadows } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 
 export default function SignupScreen() {
+  const { redirect } = useLocalSearchParams<{ redirect?: string }>();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -82,7 +83,16 @@ export default function SignupScreen() {
 
     if (result.ok) {
       Alert.alert('Welcome to Elix', 'Your account has been created successfully!', [
-        { text: 'Start Exploring', onPress: () => router.replace('/(tabs)') },
+        {
+          text: redirect === 'booking' ? 'Proceed to Booking' : 'Start Exploring',
+          onPress: () => {
+            if (redirect === 'booking' || redirect === 'cart') {
+              router.replace({ pathname: '/(tabs)/services', params: { openBooking: '1' } });
+            } else {
+              router.replace('/(tabs)');
+            }
+          },
+        },
       ]);
     } else {
       setError(result.error ?? 'Registration failed. Please check your details.');
@@ -138,7 +148,7 @@ export default function SignupScreen() {
           {/* Alert error box matching web .auth-card__alert */}
           {error ? (
             <View style={styles.alertBox}>
-              <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />
+              <Ionicons name="alert-circle-outline" size={18} color={ElixColors.ink} />
               <Text style={styles.alertText}>{error}</Text>
             </View>
           ) : null}
@@ -413,7 +423,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   brandLogoAccent: {
-    color: ElixColors.gold,
+    color: ElixColors.blue,
   },
 
   // Card
@@ -443,7 +453,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   inlineLink: {
-    color: ElixColors.gold,
+    color: ElixColors.blue,
     fontWeight: ElixTypography.weights.bold,
     textDecorationLine: 'underline',
   },
@@ -452,7 +462,7 @@ const styles = StyleSheet.create({
   alertBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: ElixColors.surface3,
     borderWidth: 1,
     borderColor: '#FECACA',
     borderRadius: ElixRadii.md,
@@ -464,7 +474,7 @@ const styles = StyleSheet.create({
   alertText: {
     flex: 1,
     fontSize: 13,
-    color: '#DC2626',
+    color: ElixColors.ink,
     fontWeight: ElixTypography.weights.medium,
   },
 
@@ -539,7 +549,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   inputFocused: {
-    borderColor: ElixColors.gold,
+    borderColor: ElixColors.blue,
     backgroundColor: '#FFFFFF',
   },
   input: {
@@ -567,11 +577,11 @@ const styles = StyleSheet.create({
   submitBtn: {
     marginTop: 8,
     height: 52,
-    backgroundColor: '#D97706',
+    backgroundColor: ElixColors.blue,
     borderRadius: ElixRadii.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#D97706',
+    shadowColor: ElixColors.blue,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28,
     shadowRadius: 10,
@@ -581,7 +591,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   submitBtnText: {
-    color: '#16120F',
+    color: ElixColors.white,
     fontSize: 15,
     fontWeight: ElixTypography.weights.bold,
     letterSpacing: 0.2,

@@ -22,11 +22,11 @@ export const Badge: React.FC<BadgeProps> = ({
   const getColors = () => {
     switch (variant) {
       case 'urgent':
-        return { bg: ElixColors.urgentRed, text: ElixColors.white };
+        return { bg: ElixColors.blueLight, text: ElixColors.blue };
       case 'discount':
         return { bg: ElixColors.greenLight, text: ElixColors.greenDeep };
       case 'rating':
-        return { bg: '#FEF3C7', text: '#92400E' };
+        return { bg: ElixColors.blueLight, text: ElixColors.blue };
       case 'category':
         return { bg: ElixColors.blueLight, text: ElixColors.blue };
       case 'neutral':

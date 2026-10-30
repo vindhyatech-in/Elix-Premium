@@ -89,7 +89,7 @@ export function StepPayment({ onNext }: { onNext: () => void }) {
           />
           {couponApplied ? (
             <Pressable style={styles.couponRemoveBtn} onPress={() => { clearCoupon(); setCouponInput(''); }}>
-              <Ionicons name="close-circle" size={18} color="#DC2626" />
+              <Ionicons name="close-circle" size={18} color={ElixColors.inkMuted} />
               <Text style={styles.couponRemoveText}>Remove</Text>
             </Pressable>
           ) : (
@@ -125,8 +125,8 @@ const styles = StyleSheet.create({
   optIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
   optLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
   optLabel: { fontSize: 15, fontWeight: '700', color: ElixColors.ink },
-  soonBadge: { backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  soonBadgeText: { fontSize: 9, fontWeight: '800', color: '#92400E' },
+  soonBadge: { backgroundColor: ElixColors.blueLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  soonBadgeText: { fontSize: 9, fontWeight: '800', color: ElixColors.blue },
   optSub: { fontSize: 12, color: ElixColors.inkMuted },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' },
   radioActive: { borderColor: ElixColors.blue },
@@ -138,9 +138,9 @@ const styles = StyleSheet.create({
   couponInputApplied: { borderColor: ElixColors.green, backgroundColor: '#F0FDF4' },
   couponApplyBtn: { backgroundColor: ElixColors.blue, paddingHorizontal: 16, paddingVertical: 10, borderRadius: ElixRadii.md, minWidth: 70, alignItems: 'center' },
   couponApplyText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  couponRemoveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: ElixRadii.md, borderWidth: 1.5, borderColor: '#FECACA' },
-  couponRemoveText: { color: '#DC2626', fontWeight: '600', fontSize: 13 },
-  couponError: { fontSize: 12, color: '#DC2626', marginTop: 6 },
+  couponRemoveBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: ElixRadii.md, borderWidth: 1.5, borderColor: ElixColors.borderHairlineMedium },
+  couponRemoveText: { color: ElixColors.inkMuted, fontWeight: '600', fontSize: 13 },
+  couponError: { fontSize: 12, color: ElixColors.inkMuted, marginTop: 6 },
   couponSuccess: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   couponSuccessText: { fontSize: 12, color: ElixColors.green, fontWeight: '600' },
   nextBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ElixColors.blue, borderRadius: ElixRadii.lg, paddingVertical: 14, marginTop: 4, marginBottom: 8 },

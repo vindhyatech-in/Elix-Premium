@@ -7,11 +7,13 @@ import {
   Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ElixColors, ElixRadii, ElixTypography, ElixShadows } from '@/constants/theme';
 import { Header } from '@/components/ui/Header';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { useCartStore } from '@/store/cartStore';
 
 const TOP_EXPRESS_SERVICES = [
   { id: 'u1', name: 'Express Glow Cleanup', duration: '35 mins', price: 599 },
@@ -21,6 +23,7 @@ const TOP_EXPRESS_SERVICES = [
 ];
 
 export default function UrgentScreen() {
+  const { totalItems } = useCartStore();
   const [selectedSlot, setSelectedSlot] = useState('Earliest: In 50 mins');
 
   // Compute live slots starting 50 mins from now
@@ -45,13 +48,18 @@ export default function UrgentScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <Header location="Indore, MP" />
+      <Header
+        location="Indore, MP"
+        cartItemCount={totalItems}
+        onSearchPress={() => router.push({ pathname: '/(tabs)/services', params: { autoSearch: '1' } })}
+        onCartPress={() => router.push({ pathname: '/(tabs)/services', params: { openCart: '1' } })}
+      />
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {/* 1. High-Energy Urgency Header */}
+        {/* 1. Urgency Header */}
         <View style={styles.urgentBanner}>
           <View style={styles.bannerBadgeRow}>
-            <Badge label="⚡ PRIORITY DISPATCH" variant="urgent" />
+            <Badge label="⚡ PRIORITY DISPATCH" variant="category" />
             <Text style={styles.feeHighlight}>+₹99 Express Fee</Text>
           </View>
           <Text style={styles.bannerTitle}>50-Minute Express Urgent Salon</Text>
@@ -61,7 +69,7 @@ export default function UrgentScreen() {
 
           {/* Guarantee Pill */}
           <View style={styles.guaranteeBox}>
-            <Ionicons name="flash" size={16} color={ElixColors.urgentRed} />
+            <Ionicons name="flash" size={16} color={ElixColors.blue} />
             <Text style={styles.guaranteeText}>
               Earliest arrival window: <Text style={{ fontWeight: 'bold' }}>{formatTime(slot1Time)}</Text>
             </Text>
@@ -82,7 +90,7 @@ export default function UrgentScreen() {
                   <Ionicons
                     name={isSelected ? 'radio-button-on' : 'radio-button-off'}
                     size={16}
-                    color={isSelected ? ElixColors.urgentRed : ElixColors.inkMuted}
+                    color={isSelected ? ElixColors.blue : ElixColors.inkMuted}
                   />
                   <Text style={[styles.slotText, isSelected && styles.slotTextActive]}>
                     {slot}
@@ -105,7 +113,7 @@ export default function UrgentScreen() {
               <Button
                 title="+ Add"
                 size="sm"
-                variant="urgent"
+                variant="primary"
                 onPress={() => {}}
                 style={{ paddingHorizontal: 16 }}
               />
@@ -138,9 +146,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   urgentBanner: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: ElixColors.blueLight,
     borderWidth: 1,
-    borderColor: '#FEE2E2',
+    borderColor: '#C7D2FE',
     borderRadius: ElixRadii.xl,
     padding: 20,
     marginHorizontal: 16,
@@ -153,7 +161,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   feeHighlight: {
-    backgroundColor: ElixColors.urgentRed,
+    backgroundColor: ElixColors.blue,
     color: ElixColors.white,
     paddingVertical: 3,
     paddingHorizontal: 8,
@@ -164,12 +172,12 @@ const styles = StyleSheet.create({
   bannerTitle: {
     fontSize: ElixTypography.sizes.lg,
     fontWeight: ElixTypography.weights.bold,
-    color: '#991B1B',
+    color: ElixColors.blue,
     marginBottom: 6,
   },
   bannerDesc: {
     fontSize: 12,
-    color: '#7F1D1D',
+    color: ElixColors.inkSoft,
     lineHeight: 18,
     marginBottom: 14,
   },
@@ -210,8 +218,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   slotCardActive: {
-    backgroundColor: '#FFF1F2',
-    borderColor: ElixColors.urgentRed,
+    backgroundColor: ElixColors.blueLight,
+    borderColor: ElixColors.blue,
   },
   slotText: {
     fontSize: ElixTypography.sizes.sm,
@@ -219,7 +227,7 @@ const styles = StyleSheet.create({
   },
   slotTextActive: {
     fontWeight: ElixTypography.weights.bold,
-    color: ElixColors.urgentRed,
+    color: ElixColors.blue,
   },
   expressItemCard: {
     backgroundColor: ElixColors.surface2,

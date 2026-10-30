@@ -44,13 +44,11 @@ export const Button: React.FC<ButtonProps> = ({
 
     switch (variant) {
       case 'primary':
+      case 'urgent':
         bg = pressed ? ElixColors.blueDeep : ElixColors.blue;
         break;
       case 'secondary':
         bg = pressed ? '#E2E8F0' : ElixColors.surface3;
-        break;
-      case 'urgent':
-        bg = pressed ? '#DC2626' : ElixColors.urgentRed;
         break;
       case 'ghost':
         bg = pressed ? ElixColors.blueLight : 'transparent';

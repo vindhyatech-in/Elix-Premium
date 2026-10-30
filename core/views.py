@@ -198,6 +198,7 @@ def service_detail(request, slug):
         'how_it_works': how_it_works,
         'related_services': related_qs,
         'booking_categories': booking_data.get_booking_categories(),
+        'booking_offers': booking_data.get_booking_offers(),
         'booking_catalog': booking_data.get_booking_catalog(),
     }
     return render(request, 'booking/pages/service_detail.html', context)
@@ -236,6 +237,9 @@ def privacy_policy(request):
     """
     return render(request, 'core/privacy.html', {
         'page_title': f"Privacy Policy — {settings.SITE_NAME}",
+        'booking_categories': booking_data.get_booking_categories(),
+        'booking_offers': booking_data.get_booking_offers(),
+        'booking_catalog': booking_data.get_booking_catalog(),
     })
 
 
@@ -245,6 +249,9 @@ def terms_and_conditions(request):
     """
     return render(request, 'core/terms.html', {
         'page_title': f"Terms of Service — {settings.SITE_NAME}",
+        'booking_categories': booking_data.get_booking_categories(),
+        'booking_offers': booking_data.get_booking_offers(),
+        'booking_catalog': booking_data.get_booking_catalog(),
     })
 
 

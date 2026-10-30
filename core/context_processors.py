@@ -80,3 +80,24 @@ def admin_sidebar_counts(request):
         except Exception:
             return {'unassigned_active_count': 0}
     return {}
+
+
+def navbar_data(request):
+    """
+    Injects `booking_categories`, `booking_offers`, and `booking_catalog`
+    into templates so navbar dropdowns (Categories, Offers, Packages)
+    render populated content on all marketing and customer-facing pages.
+    Excludes dashboard and API routes to avoid unnecessary queries.
+    """
+    path = request.path
+    if path.startswith('/dashboard/') or path.startswith('/employee/') or path.startswith('/api/'):
+        return {}
+    try:
+        from core import booking_data
+        return {
+            'booking_categories': booking_data.get_booking_categories(),
+            'booking_offers': booking_data.get_booking_offers(),
+            'booking_catalog': booking_data.get_booking_catalog(),
+        }
+    except Exception:
+        return {}

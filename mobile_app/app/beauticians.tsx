@@ -141,17 +141,17 @@ export default function BeauticiansScreen() {
         {/* 2. Trust Promise Strip */}
         <View style={styles.promiseBanner}>
           <View style={styles.promiseItem}>
-            <Ionicons name="finger-print-outline" size={18} color={ElixColors.gold} />
+            <Ionicons name="finger-print-outline" size={18} color={ElixColors.blue} />
             <Text style={styles.promiseText}>Police & ID Verified</Text>
           </View>
           <View style={styles.promiseDivider} />
           <View style={styles.promiseItem}>
-            <Ionicons name="ribbon-outline" size={18} color={ElixColors.gold} />
+            <Ionicons name="ribbon-outline" size={18} color={ElixColors.blue} />
             <Text style={styles.promiseText}>4+ Yrs Salon Exp</Text>
           </View>
           <View style={styles.promiseDivider} />
           <View style={styles.promiseItem}>
-            <Ionicons name="sparkles-outline" size={18} color={ElixColors.gold} />
+            <Ionicons name="sparkles-outline" size={18} color={ElixColors.blue} />
             <Text style={styles.promiseText}>Monodose Kits</Text>
           </View>
         </View>
@@ -197,7 +197,7 @@ export default function BeauticiansScreen() {
         {/* 5. Beautician Cards List */}
         {isLoading ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={ElixColors.gold} />
+            <ActivityIndicator size="large" color={ElixColors.blue} />
             <Text style={styles.loadingText}>Loading certified artists...</Text>
           </View>
         ) : filteredBeauticians.length === 0 ? (
@@ -220,7 +220,7 @@ export default function BeauticiansScreen() {
                     />
                   ) : (
                     <View style={styles.avatarFallback}>
-                      <Ionicons name="person" size={28} color={ElixColors.gold} />
+                      <Ionicons name="person" size={28} color={ElixColors.blue} />
                     </View>
                   )}
                   <View style={styles.verifiedDot}>
@@ -233,7 +233,7 @@ export default function BeauticiansScreen() {
                   <View style={styles.nameRow}>
                     <Text style={styles.artistName}>{artist.name}</Text>
                     <View style={styles.ratingBadge}>
-                      <Ionicons name="star" size={12} color="#F59E0B" />
+                      <Ionicons name="star" size={12} color={ElixColors.blue} />
                       <Text style={styles.ratingText}>{Number(artist.rating).toFixed(1)}</Text>
                     </View>
                   </View>
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: ElixColors.blueLight,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: ElixRadii.full,

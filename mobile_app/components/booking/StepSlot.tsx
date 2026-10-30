@@ -67,7 +67,7 @@ export function StepSlot({ onNext }: { onNext: () => void }) {
             style={[styles.typeCard, bookingType === t.key && ((t.key === 'urgent') ? styles.typeCardUrgentActive : styles.typeCardActive)]}
             onPress={() => setBookingType(t.key)}
           >
-            <View style={[styles.typeIcon, (t.key === 'urgent') && { backgroundColor: '#FEE2E2' }]}>
+            <View style={[styles.typeIcon, (t.key === 'urgent') && { backgroundColor: ElixColors.blueLight }]}>
               <Ionicons name={t.icon as any} size={22} color={(t.key === 'urgent') ? ElixColors.urgentRed : ElixColors.blue} />
             </View>
             <Text style={[styles.typeLabel, bookingType === t.key && !(t.key === 'urgent') && { color: ElixColors.blue }, bookingType === t.key && (t.key === 'urgent') && { color: ElixColors.urgentRed }]}>{t.label}</Text>
@@ -113,7 +113,7 @@ export function StepSlot({ onNext }: { onNext: () => void }) {
       {bookingType === 'urgent' && (
         <View style={styles.slotsSection}>
           <View style={styles.urgentBanner}>
-            <Ionicons name="flash" size={14} color={ElixColors.urgentRed} />
+            <Ionicons name="flash" size={14} color={ElixColors.blue} />
             <Text style={styles.urgentBannerText}>Artist arrives within 50 minutes · Rs.99 express fee · Rs.50 rush bonus to artist</Text>
           </View>
           <Text style={styles.slotSectionTitle}>Select Arrival Time</Text>
@@ -151,15 +151,15 @@ const styles = StyleSheet.create({
   typeToggle: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   typeCard: { flex: 1, borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: ElixRadii.lg, padding: 14, alignItems: 'center', gap: 4 },
   typeCardActive: { borderColor: ElixColors.blue, backgroundColor: '#EFF6FF' },
-  typeCardUrgentActive: { borderColor: ElixColors.urgentRed, backgroundColor: '#FEF2F2' },
+  typeCardUrgentActive: { borderColor: ElixColors.blue, backgroundColor: ElixColors.blueLight },
   typeIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   typeLabel: { fontSize: 14, fontWeight: '700', color: ElixColors.ink },
   typeSub: { fontSize: 11, color: ElixColors.inkMuted, textAlign: 'center' },
-  urgentFeeTag: { backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20, marginTop: 2 },
-  urgentFeeText: { fontSize: 10, fontWeight: '800', color: ElixColors.urgentRed },
+  urgentFeeTag: { backgroundColor: ElixColors.blueLight, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20, marginTop: 2 },
+  urgentFeeText: { fontSize: 10, fontWeight: '800', color: ElixColors.blue },
   typeRadio: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   typeRadioActive: { borderColor: ElixColors.blue },
-  typeRadioUrgent: { borderColor: ElixColors.urgentRed },
+  typeRadioUrgent: { borderColor: ElixColors.blue },
   typeRadioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: ElixColors.blue },
   slotsSection: { marginBottom: 16 },
   slotSectionTitle: { fontSize: 14, fontWeight: '700', color: ElixColors.ink, marginBottom: 10 },
@@ -171,15 +171,15 @@ const styles = StyleSheet.create({
   slotRadio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' },
   slotRadioActive: { borderColor: ElixColors.blue },
   slotRadioInner: { width: 9, height: 9, borderRadius: 5, backgroundColor: ElixColors.blue },
-  urgentBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: '#FEF2F2', borderRadius: ElixRadii.md, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#FEE2E2' },
-  urgentBannerText: { fontSize: 12, color: '#991B1B', flex: 1, lineHeight: 16 },
+  urgentBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: ElixColors.blueLight, borderRadius: ElixRadii.md, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#C7D2FE' },
+  urgentBannerText: { fontSize: 12, color: ElixColors.blueDeep, flex: 1, lineHeight: 16 },
   urgentGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   urgentSlotBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: ElixRadii.md, borderWidth: 1.5, borderColor: '#E5E7EB', backgroundColor: ElixColors.white },
-  urgentSlotBtnActive: { borderColor: ElixColors.urgentRed, backgroundColor: '#FEF2F2' },
+  urgentSlotBtnActive: { borderColor: ElixColors.blue, backgroundColor: ElixColors.blueLight },
   urgentSlotText: { fontSize: 13, fontWeight: '600', color: ElixColors.inkMuted },
-  urgentSlotTextActive: { color: ElixColors.urgentRed, fontWeight: '800' },
+  urgentSlotTextActive: { color: ElixColors.blue, fontWeight: '800' },
   nextBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ElixColors.blue, borderRadius: ElixRadii.lg, paddingVertical: 14, marginTop: 8 },
-  nextBtnUrgent: { backgroundColor: ElixColors.urgentRed },
+  nextBtnUrgent: { backgroundColor: ElixColors.blue },
   nextBtnDisabled: { opacity: 0.45 },
   nextBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

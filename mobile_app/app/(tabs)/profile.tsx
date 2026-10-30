@@ -17,10 +17,12 @@ import { Header } from '@/components/ui/Header';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/store/authStore';
+import { useCartStore } from '@/store/cartStore';
 import { useProfile, useAddresses, useDeleteAddress } from '@/hooks/useProfile';
 
 export default function ProfileScreen() {
   const { isLoggedIn, user, logout } = useAuthStore();
+  const { totalItems } = useCartStore();
   const { data: profile, isLoading: profileLoading } = useProfile(isLoggedIn);
   const { data: addresses, isLoading: addrLoading } = useAddresses(isLoggedIn);
   const deleteAddress = useDeleteAddress();
@@ -65,7 +67,12 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <Header location="Indore, MP" />
+      <Header
+        location="Indore, MP"
+        cartItemCount={totalItems}
+        onSearchPress={() => router.push({ pathname: '/(tabs)/services', params: { autoSearch: '1' } })}
+        onCartPress={() => router.push({ pathname: '/(tabs)/services', params: { openCart: '1' } })}
+      />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.userCard}>
           <View style={styles.avatar}>
@@ -142,7 +149,7 @@ export default function ProfileScreen() {
             <View style={styles.divider} />
             <Pressable style={styles.menuItem}>
               <View style={[styles.menuIcon, { backgroundColor: '#EFF6FF' }]}>
-                <Ionicons name="notifications-outline" size={18} color="#2563EB" />
+                <Ionicons name="notifications-outline" size={18} color={ElixColors.blue} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.menuItemTitle}>Notifications</Text>
@@ -152,8 +159,8 @@ export default function ProfileScreen() {
             </Pressable>
             <View style={styles.divider} />
             <Pressable style={styles.menuItem}>
-              <View style={[styles.menuIcon, { backgroundColor: '#F5F3FF' }]}>
-                <Ionicons name="document-text-outline" size={18} color="#7C3AED" />
+              <View style={[styles.menuIcon, { backgroundColor: ElixColors.blueLight }]}>
+                <Ionicons name="document-text-outline" size={18} color={ElixColors.blue} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.menuItemTitle}>Terms and Privacy</Text>
@@ -166,7 +173,7 @@ export default function ProfileScreen() {
 
         {isLoggedIn ? (
           <View style={styles.section}>
-            <Button title="Sign Out" variant="outline" onPress={handleLogout} style={styles.logoutBtn} textStyle={{ color: '#DC2626' }} />
+            <Button title="Sign Out" variant="outline" onPress={handleLogout} style={styles.logoutBtn} textStyle={{ color: ElixColors.ink }} />
           </View>
         ) : (
           <View style={styles.section}>
@@ -249,6 +256,6 @@ const styles = StyleSheet.create({
   menuItemTitle: { fontSize: 14, fontWeight: '600', color: ElixColors.ink },
   menuItemSubtitle: { fontSize: 12, color: ElixColors.inkMuted, marginTop: 1 },
   divider: { height: 1, backgroundColor: '#F3F4F6', marginLeft: 60 },
-  logoutBtn: { borderColor: '#DC2626' },
+  logoutBtn: { borderColor: ElixColors.borderHairlineMedium },
   versionText: { textAlign: 'center', fontSize: 12, color: ElixColors.inkMuted, marginTop: 20 },
 });

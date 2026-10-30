@@ -3,25 +3,34 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { apiClient } from '../lib/apiClient';
 import type { User } from '../types/api';
+import { useCartStore } from './cartStore';
 
 /**
  * Web-safe storage shim — expo-secure-store is native-only.
  * On web (browser testing with `npm run web`) we fall back to
- * localStorage so the app loads without crashing.  On device,
+ * localStorage so the app loads without crashing. On device,
  * the real Keychain/Keystore-backed SecureStore is used.
  */
 const storage = {
   async getItem(key: string): Promise<string | null> {
     if (Platform.OS === 'web') return localStorage.getItem(key);
-    return storage.getItem(key);
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch {
+      return null;
+    }
   },
   async setItem(key: string, value: string): Promise<void> {
     if (Platform.OS === 'web') { localStorage.setItem(key, value); return; }
-    return storage.setItem(key, value);
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch {}
   },
   async deleteItem(key: string): Promise<void> {
     if (Platform.OS === 'web') { localStorage.removeItem(key); return; }
-    return storage.deleteItem(key);
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch {}
   },
 };
 
@@ -70,12 +79,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const token = await storage.getItem('auth_token');
       const userJson = await storage.getItem('auth_user');
       if (token && userJson) {
-        set({ token, user: JSON.parse(userJson), isLoggedIn: true });
+        const user = JSON.parse(userJson);
+        set({ token, user, isLoggedIn: true });
+        useCartStore.getState().hydrate(user.id);
+      } else {
+        useCartStore.getState().hydrate(null);
       }
     } catch (e) {
       // Corrupted storage — wipe and start fresh
       await storage.deleteItem('auth_token');
       await storage.deleteItem('auth_user');
+      useCartStore.getState().hydrate(null);
     } finally {
       set({ isLoading: false });
     }
@@ -94,6 +108,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await storage.setItem('auth_token', token);
       await storage.setItem('auth_user', JSON.stringify(user));
       set({ token, user, isLoggedIn: true, isLoading: false });
+      // Merge guest cart with saved user cart
+      useCartStore.getState().onUserLogin(user.id);
       return { ok: true };
     } catch (err: any) {
       const error = err?.response?.data?.error ?? 'Network error. Check your connection.';
@@ -115,6 +131,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await storage.setItem('auth_token', token);
       await storage.setItem('auth_user', JSON.stringify(user));
       set({ token, user, isLoggedIn: true, isLoading: false });
+      // Merge guest cart with saved user cart
+      useCartStore.getState().onUserLogin(user.id);
       return { ok: true };
     } catch (err: any) {
       const error = err?.response?.data?.error ?? 'Network error. Check your connection.';
@@ -150,6 +168,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await storage.setItem('auth_token', token);
       await storage.setItem('auth_user', JSON.stringify(user));
       set({ token, user, isLoggedIn: true, isLoading: false });
+      // Merge guest cart with saved user cart
+      useCartStore.getState().onUserLogin(user.id);
       return { ok: true };
     } catch (err: any) {
       const data = err?.response?.data;
@@ -166,6 +186,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // Even if the server request fails, wipe local state
     }
+    useCartStore.getState().onUserLogout();
     await storage.deleteItem('auth_token');
     await storage.deleteItem('auth_user');
     set({ token: null, user: null, isLoggedIn: false });

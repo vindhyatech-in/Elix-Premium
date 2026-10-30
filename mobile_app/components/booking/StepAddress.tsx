@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   addNewText: { color: ElixColors.blue, fontWeight: '600', fontSize: 14 },
   addForm: { backgroundColor: '#F8FAFC', borderRadius: ElixRadii.lg, padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#E5E7EB' },
   formTitle: { fontSize: 15, fontWeight: '700', color: ElixColors.ink, marginBottom: 12 },
-  errorText: { color: '#DC2626', fontSize: 12, marginBottom: 8 },
+  errorText: { color: ElixColors.ink, fontSize: 12, marginBottom: 8 },
   label: { fontSize: 12, fontWeight: '600', color: ElixColors.ink, marginBottom: 6 },
   segRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   segBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, backgroundColor: '#E5E7EB' },

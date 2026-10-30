@@ -16,19 +16,20 @@ import { ElixColors, ElixRadii, ElixShadows } from '@/constants/theme';
 import { Header } from '@/components/ui/Header';
 import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/store/authStore';
+import { useCartStore } from '@/store/cartStore';
 import { useBookings, useCancelBooking } from '@/hooks/useBookings';
 import type { Booking } from '@/types/api';
 
 type FilterTab = 'all' | 'upcoming' | 'completed' | 'cancelled';
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  pending:     { bg: '#FEF3C7', text: '#92400E', label: 'Pending' },
-  confirmed:   { bg: '#D1FAE5', text: '#065F46', label: 'Confirmed' },
-  assigned:    { bg: '#DBEAFE', text: '#1E40AF', label: 'Artist Assigned' },
-  on_the_way:  { bg: '#EDE9FE', text: '#5B21B6', label: 'On the Way' },
-  in_progress: { bg: '#FEF3C7', text: '#92400E', label: 'In Progress' },
-  completed:   { bg: '#D1FAE5', text: '#065F46', label: 'Completed' },
-  cancelled:   { bg: '#FEE2E2', text: '#991B1B', label: 'Cancelled' },
+  pending:     { bg: ElixColors.blueLight, text: ElixColors.blue, label: 'Pending' },
+  confirmed:   { bg: ElixColors.greenLight, text: ElixColors.greenDeep, label: 'Confirmed' },
+  assigned:    { bg: ElixColors.blueLight, text: ElixColors.blue, label: 'Artist Assigned' },
+  on_the_way:  { bg: ElixColors.blueLight, text: ElixColors.blueDeep, label: 'On the Way' },
+  in_progress: { bg: ElixColors.blueLight, text: ElixColors.blue, label: 'In Progress' },
+  completed:   { bg: ElixColors.greenLight, text: ElixColors.greenDeep, label: 'Completed' },
+  cancelled:   { bg: ElixColors.surface3, text: ElixColors.inkMuted, label: 'Cancelled' },
 };
 
 const UPCOMING_STATUSES = ['pending', 'confirmed', 'assigned', 'on_the_way', 'in_progress'];
@@ -87,7 +88,7 @@ function BookingCard({ booking, onCancel }: { booking: Booking; onCancel: (num: 
         {booking.booking_type === 'urgent' && (
           <View style={styles.pricingRow}>
             <Text style={styles.pricingLabel}>Priority Fee</Text>
-            <Text style={[styles.pricingValue, { color: '#C2185B' }]}>+Rs.99</Text>
+            <Text style={[styles.pricingValue, { color: ElixColors.blue }]}>+Rs.99</Text>
           </View>
         )}
         <View style={[styles.pricingRow, styles.totalRow]}>
@@ -116,11 +117,11 @@ function BookingCard({ booking, onCancel }: { booking: Booking; onCancel: (num: 
         )}
         {booking.can_cancel && (
           <Pressable
-            style={[styles.actionBtn, { borderColor: '#FCA5A5' }]}
+            style={[styles.actionBtn, { borderColor: ElixColors.borderHairlineMedium }]}
             onPress={() => onCancel(booking.booking_number)}
           >
-            <Ionicons name="close-outline" size={14} color="#DC2626" />
-            <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Cancel</Text>
+            <Ionicons name="close-outline" size={14} color={ElixColors.inkMuted} />
+            <Text style={[styles.actionBtnText, { color: ElixColors.inkMuted }]}>Cancel</Text>
           </Pressable>
         )}
       </View>
@@ -131,6 +132,7 @@ function BookingCard({ booking, onCancel }: { booking: Booking; onCancel: (num: 
 export default function BookingsScreen() {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const { isLoggedIn } = useAuthStore();
+  const { totalItems } = useCartStore();
   const { data: bookings, isLoading, error } = useBookings(isLoggedIn);
   const cancelBooking = useCancelBooking();
 
@@ -160,7 +162,12 @@ export default function BookingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <Header location="Indore, MP" />
+      <Header
+        location="Indore, MP"
+        cartItemCount={totalItems}
+        onSearchPress={() => router.push({ pathname: '/(tabs)/services', params: { autoSearch: '1' } })}
+        onCartPress={() => router.push({ pathname: '/(tabs)/services', params: { openCart: '1' } })}
+      />
 
       {/* Filter tabs */}
       <ScrollView
@@ -238,8 +245,8 @@ const styles = StyleSheet.create({
   bookingNum: { fontSize: 14, fontWeight: '700', color: ElixColors.ink },
   bookingDate: { fontSize: 12, color: ElixColors.inkMuted, marginTop: 2 },
   badgeRow: { flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' },
-  urgentPill: { backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  urgentPillText: { color: '#DC2626', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  urgentPill: { backgroundColor: ElixColors.blueLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  urgentPillText: { color: ElixColors.blue, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   statusPillText: { fontSize: 11, fontWeight: '700' },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },

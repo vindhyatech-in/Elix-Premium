@@ -189,6 +189,7 @@ TEMPLATES = [
                 'core.context_processors.site_meta',
                 'core.context_processors.user_roles',
                 'core.context_processors.admin_sidebar_counts',
+                'core.context_processors.navbar_data',
             ],
         },
     },

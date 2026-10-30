@@ -59,13 +59,13 @@ export default function BookingConfirmedScreen() {
           <Text style={styles.bnValue}>#{bookingNumber}</Text>
           {isPaid && (
             <View style={styles.paidBadge}>
-              <Ionicons name="card" size={12} color="#065F46" />
+              <Ionicons name="card" size={12} color={ElixColors.greenDeep} />
               <Text style={styles.paidBadgeText}>Payment Received</Text>
             </View>
           )}
           {!isPaid && (
             <View style={styles.cahBadge}>
-              <Ionicons name="cash-outline" size={12} color="#92400E" />
+              <Ionicons name="cash-outline" size={12} color={ElixColors.blue} />
               <Text style={styles.cahBadgeText}>Pay at Home when artist arrives</Text>
             </View>
           )}
@@ -76,7 +76,7 @@ export default function BookingConfirmedScreen() {
           {[
             { icon: 'person-circle-outline', color: '#4F46E5', text: 'Artist is being assigned to your booking' },
             { icon: 'notifications-outline', color: '#059669', text: 'You will receive a notification once assigned' },
-            { icon: 'location-outline', color: '#C2185B', text: 'Artist will arrive at your address on schedule' },
+            { icon: 'location-outline', color: ElixColors.blue, text: 'Artist will arrive at your address on schedule' },
           ].map((item, i) => (
             <View key={i} style={[styles.stepRow, i > 0 && styles.stepRowBorder]}>
               <View style={[styles.stepIconWrap, { backgroundColor: item.color + '18' }]}>
@@ -157,14 +157,14 @@ const styles = StyleSheet.create({
   bnValue: { fontSize: 28, fontWeight: '800', color: ElixColors.ink, letterSpacing: -0.5, marginBottom: 10 },
   paidBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#D1FAE5', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,
+    backgroundColor: ElixColors.greenLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,
   },
-  paidBadgeText: { fontSize: 12, fontWeight: '700', color: '#065F46' },
+  paidBadgeText: { fontSize: 12, fontWeight: '700', color: ElixColors.greenDeep },
   cahBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#FEF3C7', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,
+    backgroundColor: ElixColors.blueLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,
   },
-  cahBadgeText: { fontSize: 12, fontWeight: '700', color: '#92400E' },
+  cahBadgeText: { fontSize: 12, fontWeight: '700', color: ElixColors.blue },
 
   stepsCard: {
     backgroundColor: '#fff',

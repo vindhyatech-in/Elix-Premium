@@ -166,8 +166,8 @@ export default function HomeScreen() {
       <Header
         location="Indore, MP"
         onLocationPress={() => {}}
-        onSearchPress={() => router.push('/services')}
-        onCartPress={() => {}}
+        onSearchPress={() => router.push({ pathname: '/(tabs)/services', params: { autoSearch: '1' } })}
+        onCartPress={() => router.push({ pathname: '/(tabs)/services', params: { openCart: '1' } })}
         cartItemCount={cartCount}
       />
 
@@ -211,16 +211,14 @@ export default function HomeScreen() {
         {/* ── 2. EXPRESS 50-MIN CARD ─────────────────────────────────────────── */}
         {/* STATIC: The express service offering is a fixed product (₹99 express fee).
             This card's content is product-defined, not CMS-driven. */}
-        <Pressable
-          style={styles.redesignedUrgentCard}
-          onPress={() => router.push('/urgent')}>
+        <View style={styles.redesignedUrgentCard}>
           <View style={styles.urgentTopBar}>
             <View style={styles.urgentPillBadge}>
               <View style={styles.urgentLiveDot} />
               <Text style={styles.urgentPillText}>EXPRESS DISPATCH</Text>
             </View>
             <View style={styles.urgentFeeChip}>
-              <Ionicons name="flash" size={13} color={ElixColors.urgentRed} />
+              <Ionicons name="flash" size={13} color={ElixColors.blue} />
               <Text style={styles.urgentFeeText}>+₹99 Priority Fee</Text>
             </View>
           </View>
@@ -232,24 +230,19 @@ export default function HomeScreen() {
 
           <View style={styles.urgentPerksRow}>
             <View style={styles.urgentPerkItem}>
-              <Ionicons name="time" size={14} color={ElixColors.urgentRed} />
+              <Ionicons name="time" size={14} color={ElixColors.blue} />
               <Text style={styles.urgentPerkText}>50m Arrival</Text>
             </View>
             <View style={styles.urgentPerkItem}>
-              <Ionicons name="shield-checkmark" size={14} color={ElixColors.urgentRed} />
+              <Ionicons name="shield-checkmark" size={14} color={ElixColors.blue} />
               <Text style={styles.urgentPerkText}>Sealed Kit</Text>
             </View>
             <View style={styles.urgentPerkItem}>
-              <Ionicons name="location" size={14} color={ElixColors.urgentRed} />
+              <Ionicons name="location" size={14} color={ElixColors.blue} />
               <Text style={styles.urgentPerkText}>All Indore</Text>
             </View>
           </View>
-
-          <View style={styles.urgentCtaButton}>
-            <Text style={styles.urgentCtaText}>Book Express Slot</Text>
-            <Ionicons name="arrow-forward" size={15} color={ElixColors.white} />
-          </View>
-        </Pressable>
+        </View>
 
         {/* ── 3. OFFERS — Dynamic from /api/v1/offers/ ──────────────────────── */}
         {offers.length > 0 && (
@@ -292,7 +285,7 @@ export default function HomeScreen() {
                       <Text style={styles.offerTitle} numberOfLines={2}>{offer.title}</Text>
                       <Text style={styles.offerDesc} numberOfLines={2}>{offer.description}</Text>
                       <View style={styles.offerCouponRow}>
-                        <Ionicons name="pricetag-outline" size={13} color={ElixColors.gold} />
+                        <Ionicons name="pricetag-outline" size={13} color={ElixColors.blue} />
                         <Text style={styles.offerCouponCode}>CODE: {offer.code}</Text>
                         <Text style={styles.offerTapToApply}>Tap to apply →</Text>
                       </View>
@@ -449,7 +442,7 @@ export default function HomeScreen() {
                     <View style={styles.beauticianNameRow}>
                       <Text style={styles.beauticianName} numberOfLines={1}>{artist.name}</Text>
                       <View style={styles.beauticianRatingBadge}>
-                        <Ionicons name="star" size={11} color="#F59E0B" />
+                        <Ionicons name="star" size={11} color={ElixColors.blue} />
                         <Text style={styles.beauticianRatingText}>
                           {Number(artist.rating).toFixed(1)}
                         </Text>
@@ -520,7 +513,7 @@ export default function HomeScreen() {
                         <Ionicons
                           name={getHiwIcon(step.icon) as any}
                           size={18}
-                          color={ElixColors.gold}
+                          color={ElixColors.blue}
                         />
                         <Text style={styles.hiwStepTitle}>{step.title}</Text>
                       </View>
@@ -597,13 +590,13 @@ const styles = StyleSheet.create({
 
   // ── Express Urgent Card (light mode) ──
   redesignedUrgentCard: {
-    backgroundColor: '#FFF5F5',
+    backgroundColor: ElixColors.blueLight,
     marginHorizontal: 16,
     marginTop: 14,
     borderRadius: ElixRadii.xl,
     padding: 18,
     borderWidth: 1.5,
-    borderColor: '#FECDD3',
+    borderColor: '#C7D2FE',
     ...ElixShadows.sm,
   },
   urgentTopBar: {
@@ -615,24 +608,24 @@ const styles = StyleSheet.create({
   urgentPillBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFE4E6',
+    backgroundColor: ElixColors.white,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: ElixRadii.full,
     borderWidth: 1,
-    borderColor: '#FDA4AF',
+    borderColor: '#C7D2FE',
   },
   urgentLiveDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#E11D48',
+    backgroundColor: ElixColors.blue,
     marginRight: 6,
   },
   urgentPillText: {
     fontSize: 10,
     fontWeight: ElixTypography.weights.bold,
-    color: '#9F1239',
+    color: ElixColors.blue,
     letterSpacing: 0.5,
   },
   urgentFeeChip: {
@@ -643,13 +636,13 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: ElixRadii.full,
     borderWidth: 1,
-    borderColor: '#FECDD3',
+    borderColor: '#C7D2FE',
     gap: 4,
   },
   urgentFeeText: {
     fontSize: 11,
     fontWeight: ElixTypography.weights.bold,
-    color: '#BE123C',
+    color: ElixColors.blue,
   },
   urgentMainHeading: {
     fontSize: ElixTypography.sizes.lg,
@@ -665,8 +658,9 @@ const styles = StyleSheet.create({
   },
   urgentPerksRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 14,
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 2,
   },
   urgentPerkItem: {
     flexDirection: 'row',
@@ -677,7 +671,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: ElixRadii.sm,
     borderWidth: 1,
-    borderColor: '#FFE4E6',
+    borderColor: '#C7D2FE',
   },
   urgentPerkText: {
     fontSize: 11,
@@ -723,7 +717,7 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: ElixTypography.sizes.sm,
-    color: ElixColors.gold,
+    color: ElixColors.blue,
     fontWeight: ElixTypography.weights.medium,
   },
 
@@ -803,7 +797,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   offerTapToApply: {
-    color: ElixColors.gold,
+    color: ElixColors.blue,
     fontSize: 10,
     fontWeight: ElixTypography.weights.medium,
   },
@@ -954,7 +948,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: ElixColors.blueLight,
     paddingHorizontal: 4,
     paddingVertical: 1,
     borderRadius: 4,
@@ -962,7 +956,7 @@ const styles = StyleSheet.create({
   beauticianRatingText: {
     fontSize: 10,
     fontWeight: ElixTypography.weights.bold,
-    color: '#B45309',
+    color: ElixColors.blue,
   },
   beauticianSpecialty: {
     fontSize: 11,
@@ -1038,7 +1032,7 @@ const styles = StyleSheet.create({
   hiwEyebrowText: {
     fontSize: 10,
     fontWeight: ElixTypography.weights.bold,
-    color: ElixColors.gold,
+    color: ElixColors.blue,
     letterSpacing: 1,
   },
   hiwTitle: {
@@ -1072,7 +1066,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: ElixColors.gold,
+    borderColor: ElixColors.blue,
   },
   hiwNumberText: {
     fontSize: 11,

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import { ElixColors, ElixRadii, ElixTypography, ElixShadows } from '@/constants/theme';
 import { Header } from '@/components/ui/Header';
 import { Badge } from '@/components/ui/Badge';
@@ -19,10 +20,34 @@ import type { CatalogItem } from '@/types/api';
 import { BookingDrawer } from '@/components/booking/BookingDrawer';
 
 export default function ServicesScreen() {
+  const params = useLocalSearchParams<{ autoSearch?: string; openBooking?: string; openCart?: string }>();
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [isSearchActive, setIsSearchActive] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
   const { data: catalog, isLoading, error } = useCatalog();
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [drawerInitialMode, setDrawerInitialMode] = useState<'cart' | 'checkout'>('cart');
   const { items: cartItems, totalItems, totalAmount, addItem, increment, decrement, getKey } = useCartStore();
+
+  // If navigated here with autoSearch=1, immediately activate search
+  useEffect(() => {
+    if (params.autoSearch === '1') {
+      setIsSearchActive(true);
+      setActiveTab('all');
+    }
+  }, [params.autoSearch]);
+
+  // If navigated here with openBooking or openCart, immediately open the drawer
+  useEffect(() => {
+    if (params.openBooking === '1') {
+      setDrawerInitialMode('checkout');
+      setDrawerVisible(true);
+    } else if (params.openCart === '1') {
+      setDrawerInitialMode('cart');
+      setDrawerVisible(true);
+    }
+  }, [params.openBooking, params.openCart]);
 
   // Derive category tabs from live catalog data
   const categoryTabs = useMemo(() => {
@@ -31,11 +56,31 @@ export default function ServicesScreen() {
     return [{ id: 'all', label: 'All' }, ...cats.map((c) => ({ id: c, label: c }))];
   }, [catalog]);
 
+  // Filter by category tab AND search query
   const filtered = useMemo(() => {
     if (!catalog) return [];
-    if (activeTab === 'all') return catalog;
-    return catalog.filter((i) => i.category === activeTab);
-  }, [catalog, activeTab]);
+    let list = catalog;
+
+    // Filter by category if not 'all'
+    if (activeTab !== 'all') {
+      list = list.filter((i) => i.category === activeTab);
+    }
+
+    // Filter by search query (name, category, description, variant label, features)
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((item) => {
+        const nameMatch = item.name.toLowerCase().includes(q);
+        const descMatch = (item.description || '').toLowerCase().includes(q);
+        const catMatch = (item.category || '').toLowerCase().includes(q);
+        const labelMatch = (item.label || '').toLowerCase().includes(q);
+        const featMatch = (item.features || []).some((f) => f.toLowerCase().includes(q));
+        return nameMatch || descMatch || catMatch || labelMatch || featMatch;
+      });
+    }
+
+    return list;
+  }, [catalog, activeTab, searchQuery]);
 
   function getItemQty(item: CatalogItem): number {
     const key = item.kind === 'package'
@@ -74,7 +119,26 @@ export default function ServicesScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <Header location="Indore, MP" cartItemCount={totalItems} />
+      <Header
+        location="Indore, MP"
+        cartItemCount={totalItems}
+        onSearchPress={() => {
+          setIsSearchActive(true);
+          setActiveTab('all');
+        }}
+        onCartPress={() => {
+          setDrawerInitialMode('cart');
+          setDrawerVisible(true);
+        }}
+        isSearchActive={isSearchActive}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchClose={() => {
+          setIsSearchActive(false);
+          setSearchQuery('');
+        }}
+        searchPlaceholder="Search services, packages, categories..."
+      />
 
       {/* Category filter tabs */}
       <ScrollView
@@ -96,6 +160,18 @@ export default function ServicesScreen() {
         ))}
       </ScrollView>
 
+      {/* Search results status row */}
+      {searchQuery.trim().length > 0 && (
+        <View style={styles.searchStatusRow}>
+          <Text style={styles.searchStatusText}>
+            {filtered.length} {filtered.length === 1 ? 'service' : 'services'} found for "{searchQuery}"
+          </Text>
+          <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+            <Text style={styles.searchStatusClear}>Clear</Text>
+          </Pressable>
+        </View>
+      )}
+
       {/* Service list */}
       <ScrollView
         style={styles.container}
@@ -110,8 +186,27 @@ export default function ServicesScreen() {
             <Text style={styles.errorText}>Could not load services. Check your connection.</Text>
           </View>
         ) : filtered.length === 0 ? (
-          <View style={styles.errorState}>
-            <Text style={styles.errorText}>No services found in this category.</Text>
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="search-outline" size={32} color={ElixColors.blue} />
+            </View>
+            <Text style={styles.emptyTitle}>No services found</Text>
+            <Text style={styles.emptySub}>
+              {searchQuery.trim()
+                ? `We couldn't find any service matching "${searchQuery}".`
+                : 'No services available in this category.'}
+            </Text>
+            <Button
+              title="View All Services"
+              variant="outline"
+              size="sm"
+              onPress={() => {
+                setSearchQuery('');
+                setActiveTab('all');
+                setIsSearchActive(false);
+              }}
+              style={{ marginTop: 14 }}
+            />
           </View>
         ) : (
           <View style={{ padding: 16, gap: 16 }}>
@@ -132,7 +227,7 @@ export default function ServicesScreen() {
 
                   <View style={styles.metaRow}>
                     <View style={styles.ratingPill}>
-                      <Ionicons name="star" size={11} color="#F59E0B" />
+                      <Ionicons name="star" size={11} color={ElixColors.blue} />
                       <Text style={styles.ratingText}>4.8+</Text>
                     </View>
                     <Ionicons name="time-outline" size={12} color={ElixColors.inkMuted} />
@@ -200,13 +295,23 @@ export default function ServicesScreen() {
             <Text style={styles.cartBarItems}>{totalItems} item{totalItems !== 1 ? 's' : ''} added</Text>
             <Text style={styles.cartBarAmount}>Rs.{totalAmount.toFixed(0)}</Text>
           </View>
-          <Pressable style={styles.cartBarBtn} onPress={() => setDrawerVisible(true)}>
+          <Pressable
+            style={styles.cartBarBtn}
+            onPress={() => {
+              setDrawerInitialMode('checkout');
+              setDrawerVisible(true);
+            }}
+          >
             <Text style={styles.cartBarBtnText}>Proceed to Booking</Text>
             <Ionicons name="arrow-forward" size={16} color="#fff" />
           </Pressable>
         </View>
       )}
-      <BookingDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} />
+      <BookingDrawer
+        visible={drawerVisible}
+        onClose={() => setDrawerVisible(false)}
+        initialMode={drawerInitialMode}
+      />
     </SafeAreaView>
   );
 }
@@ -224,9 +329,61 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: ElixColors.blue },
   tabText: { fontSize: 13, fontWeight: '600', color: ElixColors.inkMuted },
   tabTextActive: { color: '#fff' },
+
+  searchStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: ElixColors.blueLight,
+    borderBottomWidth: 1,
+    borderBottomColor: '#C7D2FE',
+  },
+  searchStatusText: {
+    fontSize: 12,
+    fontWeight: ElixTypography.weights.medium,
+    color: ElixColors.blue,
+  },
+  searchStatusClear: {
+    fontSize: 12,
+    fontWeight: ElixTypography.weights.bold,
+    color: ElixColors.blue,
+    textDecorationLine: 'underline',
+  },
+
   container: { flex: 1 },
   errorState: { alignItems: 'center', paddingTop: 60, paddingHorizontal: 32 },
   errorText: { fontSize: 14, color: ElixColors.inkMuted, textAlign: 'center', marginTop: 8 },
+
+  emptyContainer: {
+    alignItems: 'center',
+    paddingTop: 50,
+    paddingHorizontal: 32,
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: ElixColors.blueLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: ElixTypography.weights.bold,
+    color: ElixColors.ink,
+    marginBottom: 6,
+  },
+  emptySub: {
+    fontSize: 13,
+    color: ElixColors.inkMuted,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 8,
+  },
+
   serviceCard: {
     backgroundColor: ElixColors.white,
     borderRadius: ElixRadii.lg,
@@ -235,25 +392,25 @@ const styles = StyleSheet.create({
   },
   packageBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#FEF3C7',
+    backgroundColor: ElixColors.blueLight,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
     marginBottom: 8,
   },
-  packageBadgeText: { fontSize: 10, fontWeight: '800', color: '#92400E', letterSpacing: 0.5 },
+  packageBadgeText: { fontSize: 10, fontWeight: '800', color: ElixColors.blue, letterSpacing: 0.5 },
   serviceName: { fontSize: 15, fontWeight: '700', color: ElixColors.ink, marginBottom: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 },
   ratingPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: ElixColors.blueLight,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
-  ratingText: { fontSize: 11, fontWeight: '700', color: '#92400E' },
+  ratingText: { fontSize: 11, fontWeight: '700', color: ElixColors.blue },
   metaText: { fontSize: 12, color: ElixColors.inkMuted },
   metaDot: { color: ElixColors.inkMuted },
   serviceDesc: { fontSize: 13, color: ElixColors.inkMuted, lineHeight: 18, marginBottom: 8 },
@@ -311,7 +468,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#C2185B',
+    backgroundColor: ElixColors.blue,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,

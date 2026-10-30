@@ -5,6 +5,8 @@ import { Platform } from 'react-native';
 import { ElixColors, ElixTypography } from '@/constants/theme';
 
 export default function TabLayout() {
+  const isIos = Platform.OS === 'ios';
+
   return (
     <Tabs
       screenOptions={{
@@ -14,13 +16,21 @@ export default function TabLayout() {
           backgroundColor: ElixColors.surface2,
           borderTopColor: ElixColors.borderHairline,
           borderTopWidth: 1,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
-          paddingTop: 8,
+          height: isIos ? 88 : 70,
+          paddingBottom: isIos ? 28 : 8,
+          paddingTop: 6,
+        },
+        tabBarItemStyle: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        tabBarIconStyle: {
+          marginBottom: 1,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: ElixTypography.weights.medium,
+          marginBottom: isIos ? 0 : 2,
         },
         headerShown: false,
       }}>
@@ -46,12 +56,11 @@ export default function TabLayout() {
         name="urgent"
         options={{
           title: 'Express 50m',
-          tabBarActiveTintColor: ElixColors.urgentRed,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'flash' : 'flash-outline'}
               size={22}
-              color={focused ? ElixColors.urgentRed : color}
+              color={color}
             />
           ),
         }}
