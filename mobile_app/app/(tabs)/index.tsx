@@ -21,6 +21,7 @@ import { useCatalog } from '@/hooks/useCatalog';
 import { useOffers } from '@/hooks/useOffers';
 import { useBeauticians } from '@/hooks/useBeauticians';
 import { useCartStore } from '@/store/cartStore';
+import { resolveImageUrl } from '@/lib/apiClient';
 import type { Category, Beautician } from '@/types/api';
 
 // ─── STATIC CONTENT ──────────────────────────────────────────────────────────
@@ -74,20 +75,13 @@ const FALLBACK_BEAUTICIANS: Beautician[] = [
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
-/** Prepend the base Django server URL if the path is relative (from /static/). */
-function resolveImageUrl(path: string | null | undefined): string | null {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  return `http://localhost:8003${path}`;
-}
-
 function getCategoryIcon(slug: string): string {
   return CATEGORY_ICON_MAP[slug] ?? 'grid-outline';
 }
 
 function getOfferImage(code: string): string {
   const path = OFFER_IMAGE_MAP[code] ?? '/static/images/service-facial.jpg';
-  return `http://localhost:8003${path}`;
+  return resolveImageUrl(path) ?? path;
 }
 
 function getHiwIcon(iconSlug: string): string {

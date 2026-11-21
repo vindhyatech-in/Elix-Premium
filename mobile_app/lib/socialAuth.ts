@@ -3,12 +3,10 @@ import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
 import { useAuthStore } from '../store/authStore';
 import type { User } from '../types/api';
-
-const PORT = 8003;
+import { getBaseHost } from './apiClient';
 
 function getDjangoBase(): string {
-  if (Platform.OS === 'android') return `http://10.0.2.2:${PORT}`;
-  return `http://localhost:${PORT}`;
+  return getBaseHost();
 }
 
 /**
@@ -36,7 +34,7 @@ export async function initiateSocialSignIn(provider: 'google' | 'apple'): Promis
     }
 
     // Native iOS / Android
-    const returnUrl = 'mobileapp://auth/callback';
+    const returnUrl = 'elixpremium://auth/callback';
     const socialCallbackNext = `/api/v1/auth/social-callback/?return_url=${encodeURIComponent(returnUrl)}`;
     const authUrl = `${djangoBase}/accounts/${provider}/login/?process=login&next=${encodeURIComponent(
       socialCallbackNext

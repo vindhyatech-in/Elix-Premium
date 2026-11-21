@@ -15,10 +15,16 @@ import * as SecureStore from 'expo-secure-store';
 const PORT = 8003;
 const DEVICE_LAN_IP = '192.168.1.100'; // change this for physical Expo Go testing
 
+const LIVE_HOST = 'https://elix.vindhyatech.in';
+
 export function getBaseHost(): string {
-  if (Platform.OS === 'web') return `http://localhost:${PORT}`;
-  if (Platform.OS === 'android') return `http://10.0.2.2:${PORT}`;
-  return `http://localhost:${PORT}`; // iOS simulator
+  if (process.env.EXPO_PUBLIC_HOST) {
+    return process.env.EXPO_PUBLIC_HOST.replace(/\/+$/, '');
+  }
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
+  }
+  return LIVE_HOST;
 }
 
 export function resolveImageUrl(path: string | null | undefined): string | null {
@@ -29,6 +35,9 @@ export function resolveImageUrl(path: string | null | undefined): string | null 
 }
 
 function getBaseUrl(): string {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, '');
+  }
   return `${getBaseHost()}/api/v1`;
 }
 
