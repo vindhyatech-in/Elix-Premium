@@ -454,6 +454,7 @@
         evening: 20 * 60,   // 8:00 PM
       };
 
+      let visibleCount = 0;
       regularSlots.querySelectorAll('.slot-card').forEach((card) => {
         const slotValue = card.dataset.slotValue;
         const endTime = slotEndTimes[slotValue] || 0;
@@ -462,6 +463,7 @@
           card.classList.add('is-disabled');
           card.style.opacity = '0.4';
           card.style.pointerEvents = 'none';
+          card.style.display = 'none';
           if (card.classList.contains('is-selected')) {
             card.classList.remove('is-selected');
             state.slot = null;
@@ -470,8 +472,24 @@
           card.classList.remove('is-disabled');
           card.style.opacity = '1';
           card.style.pointerEvents = 'auto';
+          card.style.display = '';
+          visibleCount++;
         }
       });
+
+      let noSlotsMsg = regularSlots.querySelector('.no-regular-slots-msg');
+      if (visibleCount === 0) {
+        if (!noSlotsMsg) {
+          noSlotsMsg = document.createElement('div');
+          noSlotsMsg.className = 'no-regular-slots-msg';
+          noSlotsMsg.style.cssText = 'grid-column: 1 / -1; padding: 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; font-size: 13px; color: #1e3a8a; text-align: center; line-height: 1.4;';
+          noSlotsMsg.innerHTML = 'All regular slots for today have ended.<br><span style="font-size:12px;color:#475569;">Please choose <strong>Urgent</strong> (50-min arrival) or pick another date.</span>';
+          regularSlots.appendChild(noSlotsMsg);
+        }
+        noSlotsMsg.style.display = '';
+      } else if (noSlotsMsg) {
+        noSlotsMsg.style.display = 'none';
+      }
     }
 
     calendarGrid.addEventListener('click', (e) => {

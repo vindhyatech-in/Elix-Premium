@@ -308,6 +308,7 @@
           card.classList.add('is-disabled');
           card.style.opacity = '0.4';
           card.style.pointerEvents = 'none';
+          card.style.display = 'none';
           if (card.classList.contains('is-selected')) {
             card.classList.remove('is-selected');
             if (selectedSlot === sVal) selectedSlot = null;
@@ -316,6 +317,7 @@
           card.classList.remove('is-disabled');
           card.style.opacity = '1';
           card.style.pointerEvents = 'auto';
+          card.style.display = '';
         }
       });
     }

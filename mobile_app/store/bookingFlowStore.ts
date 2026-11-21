@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import type { Address } from '../types/api';
 
@@ -34,8 +35,8 @@ export interface BookingFlowState {
   setAddress: (address: Address | null) => void;
   setDate: (date: string) => void;
   setBookingType: (type: BookingType) => void;
-  setTimeSlot: (slot: TimeSlot) => void;
-  setExactTime: (time: string) => void;
+  setTimeSlot: (slot: TimeSlot | null) => void;
+  setExactTime: (time: string | null) => void;
   setCoupon: (code: string, pct: number) => void;
   clearCoupon: () => void;
   setPaymentMethod: (method: PaymentMethod) => void;

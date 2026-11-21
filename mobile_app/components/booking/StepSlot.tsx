@@ -1,21 +1,31 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ElixColors, ElixRadii } from '@/constants/theme';
 import { useBookingFlowStore } from '@/store/bookingFlowStore';
 import type { TimeSlot, BookingType } from '@/store/bookingFlowStore';
+import { toYMD } from './StepDate';
 
-const REGULAR_SLOTS: { key: TimeSlot; label: string; time: string; icon: string }[] = [
-  { key: 'morning',   label: 'Morning',   time: '7 AM – 12 PM',  icon: 'sunny-outline' },
-  { key: 'afternoon', label: 'Afternoon', time: '12 PM – 4 PM',  icon: 'partly-sunny-outline' },
-  { key: 'evening',   label: 'Evening',   time: '4 PM – 8 PM',   icon: 'moon-outline' },
+interface RegularSlotDef {
+  key: TimeSlot;
+  label: string;
+  time: string;
+  icon: string;
+  endHour: number;
+  endMinute: number;
+}
+
+const REGULAR_SLOTS: RegularSlotDef[] = [
+  { key: 'morning',   label: 'Morning',   time: '7 AM – 12 PM',  icon: 'sunny-outline',        endHour: 12, endMinute: 0 },
+  { key: 'afternoon', label: 'Afternoon', time: '12 PM – 4 PM',  icon: 'partly-sunny-outline', endHour: 16, endMinute: 0 },
+  { key: 'evening',   label: 'Evening',   time: '4 PM – 8 PM',   icon: 'moon-outline',         endHour: 20, endMinute: 0 },
 ];
 
-/** Generate urgent slots: start from now + 50 min, round up to next 15-min mark, 6 slots */
+/** Generate urgent slots: start from now + 50 min, round up to next 15-min mark, 6-8 slots */
 function getUrgentSlots(selectedDate: string | null): { time: string; label: string }[] {
   const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  const isToday = selectedDate === today;
+  const today = toYMD(now);
+  const isToday = !selectedDate || selectedDate === today;
 
   let start = new Date(now.getTime() + 50 * 60 * 1000);
   // Round up to next 15-min slot
@@ -24,7 +34,7 @@ function getUrgentSlots(selectedDate: string | null): { time: string; label: str
   start.setMinutes(roundUp, 0, 0);
 
   const slots = [];
-  let cursor = isToday ? start : new Date(selectedDate + 'T07:00:00');
+  let cursor = isToday ? start : new Date((selectedDate || today) + 'T07:00:00');
   for (let i = 0; i < 8; i++) {
     const h = cursor.getHours();
     const m = cursor.getMinutes();
@@ -44,12 +54,52 @@ export function StepSlot({ onNext }: { onNext: () => void }) {
     bookingType, setBookingType,
     timeSlot, setTimeSlot,
     exactTime, setExactTime,
-    selectedDate,
+    selectedDate, setDate,
   } = useBookingFlowStore();
 
   const urgentSlots = useMemo(() => getUrgentSlots(selectedDate), [selectedDate]);
 
-  const canProceed = bookingType === 'regular' ? !!timeSlot : !!exactTime;
+  // Filter out time slots that have already passed when booking for same day
+  const availableRegularSlots = useMemo(() => {
+    const now = new Date();
+    const todayStr = toYMD(now);
+    const isToday = !selectedDate || selectedDate === todayStr;
+
+    if (!isToday) {
+      if (selectedDate && selectedDate < todayStr) return [];
+      return REGULAR_SLOTS;
+    }
+
+    // For same-day bookings, hide time slots whose interval has already passed
+    // Align with backend lead-time buffer (min_allowed_time = now + 50 mins)
+    const minMins = now.getHours() * 60 + now.getMinutes() + 50;
+
+    return REGULAR_SLOTS.filter((slot) => {
+      const slotEndMins = slot.endHour * 60 + slot.endMinute;
+      return minMins < slotEndMins;
+    });
+  }, [selectedDate]);
+
+  // If a previously selected slot has passed / is no longer available today, clear selection
+  useEffect(() => {
+    if (bookingType === 'regular' && timeSlot) {
+      const isStillAvailable = availableRegularSlots.some((s) => s.key === timeSlot);
+      if (!isStillAvailable) {
+        setTimeSlot(null);
+      }
+    }
+  }, [availableRegularSlots, timeSlot, bookingType, setTimeSlot]);
+
+  // Quick switch to tomorrow if all today slots have ended
+  const handlePickTomorrow = () => {
+    const tmrw = new Date();
+    tmrw.setDate(tmrw.getDate() + 1);
+    setDate(toYMD(tmrw));
+  };
+
+  const canProceed = bookingType === 'regular'
+    ? (!!timeSlot && availableRegularSlots.some((s) => s.key === timeSlot))
+    : (!!exactTime && urgentSlots.some((s) => s.time === exactTime));
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -88,24 +138,48 @@ export function StepSlot({ onNext }: { onNext: () => void }) {
       {bookingType === 'regular' && (
         <View style={styles.slotsSection}>
           <Text style={styles.slotSectionTitle}>Select Time Slot</Text>
-          {REGULAR_SLOTS.map((slot) => (
-            <Pressable
-              key={slot.key}
-              style={[styles.slotRow, timeSlot === slot.key && styles.slotRowSelected]}
-              onPress={() => setTimeSlot(slot.key)}
-            >
-              <View style={[styles.slotIcon, timeSlot === slot.key && { backgroundColor: '#EFF6FF' }]}>
-                <Ionicons name={slot.icon as any} size={20} color={timeSlot === slot.key ? ElixColors.blue : ElixColors.inkMuted} />
+          {availableRegularSlots.length > 0 ? (
+            availableRegularSlots.map((slot) => (
+              <Pressable
+                key={slot.key}
+                style={[styles.slotRow, timeSlot === slot.key && styles.slotRowSelected]}
+                onPress={() => setTimeSlot(slot.key)}
+              >
+                <View style={[styles.slotIcon, timeSlot === slot.key && { backgroundColor: '#EFF6FF' }]}>
+                  <Ionicons name={slot.icon as any} size={20} color={timeSlot === slot.key ? ElixColors.blue : ElixColors.inkMuted} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.slotLabel, timeSlot === slot.key && { color: ElixColors.blue }]}>{slot.label}</Text>
+                  <Text style={styles.slotTime}>{slot.time}</Text>
+                </View>
+                <View style={[styles.slotRadio, timeSlot === slot.key && styles.slotRadioActive]}>
+                  {timeSlot === slot.key && <View style={styles.slotRadioInner} />}
+                </View>
+              </Pressable>
+            ))
+          ) : (
+            <View style={styles.noSlotsCard}>
+              <View style={styles.noSlotsIconWrap}>
+                <Ionicons name="time-outline" size={24} color={ElixColors.blue} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.slotLabel, timeSlot === slot.key && { color: ElixColors.blue }]}>{slot.label}</Text>
-                <Text style={styles.slotTime}>{slot.time}</Text>
+              <Text style={styles.noSlotsTitle}>All regular slots ended for today</Text>
+              <Text style={styles.noSlotsSub}>
+                Regular time slots for today have already passed. You can schedule for tomorrow or choose Express arrival.
+              </Text>
+              <View style={styles.noSlotsActions}>
+                <Pressable style={styles.noSlotsBtnOutline} onPress={handlePickTomorrow}>
+                  <Ionicons name="calendar-outline" size={15} color={ElixColors.blue} />
+                  <Text style={styles.noSlotsBtnOutlineText}>Book Tomorrow</Text>
+                </Pressable>
+                {urgentSlots.length > 0 && (
+                  <Pressable style={styles.noSlotsBtnPrimary} onPress={() => setBookingType('urgent')}>
+                    <Ionicons name="flash" size={15} color="#fff" />
+                    <Text style={styles.noSlotsBtnPrimaryText}>Express Arrival</Text>
+                  </Pressable>
+                )}
               </View>
-              <View style={[styles.slotRadio, timeSlot === slot.key && styles.slotRadioActive]}>
-                {timeSlot === slot.key && <View style={styles.slotRadioInner} />}
-              </View>
-            </Pressable>
-          ))}
+            </View>
+          )}
         </View>
       )}
 
@@ -117,17 +191,35 @@ export function StepSlot({ onNext }: { onNext: () => void }) {
             <Text style={styles.urgentBannerText}>Artist arrives within 50 minutes · Rs.99 express fee · Rs.50 rush bonus to artist</Text>
           </View>
           <Text style={styles.slotSectionTitle}>Select Arrival Time</Text>
-          <View style={styles.urgentGrid}>
-            {urgentSlots.map((slot) => (
-              <Pressable
-                key={slot.time}
-                style={[styles.urgentSlotBtn, exactTime === slot.time && styles.urgentSlotBtnActive]}
-                onPress={() => setExactTime(slot.time)}
-              >
-                <Text style={[styles.urgentSlotText, exactTime === slot.time && styles.urgentSlotTextActive]}>{slot.label}</Text>
-              </Pressable>
-            ))}
-          </View>
+          {urgentSlots.length > 0 ? (
+            <View style={styles.urgentGrid}>
+              {urgentSlots.map((slot) => (
+                <Pressable
+                  key={slot.time}
+                  style={[styles.urgentSlotBtn, exactTime === slot.time && styles.urgentSlotBtnActive]}
+                  onPress={() => setExactTime(slot.time)}
+                >
+                  <Text style={[styles.urgentSlotText, exactTime === slot.time && styles.urgentSlotTextActive]}>{slot.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.noSlotsCard}>
+              <View style={styles.noSlotsIconWrap}>
+                <Ionicons name="moon-outline" size={24} color={ElixColors.inkMuted} />
+              </View>
+              <Text style={styles.noSlotsTitle}>No express slots left for today</Text>
+              <Text style={styles.noSlotsSub}>
+                Express bookings close at 7:15 PM for same-day service. Please select tomorrow to schedule.
+              </Text>
+              <View style={styles.noSlotsActions}>
+                <Pressable style={styles.noSlotsBtnOutline} onPress={handlePickTomorrow}>
+                  <Ionicons name="calendar-outline" size={15} color={ElixColors.blue} />
+                  <Text style={styles.noSlotsBtnOutlineText}>Book Tomorrow</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
       )}
 
@@ -182,4 +274,73 @@ const styles = StyleSheet.create({
   nextBtnUrgent: { backgroundColor: ElixColors.blue },
   nextBtnDisabled: { opacity: 0.45 },
   nextBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  noSlotsCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: ElixRadii.lg,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    padding: 18,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  noSlotsIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  noSlotsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: ElixColors.ink,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  noSlotsSub: {
+    fontSize: 12,
+    color: ElixColors.inkMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 14,
+    paddingHorizontal: 10,
+  },
+  noSlotsActions: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  noSlotsBtnOutline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: ElixRadii.md,
+    borderWidth: 1.5,
+    borderColor: ElixColors.blue,
+    backgroundColor: '#fff',
+  },
+  noSlotsBtnOutlineText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: ElixColors.blue,
+  },
+  noSlotsBtnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: ElixRadii.md,
+    backgroundColor: ElixColors.blue,
+  },
+  noSlotsBtnPrimaryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
 });

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   Pressable,
@@ -18,6 +19,7 @@ import { useCatalog } from '@/hooks/useCatalog';
 import { useCartStore } from '@/store/cartStore';
 import type { CatalogItem } from '@/types/api';
 import { BookingDrawer } from '@/components/booking/BookingDrawer';
+import { resolveImageUrl } from '@/lib/apiClient';
 
 export default function ServicesScreen() {
   const params = useLocalSearchParams<{ autoSearch?: string; openBooking?: string; openCart?: string }>();
@@ -99,7 +101,7 @@ export default function ServicesScreen() {
       packageId: item.kind === 'package' ? (item.package_id ?? item.id) : undefined,
       name: item.name + (item.label ? ' - ' + item.label : ''),
       price: item.price,
-      duration: item.duration,
+      duration: item.duration_mins ?? item.duration ?? 15,
     });
   }
 
@@ -212,74 +214,108 @@ export default function ServicesScreen() {
           <View style={{ padding: 16, gap: 16 }}>
             {filtered.map((item) => {
               const qty = getItemQty(item);
-              const discount = item.original_price && item.original_price > item.price
-                ? Math.round((1 - item.price / item.original_price) * 100)
-                : 0;
+              const originalPrice = item.mrp || item.original_price;
+              const discount = originalPrice && originalPrice > item.price
+                ? Math.round((1 - item.price / originalPrice) * 100)
+                : (item.discount_pct || 0);
+
+              const photoUrl = resolveImageUrl(item.photo || item.image);
+              const durationText = item.duration_label || (item.duration_mins ? `${item.duration_mins} mins` : (item.duration ? `${item.duration} mins` : null));
+              const ratingVal = item.rating ? Number(item.rating).toFixed(1) : '4.8';
+
               return (
                 <View key={`${item.kind}-${item.id}-${item.variant_id ?? ''}`} style={styles.serviceCard}>
-                  {item.kind === 'package' && (
-                    <View style={styles.packageBadge}>
-                      <Text style={styles.packageBadgeText}>PACKAGE</Text>
-                    </View>
-                  )}
-
-                  <Text style={styles.serviceName}>{item.name}{item.label ? ' - ' + item.label : ''}</Text>
-
-                  <View style={styles.metaRow}>
-                    <View style={styles.ratingPill}>
-                      <Ionicons name="star" size={11} color={ElixColors.blue} />
-                      <Text style={styles.ratingText}>4.8+</Text>
-                    </View>
-                    <Ionicons name="time-outline" size={12} color={ElixColors.inkMuted} />
-                    <Text style={styles.metaText}>{item.duration} mins</Text>
-                    <Text style={styles.metaDot}>·</Text>
-                    <Text style={styles.metaText}>{item.category}</Text>
-                  </View>
-
-                  {item.description ? (
-                    <Text style={styles.serviceDesc} numberOfLines={2}>{item.description}</Text>
-                  ) : null}
-
-                  {item.features && item.features.length > 0 && (
-                    <View style={styles.featureList}>
-                      {item.features.slice(0, 3).map((f, i) => (
-                        <View key={i} style={styles.featureItem}>
-                          <Ionicons name="checkmark-circle" size={13} color={ElixColors.green} />
-                          <Text style={styles.featureText}>{f}</Text>
+                  <View style={styles.cardMainRow}>
+                    {/* Left Column: Info & Price */}
+                    <View style={styles.cardInfoCol}>
+                      {item.kind === 'package' && (
+                        <View style={styles.packageBadge}>
+                          <Text style={styles.packageBadgeText}>PACKAGE</Text>
                         </View>
-                      ))}
-                    </View>
-                  )}
-
-                  <View style={styles.priceRow}>
-                    <View style={styles.priceGroup}>
-                      <Text style={styles.price}>Rs.{item.price}</Text>
-                      {discount > 0 && item.original_price && (
-                        <>
-                          <Text style={styles.originalPrice}>Rs.{item.original_price}</Text>
-                          <View style={styles.discountPill}>
-                            <Text style={styles.discountText}>{discount}% OFF</Text>
-                          </View>
-                        </>
                       )}
+
+                      <Text style={styles.serviceName}>{item.name}{item.label ? ' - ' + item.label : ''}</Text>
+
+                      <View style={styles.metaRow}>
+                        <View style={styles.ratingPill}>
+                          <Ionicons name="star" size={11} color={ElixColors.blue} />
+                          <Text style={styles.ratingText}>{ratingVal}★</Text>
+                        </View>
+                        {durationText ? (
+                          <>
+                            <Ionicons name="time-outline" size={12} color={ElixColors.inkMuted} />
+                            <Text style={styles.metaText}>{durationText}</Text>
+                          </>
+                        ) : null}
+                        <Text style={styles.metaDot}>·</Text>
+                        <Text style={styles.metaText}>{item.category}</Text>
+                      </View>
+
+                      {item.description ? (
+                        <Text style={styles.serviceDesc} numberOfLines={2}>{item.description}</Text>
+                      ) : null}
+
+                      {item.features && item.features.length > 0 && (
+                        <View style={styles.featureList}>
+                          {item.features.slice(0, 2).map((f, i) => (
+                            <View key={i} style={styles.featureItem}>
+                              <Ionicons name="checkmark-circle" size={12} color={ElixColors.green} />
+                              <Text style={styles.featureText} numberOfLines={1}>{f}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      <View style={styles.priceRow}>
+                        <View style={styles.priceGroup}>
+                          <Text style={styles.price}>Rs.{Math.round(item.price)}</Text>
+                          {discount > 0 && originalPrice && (
+                            <>
+                              <Text style={styles.originalPrice}>Rs.{Math.round(originalPrice)}</Text>
+                              <View style={styles.discountPill}>
+                                <Text style={styles.discountText}>{discount}% OFF</Text>
+                              </View>
+                            </>
+                          )}
+                        </View>
+                      </View>
                     </View>
 
-                    {qty === 0 ? (
-                      <Pressable style={styles.addBtn} onPress={() => handleAdd(item)}>
-                        <Ionicons name="add" size={16} color={ElixColors.blue} />
-                        <Text style={styles.addBtnText}>Add</Text>
-                      </Pressable>
-                    ) : (
-                      <View style={styles.qtyControl}>
-                        <Pressable style={styles.qtyBtn} onPress={() => handleDecrement(item)}>
-                          <Ionicons name="remove" size={16} color={ElixColors.blue} />
-                        </Pressable>
-                        <Text style={styles.qtyValue}>{qty}</Text>
-                        <Pressable style={styles.qtyBtn} onPress={() => handleIncrement(item)}>
-                          <Ionicons name="add" size={16} color={ElixColors.blue} />
-                        </Pressable>
+                    {/* Right Column: Service Image & Add/Qty Button */}
+                    <View style={styles.cardMediaCol}>
+                      <View style={styles.imageContainer}>
+                        {photoUrl ? (
+                          <Image
+                            source={{ uri: photoUrl }}
+                            style={styles.serviceImage}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={styles.imagePlaceholder}>
+                            <Ionicons name="sparkles" size={26} color={ElixColors.blue} />
+                          </View>
+                        )}
                       </View>
-                    )}
+
+                      <View style={styles.actionBtnWrap}>
+                        {qty === 0 ? (
+                          <Pressable style={styles.addBtn} onPress={() => handleAdd(item)}>
+                            <Ionicons name="add" size={15} color={ElixColors.blue} />
+                            <Text style={styles.addBtnText}>Add</Text>
+                          </Pressable>
+                        ) : (
+                          <View style={styles.qtyControl}>
+                            <Pressable style={styles.qtyBtn} onPress={() => handleDecrement(item)}>
+                              <Ionicons name="remove" size={14} color={ElixColors.blue} />
+                            </Pressable>
+                            <Text style={styles.qtyValue}>{qty}</Text>
+                            <Pressable style={styles.qtyBtn} onPress={() => handleIncrement(item)}>
+                              <Ionicons name="add" size={14} color={ElixColors.blue} />
+                            </Pressable>
+                          </View>
+                        )}
+                      </View>
+                    </View>
                   </View>
                 </View>
               );
@@ -390,6 +426,45 @@ const styles = StyleSheet.create({
     padding: 16,
     ...ElixShadows.md,
   },
+  cardMainRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  cardInfoCol: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  cardMediaCol: {
+    width: 96,
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  imageContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  serviceImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+  },
+  actionBtnWrap: {
+    marginTop: 10,
+    width: '100%',
+  },
   packageBadge: {
     alignSelf: 'flex-start',
     backgroundColor: ElixColors.blueLight,
@@ -400,7 +475,7 @@ const styles = StyleSheet.create({
   },
   packageBadgeText: { fontSize: 10, fontWeight: '800', color: ElixColors.blue, letterSpacing: 0.5 },
   serviceName: { fontSize: 15, fontWeight: '700', color: ElixColors.ink, marginBottom: 6 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6, flexWrap: 'wrap' },
   ratingPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -414,11 +489,11 @@ const styles = StyleSheet.create({
   metaText: { fontSize: 12, color: ElixColors.inkMuted },
   metaDot: { color: ElixColors.inkMuted },
   serviceDesc: { fontSize: 13, color: ElixColors.inkMuted, lineHeight: 18, marginBottom: 8 },
-  featureList: { gap: 4, marginBottom: 12 },
+  featureList: { gap: 4, marginBottom: 10 },
   featureItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  featureText: { fontSize: 12, color: ElixColors.inkMuted },
-  priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  priceGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  featureText: { fontSize: 12, color: ElixColors.inkMuted, flex: 1 },
+  priceRow: { marginTop: 4 },
+  priceGroup: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   price: { fontSize: 18, fontWeight: '800', color: ElixColors.ink },
   originalPrice: { fontSize: 13, color: ElixColors.inkMuted, textDecorationLine: 'line-through' },
   discountPill: { backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
@@ -426,24 +501,29 @@ const styles = StyleSheet.create({
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+    gap: 3,
     borderWidth: 1.5,
     borderColor: ElixColors.blue,
     borderRadius: 10,
-    paddingHorizontal: 14,
+    backgroundColor: '#EFF6FF',
     paddingVertical: 7,
+    width: '100%',
   },
   addBtnText: { fontSize: 13, fontWeight: '700', color: ElixColors.blue },
   qtyControl: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1.5,
     borderColor: ElixColors.blue,
     borderRadius: 10,
     overflow: 'hidden',
+    backgroundColor: '#EFF6FF',
+    width: '100%',
   },
-  qtyBtn: { paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#EFF6FF' },
-  qtyValue: { paddingHorizontal: 12, fontSize: 14, fontWeight: '700', color: ElixColors.ink },
+  qtyBtn: { paddingHorizontal: 7, paddingVertical: 7, alignItems: 'center', justifyContent: 'center' },
+  qtyValue: { fontSize: 13, fontWeight: '700', color: ElixColors.ink },
   cartBar: {
     position: 'absolute',
     bottom: 16,

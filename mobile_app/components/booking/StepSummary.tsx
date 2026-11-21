@@ -125,17 +125,75 @@ export function StepSummary({ onClose }: { onClose: () => void }) {
   }
 
   async function handleRazorpayWeb(orderId: string, amount: number, keyId: string) {
-    // Razorpay hosted checkout URL for web testing
-    const returnUrl = 'http://localhost:8003/api/v1/payments/razorpay/web-callback/';
-    const url = `https://api.razorpay.com/v1/checkout/embedded?key_id=${keyId}&order_id=${orderId}&amount=${amount}&currency=INR&name=Elix&description=Beauty+Session&callback_url=${encodeURIComponent(returnUrl)}`;
-    Alert.alert(
-      'Web Payment Testing',
-      'Razorpay native SDK works on iOS/Android devices.\n\nFor web browser testing, use "Pay at Home" or test on an Android emulator.',
-      [
-        { text: 'Use Pay at Home', onPress: handlePayAtHome },
-        { text: 'Cancel', style: 'cancel', onPress: () => flow.setSubmitting(false) },
-      ]
-    );
+    try {
+      // 1. Ensure Razorpay Checkout.js SDK is loaded in browser
+      if (typeof window !== 'undefined' && !(window as any).Razorpay) {
+        await new Promise<void>((resolve, reject) => {
+          const existing = document.getElementById('razorpay-checkout-script');
+          if (existing) {
+            existing.addEventListener('load', () => resolve());
+            if ((window as any).Razorpay) resolve();
+            return;
+          }
+          const script = document.createElement('script');
+          script.id = 'razorpay-checkout-script';
+          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error('Failed to load Razorpay Checkout script'));
+          document.body.appendChild(script);
+        });
+      }
+
+      if (typeof window === 'undefined' || !(window as any).Razorpay) {
+        throw new Error('Razorpay is not available in this browser environment.');
+      }
+
+      const Razorpay = (window as any).Razorpay;
+      const options = {
+        key: keyId,
+        amount: String(amount),
+        currency: 'INR',
+        name: 'Elix Premium Salon',
+        description: 'Beauty & Grooming Session',
+        order_id: orderId,
+        theme: { color: '#4F46E5' },
+        handler: async function (response: any) {
+          try {
+            const verifyPayload = {
+              ...buildBookingPayload({ payment_method: 'pay_now' }),
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            };
+            const verifyRes = await verifyRazorpay.mutateAsync(verifyPayload);
+            const bookingNumber = (verifyRes.data as any).booking_number as string;
+            afterSuccess(bookingNumber, 'pay_now');
+          } catch (err: any) {
+            const msg = err?.response?.data?.error ?? 'Payment verification failed. Please contact support.';
+            Alert.alert('Payment Verification Failed', msg);
+          } finally {
+            flow.setSubmitting(false);
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            flow.setSubmitting(false);
+          },
+        },
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.on('payment.failed', function (resp: any) {
+        flow.setSubmitting(false);
+        const desc = resp?.error?.description || 'Your payment was not successful.';
+        Alert.alert('Payment Failed', desc);
+      });
+      rzp.open();
+    } catch (err: any) {
+      flow.setSubmitting(false);
+      Alert.alert('Checkout Error', err?.message || 'Could not launch payment gateway. Please try again.');
+    }
   }
 
   async function handleRazorpayNative(orderId: string, amount: number, keyId: string) {

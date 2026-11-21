@@ -15,10 +15,21 @@ import * as SecureStore from 'expo-secure-store';
 const PORT = 8003;
 const DEVICE_LAN_IP = '192.168.1.100'; // change this for physical Expo Go testing
 
+export function getBaseHost(): string {
+  if (Platform.OS === 'web') return `http://localhost:${PORT}`;
+  if (Platform.OS === 'android') return `http://10.0.2.2:${PORT}`;
+  return `http://localhost:${PORT}`; // iOS simulator
+}
+
+export function resolveImageUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  const host = getBaseHost();
+  return `${host}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
 function getBaseUrl(): string {
-  if (Platform.OS === 'web') return `http://localhost:${PORT}/api/v1`;
-  if (Platform.OS === 'android') return `http://10.0.2.2:${PORT}/api/v1`;
-  return `http://localhost:${PORT}/api/v1`; // iOS simulator
+  return `${getBaseHost()}/api/v1`;
 }
 
 export const apiClient = axios.create({

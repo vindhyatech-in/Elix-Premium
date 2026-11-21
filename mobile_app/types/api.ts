@@ -38,20 +38,32 @@ export interface Address {
 
 export interface CatalogItem {
   kind: 'service' | 'package';
-  id: number;
+  id: string | number;
   name: string;
   category: string;
   price: number;
-  original_price: number | null;
-  duration: number;
+  original_price?: number | null;
+  mrp?: number | null;
+  duration?: number;
+  duration_mins?: number;
+  duration_label?: string;
   description: string;
-  features: string[];
+  features?: string[];
+  photo?: string | null;
   image?: string;
+  rating?: number;
+  reviews_count?: number;
+  badges?: string[];
+  available_today?: boolean;
+  tone?: string;
+  discount_pct?: number | null;
   // service-specific
-  variant_id?: number;
+  variant_id?: number | string;
   label?: string;
   // package-specific
-  package_id?: number;
+  package_id?: number | string;
+  included_services?: any[];
+  variants?: any[];
 }
 
 export interface Category {
@@ -139,8 +151,8 @@ export interface Booking {
 // ---- Cart ----
 
 export interface CartEntry {
-  variantId?: number;
-  packageId?: number;
+  variantId?: number | string;
+  packageId?: number | string;
   isPackage: boolean;
   name: string;
   price: number;
