@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { ElixColors, ElixRadii, ElixTypography, ElixShadows } from '@/constants/theme';
 import { Header } from '@/components/ui/Header';
 import { Badge } from '@/components/ui/Badge';
@@ -226,8 +226,11 @@ export default function ServicesScreen() {
               return (
                 <View key={`${item.kind}-${item.id}-${item.variant_id ?? ''}`} style={styles.serviceCard}>
                   <View style={styles.cardMainRow}>
-                    {/* Left Column: Info & Price */}
-                    <View style={styles.cardInfoCol}>
+                    {/* Left Column: Info & Price (Tappable to View Details) */}
+                    <Pressable
+                      style={styles.cardInfoCol}
+                      onPress={() => router.push(`/services/${item.id}` as any)}
+                    >
                       {item.kind === 'package' && (
                         <View style={styles.packageBadge}>
                           <Text style={styles.packageBadgeText}>PACKAGE</Text>
@@ -279,11 +282,19 @@ export default function ServicesScreen() {
                           )}
                         </View>
                       </View>
-                    </View>
+
+                      <View style={styles.viewDetailsRow}>
+                        <Text style={styles.viewDetailsText}>View Details</Text>
+                        <Ionicons name="chevron-forward" size={12} color={ElixColors.blue} />
+                      </View>
+                    </Pressable>
 
                     {/* Right Column: Service Image & Add/Qty Button */}
                     <View style={styles.cardMediaCol}>
-                      <View style={styles.imageContainer}>
+                      <Pressable
+                        style={styles.imageContainer}
+                        onPress={() => router.push(`/services/${item.id}` as any)}
+                      >
                         {photoUrl ? (
                           <Image
                             source={{ uri: photoUrl }}
@@ -295,7 +306,7 @@ export default function ServicesScreen() {
                             <Ionicons name="sparkles" size={26} color={ElixColors.blue} />
                           </View>
                         )}
-                      </View>
+                      </Pressable>
 
                       <View style={styles.actionBtnWrap}>
                         {qty === 0 ? (
@@ -493,6 +504,8 @@ const styles = StyleSheet.create({
   featureItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   featureText: { fontSize: 12, color: ElixColors.inkMuted, flex: 1 },
   priceRow: { marginTop: 4 },
+  viewDetailsRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 6 },
+  viewDetailsText: { fontSize: 12, fontWeight: '700', color: ElixColors.blue },
   priceGroup: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   price: { fontSize: 18, fontWeight: '800', color: ElixColors.ink },
   originalPrice: { fontSize: 13, color: ElixColors.inkMuted, textDecorationLine: 'line-through' },

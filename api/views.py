@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from django.conf import settings
 from django.core.cache import cache
@@ -24,7 +24,7 @@ from bookings import razorpay_client
 from bookings.models import Booking, BookingItem, Offer
 from bookings.notifications import notify_user
 from bookings.views import PAYMENT_METHOD_MAP, CartError, _resolve_cart_pricing
-from catalog.models import Category
+from catalog.models import Category, Package, Service
 from core import booking_data
 from core.email_service import send_booking_email_all
 from core.models import (
@@ -83,6 +83,203 @@ def catalog_view(request):
     if kind in ('service', 'package'):
         items = [item for item in items if item.get('kind') == kind]
     return JsonResponse({'status': 'success', 'catalog': items})
+
+
+@require_GET
+def service_detail_api(request, slug):
+    """GET /api/v1/catalog/<slug>/
+    Returns full details for a Service or Package, mirroring core/views.py::service_detail.
+    """
+    try:
+        service = Service.objects.select_related('category', 'aftercare').prefetch_related('variants', 'steps').get(
+            slug=slug, is_active=True,
+        )
+        kind = 'service'
+    except Service.DoesNotExist:
+        try:
+            service = Package.objects.select_related('category').prefetch_related('included_services__variants').get(
+                slug=slug, is_active=True,
+            )
+            kind = 'package'
+        except Package.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Service or package not found'}, status=404)
+
+    default_var = service if kind == 'package' else service.default_variant
+    if not default_var:
+        return JsonResponse({'status': 'error', 'message': 'Service has no active variant'}, status=404)
+
+    # Variants
+    variants_data = []
+    if kind == 'service':
+        for v in service.variants.filter(is_active=True).order_by('sort_order', 'id'):
+            variants_data.append({
+                'id': v.id,
+                'label': v.label or v.duration_label,
+                'price': float(v.price),
+                'mrp': float(v.mrp) if v.mrp else None,
+                'duration_mins': v.duration_mins,
+                'duration_label': v.duration_label,
+                'discount_pct': v.discount_pct,
+                'is_default': v.id == default_var.id,
+            })
+
+    # Included services for packages
+    included_services_data = []
+    if kind == 'package':
+        for inc in service.included_services.all():
+            inc_vars = [
+                {
+                    'id': iv.id,
+                    'label': iv.label or iv.duration_label,
+                    'price': float(iv.price),
+                    'duration_mins': iv.duration_mins,
+                    'duration_label': iv.duration_label,
+                }
+                for iv in inc.variants.filter(is_active=True)
+            ]
+            inc_default = inc.default_variant
+            if inc_default:
+                included_services_data.append({
+                    'id': inc.id,
+                    'name': inc.name,
+                    'photo': inc.display_photo_url,
+                    'selected_variant_id': inc_default.id,
+                    'price': float(inc_default.price),
+                    'duration_mins': inc_default.duration_mins,
+                    'duration_label': inc_default.duration_label,
+                    'variants': inc_vars,
+                })
+
+    # Treatment steps (How treatment works)
+    steps_data = []
+    if kind == 'service':
+        for step in service.steps.all():
+            steps_data.append({
+                'sort_order': step.sort_order,
+                'title': step.title,
+                'description': step.description,
+                'badge': step.badge,
+                'image': step.display_image_url,
+            })
+
+    # After-care tips
+    aftercare_data = None
+    if kind == 'service' and hasattr(service, 'aftercare') and service.aftercare:
+        ac = service.aftercare
+        if ac.tips_list:
+            aftercare_data = {
+                'title': ac.title or 'After-Care Tips',
+                'tips': ac.tips_list,
+            }
+
+    # Reviews
+    reviews_data = []
+    reviews_qs = service.reviews.select_related('user').order_by('-created_at')[:20]
+    for r in reviews_qs:
+        name = r.user.get_full_name() or r.user.first_name or r.user.username or 'Customer'
+        reviews_data.append({
+            'id': r.id,
+            'name': name,
+            'rating': r.rating or 5,
+            'created_at': r.created_at.strftime('%d %b %Y') if hasattr(r, 'created_at') and r.created_at else None,
+            'comment': getattr(r, 'comment', '') or '',
+            'verified': True,
+        })
+
+    # Service FAQs
+    faqs_data = [
+        {
+            'question': 'How do beauticians ensure hygiene at home?',
+            'answer': 'Our professionals carry single-use disposables, sterilized tools, and open sealed product sachets directly in front of you.'
+        },
+        {
+            'question': 'Can I select a preferred time slot?',
+            'answer': 'Yes! You can choose any convenient date and time during checkout. Express 50-minute delivery is also available for today.'
+        },
+        {
+            'question': 'What if I need to reschedule or cancel?',
+            'answer': 'Free cancellation and instant rescheduling are available up to 2 hours before your booked appointment slot.'
+        },
+    ]
+
+    # How at-home salon works (Urban Company standard 3 steps)
+    how_it_works = [
+        {
+            'step': '01',
+            'title': 'Beautician Arrival & Prep',
+            'desc': 'Certified female professional arrives at your doorstep equipped with salon setup and hygiene disposable kit.',
+        },
+        {
+            'step': '02',
+            'title': 'Sealed Product Unboxing',
+            'desc': 'All products are mono-doses opened right before your eyes to guarantee 100% purity and safety.',
+        },
+        {
+            'step': '03',
+            'title': 'Flawless Service & Clean-up',
+            'desc': 'Enjoy luxury salon treatment at home, followed by complete post-service clean-up and care guidance.',
+        },
+    ]
+
+    # Quality promises (4 pillars)
+    promises = [
+        {'title': '100% Certified', 'desc': 'Background-verified beauticians', 'icon': 'shield-checkmark-outline'},
+        {'title': 'Mono-Dose Kits', 'desc': 'Sealed single-use sachets opened in front of you', 'icon': 'cube-outline'},
+        {'title': 'Free Rescheduling', 'desc': 'Instant reschedule or cancellation anytime', 'icon': 'time-outline'},
+        {'title': 'Mess-Free Clean-up', 'desc': 'Spotless post-service home clean-up', 'icon': 'sparkles-outline'},
+    ]
+
+    # Related items
+    related_model = Package if kind == 'package' else Service
+    related_qs = related_model.objects.filter(category=service.category, is_active=True).exclude(id=service.id)[:4]
+    related_items = []
+    for rel in related_qs:
+        rel_var = rel if kind == 'package' else rel.default_variant
+        if rel_var:
+            related_items.append({
+                'id': rel.slug,
+                'slug': rel.slug,
+                'name': rel.name,
+                'kind': kind,
+                'category': rel.category.name,
+                'photo': rel.display_photo_url,
+                'price': float(rel_var.price),
+                'mrp': float(rel_var.mrp) if rel_var.mrp else None,
+                'duration_label': rel_var.duration_label,
+                'rating': float(rel.rating),
+            })
+
+    item_data = {
+        'id': service.slug,
+        'slug': service.slug,
+        'kind': kind,
+        'category': service.category.name,
+        'category_slug': service.category.slug,
+        'name': service.name,
+        'description': service.description,
+        'photo': service.display_photo_url,
+        'price': float(default_var.price),
+        'mrp': float(default_var.mrp) if default_var.mrp else None,
+        'discount_pct': default_var.discount_pct,
+        'duration_mins': default_var.duration_mins,
+        'duration_label': default_var.duration_label,
+        'rating': float(service.rating),
+        'reviews_count': service.reviews_count,
+        'available_today': service.available_today,
+        'badges': service.badges or [],
+        'variant_id': default_var.id if kind == 'service' else None,
+        'variants': variants_data,
+        'included_services': included_services_data,
+        'steps': steps_data,
+        'aftercare': aftercare_data,
+        'reviews': reviews_data,
+        'faqs': faqs_data,
+        'how_it_works': how_it_works,
+        'promises': promises,
+        'related_items': related_items,
+    }
+
+    return JsonResponse({'status': 'success', 'item': item_data})
 
 
 def offers_view(request):

@@ -29,7 +29,7 @@ const FALLBACK_BEAUTICIANS: Beautician[] = [
     reviews: 142,
     skills: ['O3+ Bridal Glow', 'Fruit Detan', 'Face Massage', 'Cleanups'],
     experience_years: 6,
-    photo: resolveImageUrl('/static/images/artist-2.jpg') ?? '/static/images/artist-2.jpg',
+    photo: 'https://elix.vindhyatech.in/static/images/artist-2.jpg',
   },
   {
     slug: 'priya-verma',
@@ -39,7 +39,7 @@ const FALLBACK_BEAUTICIANS: Beautician[] = [
     reviews: 98,
     skills: ['RICA White Chocolate', 'Honey Wax', 'Pain-Free Threading'],
     experience_years: 5,
-    photo: resolveImageUrl('/static/images/artist-3.jpg') ?? '/static/images/artist-3.jpg',
+    photo: 'https://elix.vindhyatech.in/static/images/artist-3.jpg',
   },
   {
     slug: 'neha-patel',
@@ -49,7 +49,7 @@ const FALLBACK_BEAUTICIANS: Beautician[] = [
     reviews: 86,
     skills: ['Deep Conditioning', 'Scalp Therapy', 'Blowdry & Styling'],
     experience_years: 4,
-    photo: resolveImageUrl('/static/images/artist-4.jpg') ?? '/static/images/artist-4.jpg',
+    photo: 'https://elix.vindhyatech.in/static/images/artist-4.jpg',
   },
   {
     slug: 'ananya-joshi',
@@ -59,7 +59,7 @@ const FALLBACK_BEAUTICIANS: Beautician[] = [
     reviews: 110,
     skills: ['HD Bridal Makeup', 'Gel Polish', 'Luxury Pedicure'],
     experience_years: 7,
-    photo: resolveImageUrl('/static/images/artist-1.jpg') ?? '/static/images/artist-1.jpg',
+    photo: 'https://elix.vindhyatech.in/static/images/artist-1.jpg',
   },
 ];
 

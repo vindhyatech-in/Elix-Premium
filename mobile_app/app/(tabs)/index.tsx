@@ -350,7 +350,11 @@ export default function HomeScreen() {
                 const label = discountLabel(pkg.price, pkg.original_price ?? 0);
                 const includedItems = (pkg as any).included_services?.map((s: any) => s.name) ?? [];
                 return (
-                  <View key={pkg.id} style={styles.packageCard}>
+                  <Pressable
+                    key={pkg.id}
+                    style={styles.packageCard}
+                    onPress={() => router.push(`/services/${pkg.id}` as any)}
+                  >
                     <View style={styles.packageHeader}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.packageName}>{pkg.name}</Text>
@@ -385,10 +389,10 @@ export default function HomeScreen() {
                         title="+ Add"
                         size="sm"
                         variant="outline"
-                        onPress={() => router.push('/services')}
+                        onPress={() => router.push(`/services/${pkg.id}` as any)}
                       />
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })
             )}

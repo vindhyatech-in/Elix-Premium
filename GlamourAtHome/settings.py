@@ -77,21 +77,14 @@ for origin in extra_origins:
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 
-# CORS (django-cors-headers) — only matters for the Flutter app's web
-# build (`flutter run -d chrome`, or a future web deploy); native
-# iOS/Android requests are never subject to CORS, only browsers enforce
-# it. No credentials/cookies involved (the mobile API uses a bearer
-# token — see api/auth.py), so CORS_ALLOW_CREDENTIALS is deliberately
-# left off. Regex, not a fixed port, because `flutter run -d chrome`
-# picks a random port each run unless --web-port is passed — same
-# "trust any local dev port" reasoning as the devtunnels wildcard
-# above, scoped to DEBUG the same way.
-CORS_ALLOWED_ORIGIN_REGEXES = []
-if DEBUG:
-    CORS_ALLOWED_ORIGIN_REGEXES = [
-        r'^http://localhost:\d+$',
-        r'^http://127\.0\.0\.1:\d+$',
-    ]
+# CORS (django-cors-headers) — allow mobile apps, Expo tunnels, and web clients
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^http://localhost:\d+$',
+    r'^http://127\.0\.0\.1:\d+$',
+    r'^https://.*\.exp\.direct(:\d+)?$',
+    r'^https://.*\.ngrok.*$',
+]
 
 # Cookie/transport hardening — gated on `not DEBUG` so local dev (plain
 # HTTP on localhost) is completely unaffected; only takes effect once a

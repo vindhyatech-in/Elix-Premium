@@ -5,6 +5,7 @@ urlpatterns = [
     path('serviceability/', views.verify_serviceability, name='api_serviceability'),
     path('categories/', views.get_categories, name='api_categories'),
     path('catalog/', views.catalog_view, name='api_catalog'),
+    path('catalog/<slug:slug>/', views.service_detail_api, name='api_service_detail'),
     path('offers/', views.offers_view, name='api_offers'),
     path('validate-coupon/', views.validate_coupon_view, name='api_validate_coupon'),
     path('home/', views.home_view, name='api_home'),

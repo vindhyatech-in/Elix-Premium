@@ -74,6 +74,118 @@ export interface Category {
   image?: string;
 }
 
+// ---- Service & Package Details ----
+
+export interface ServiceVariant {
+  id: number;
+  label?: string;
+  price: number;
+  mrp?: number | null;
+  duration_mins?: number;
+  duration_label?: string;
+  discount_pct?: number | null;
+  is_default?: boolean;
+}
+
+export interface IncludedService {
+  id: number;
+  name: string;
+  photo?: string | null;
+  selected_variant_id: number;
+  price: number;
+  duration_mins?: number;
+  duration_label?: string;
+  variants: Array<{
+    id: number;
+    label?: string;
+    price: number;
+    duration_mins?: number;
+    duration_label?: string;
+  }>;
+}
+
+export interface TreatmentStep {
+  sort_order: number;
+  title: string;
+  description?: string;
+  badge?: string;
+  image?: string | null;
+}
+
+export interface AftercareData {
+  title: string;
+  tips: string[];
+}
+
+export interface ReviewItem {
+  id: number;
+  name: string;
+  rating: number;
+  created_at?: string | null;
+  comment?: string;
+  verified?: boolean;
+}
+
+export interface FAQItem {
+  question: string;
+  answer: string;
+}
+
+export interface HowItWorksItem {
+  step: string;
+  title: string;
+  desc: string;
+}
+
+export interface QualityPromise {
+  title: string;
+  desc: string;
+  icon: string;
+}
+
+export interface RelatedServiceItem {
+  id: string;
+  slug: string;
+  name: string;
+  kind: 'service' | 'package';
+  category: string;
+  photo?: string | null;
+  price: number;
+  mrp?: number | null;
+  duration_label?: string;
+  rating: number;
+}
+
+export interface ServiceDetailData {
+  id: string;
+  slug: string;
+  kind: 'service' | 'package';
+  category: string;
+  category_slug?: string;
+  name: string;
+  description: string;
+  photo?: string | null;
+  price: number;
+  mrp?: number | null;
+  discount_pct?: number | null;
+  duration_mins?: number;
+  duration_label?: string;
+  rating: number;
+  reviews_count?: number;
+  available_today?: boolean;
+  badges?: string[];
+  variant_id?: number | null;
+  variants: ServiceVariant[];
+  included_services: IncludedService[];
+  steps: TreatmentStep[];
+  aftercare?: AftercareData | null;
+  reviews: ReviewItem[];
+  faqs: FAQItem[];
+  how_it_works: HowItWorksItem[];
+  promises: QualityPromise[];
+  related_items: RelatedServiceItem[];
+}
+
 // ---- Home ----
 
 export interface HomeHero {

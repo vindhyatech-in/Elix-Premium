@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ElixColors, ElixTypography } from '@/constants/theme';
 
-export type TabKey = 'index' | 'services' | 'urgent' | 'bookings' | 'profile';
+export type TabKey = 'index' | 'services' | 'bookings' | 'profile';
 
 interface BottomNavProps {
   activeTab?: TabKey;
@@ -14,7 +14,7 @@ export function BottomNav({ activeTab = 'profile' }: BottomNavProps) {
   const tabs: Array<{
     key: TabKey;
     label: string;
-    route: '/(tabs)' | '/(tabs)/services' | '/(tabs)/urgent' | '/(tabs)/bookings' | '/(tabs)/profile';
+    route: '/(tabs)' | '/(tabs)/services' | '/(tabs)/bookings' | '/(tabs)/profile';
     activeIcon: keyof typeof Ionicons.glyphMap;
     inactiveIcon: keyof typeof Ionicons.glyphMap;
     activeColor?: string;
@@ -32,14 +32,6 @@ export function BottomNav({ activeTab = 'profile' }: BottomNavProps) {
       route: '/(tabs)/services',
       activeIcon: 'sparkles',
       inactiveIcon: 'sparkles-outline',
-    },
-    {
-      key: 'urgent',
-      label: 'Express 50m',
-      route: '/(tabs)/urgent',
-      activeIcon: 'flash',
-      inactiveIcon: 'flash-outline',
-      activeColor: ElixColors.urgentRed,
     },
     {
       key: 'bookings',

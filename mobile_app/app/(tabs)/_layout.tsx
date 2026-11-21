@@ -55,14 +55,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="urgent"
         options={{
-          title: 'Express 50m',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'flash' : 'flash-outline'}
-              size={22}
-              color={color}
-            />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen
