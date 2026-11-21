@@ -48,10 +48,16 @@ export default function SignupScreen() {
   const [verificationId, setVerificationId] = useState('');
   const [otpInput, setOtpInput] = useState('');
   const [modalError, setModalError] = useState('');
-  const [devCode, setDevCode] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(60);
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+
+  // ── Error Popup Modal State ────────────────────────────────────────────────
+  const [errorPopup, setErrorPopup] = useState<{ title: string; message: string } | null>(null);
+
+  function showError(title: string, message: string) {
+    setErrorPopup({ title, message });
+  }
 
   const { signup, requestVerificationCode, verifyCode, isLoading } = useAuthStore();
 
@@ -80,7 +86,7 @@ export default function SignupScreen() {
     if (channel === 'phone') {
       const cleanPhone = phone.replace(/\D/g, '');
       if (!cleanPhone || cleanPhone.length < 10) {
-        setError('Please enter a valid 10-digit Indian phone number first.');
+        showError('Invalid Phone Number', 'Please enter a valid 10-digit Indian phone number first.');
         return;
       }
       setIsSendingCode(true);
@@ -95,17 +101,16 @@ export default function SignupScreen() {
         setVerificationId(res.verification_id);
         setVerifyChannel('phone');
         setTargetValue(cleanPhone);
-        setDevCode(res.dev_code || null);
-        setOtpInput(res.dev_code || '');
+        setOtpInput('');
         setCountdown(60);
         setIsVerifyModalVisible(true);
       } else {
-        setError(res.error || 'Failed to dispatch SMS/WhatsApp verification code.');
+        showError('Verification Failed', res.error || 'Failed to dispatch SMS/WhatsApp verification code.');
       }
     } else {
       const cleanEmail = email.trim().toLowerCase();
       if (!cleanEmail || !cleanEmail.includes('@')) {
-        setError('Please enter a valid email address first.');
+        showError('Invalid Email Address', 'Please enter a valid email address first.');
         return;
       }
       setIsSendingCode(true);
@@ -120,12 +125,11 @@ export default function SignupScreen() {
         setVerificationId(res.verification_id);
         setVerifyChannel('email');
         setTargetValue(cleanEmail);
-        setDevCode(res.dev_code || null);
-        setOtpInput(res.dev_code || '');
+        setOtpInput('');
         setCountdown(60);
         setIsVerifyModalVisible(true);
       } else {
-        setError(res.error || 'Failed to dispatch email verification code.');
+        showError('Verification Failed', res.error || 'Failed to dispatch email verification code.');
       }
     }
   }
@@ -172,10 +176,7 @@ export default function SignupScreen() {
 
     if (res.ok && res.verification_id) {
       setVerificationId(res.verification_id);
-      if (res.dev_code) {
-        setDevCode(res.dev_code);
-        setOtpInput(res.dev_code);
-      }
+      setOtpInput('');
       setCountdown(60);
       Alert.alert('Code Sent', `A new verification code has been dispatched to ${targetValue}.`);
     } else {
@@ -188,44 +189,45 @@ export default function SignupScreen() {
     setError('');
 
     if (!firstName.trim()) {
-      setError('Please enter your first name.');
+      showError('First Name Required', 'Please enter your first name.');
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      setError('Please enter a valid email address.');
+      showError('Invalid Email', 'Please enter a valid email address.');
       return;
     }
     if (!phone.trim()) {
-      setError('Please enter your phone number.');
+      showError('Phone Number Required', 'Please enter your phone number.');
       return;
     }
     if (phone.replace(/\D/g, '').length < 10) {
-      setError('Please enter a valid 10-digit phone number.');
+      showError('Invalid Phone Number', 'Please enter a valid 10-digit phone number.');
       return;
     }
 
     // ── ANY ONE VERIFICATION REQUIRED ────────────────────────────────────────
     if (!isPhoneVerified && !isEmailVerified) {
-      setError(
-        'Verification required: Please verify either your Mobile Number or Email Address to complete sign up.'
+      showError(
+        'Verification Required',
+        'Please verify either your Mobile Number or Email Address to complete sign up.'
       );
       return;
     }
 
     if (age && (parseInt(age, 10) < 13 || parseInt(age, 10) > 120)) {
-      setError('Age must be between 13 and 120.');
+      showError('Invalid Age', 'Age must be between 13 and 120.');
       return;
     }
     if (!password) {
-      setError('Please enter a password.');
+      showError('Password Required', 'Please enter a password.');
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters long.');
+      showError('Password Too Short', 'Password must be at least 6 characters long.');
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match. Please re-enter.');
+      showError('Passwords Do Not Match', 'Passwords do not match. Please re-enter.');
       return;
     }
 
@@ -239,20 +241,13 @@ export default function SignupScreen() {
     });
 
     if (result.ok) {
-      Alert.alert('Welcome to Elix', 'Your account has been created successfully!', [
-        {
-          text: redirect === 'booking' ? 'Proceed to Booking' : 'Start Exploring',
-          onPress: () => {
-            if (redirect === 'booking' || redirect === 'cart') {
-              router.replace({ pathname: '/(tabs)/services', params: { openBooking: '1' } });
-            } else {
-              router.replace('/(tabs)');
-            }
-          },
-        },
-      ]);
+      if (redirect === 'booking' || redirect === 'cart') {
+        router.replace({ pathname: '/(tabs)/services', params: { openBooking: '1' } });
+      } else {
+        router.replace('/(tabs)');
+      }
     } else {
-      setError(result.error ?? 'Registration failed. Please check your details.');
+      showError('Registration Failed', result.error ?? 'Registration failed. Please check your details.');
     }
   }
 
@@ -309,14 +304,6 @@ export default function SignupScreen() {
             <View style={styles.toastBox}>
               <Ionicons name="checkmark-circle" size={18} color={ElixColors.greenDeep} />
               <Text style={styles.toastText}>{verifiedToast}</Text>
-            </View>
-          ) : null}
-
-          {/* Alert error box */}
-          {error ? (
-            <View style={styles.alertBox}>
-              <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
-              <Text style={styles.alertText}>{error}</Text>
             </View>
           ) : null}
 
@@ -715,14 +702,6 @@ export default function SignupScreen() {
               />
             </View>
 
-            {devCode ? (
-              <View style={styles.devHintWrap}>
-                <Text style={styles.devHintText}>
-                  Dev auto-fill: <Text style={{ fontWeight: '800' }}>{devCode}</Text>
-                </Text>
-              </View>
-            ) : null}
-
             {/* Resend Row */}
             <View style={styles.resendRow}>
               <Text style={styles.resendText}>Didn't receive code? </Text>
@@ -759,6 +738,31 @@ export default function SignupScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── ERROR POPUP MODAL ────────────────────────────────────────── */}
+      <Modal
+        visible={!!errorPopup}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setErrorPopup(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.errorModalCard}>
+            <View style={styles.errorModalIconCircle}>
+              <Ionicons name="alert-circle" size={32} color="#DC2626" />
+            </View>
+            <Text style={styles.errorModalTitle}>{errorPopup?.title || 'Notice'}</Text>
+            <Text style={styles.errorModalMessage}>{errorPopup?.message}</Text>
+            <TouchableOpacity
+              style={styles.errorModalBtn}
+              onPress={() => setErrorPopup(null)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.errorModalBtnText}>Okay, Got It</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       <BottomNav activeTab="profile" />
@@ -1022,6 +1026,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: ElixColors.ink,
     height: '100%',
+    paddingVertical: 0,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+          borderStyle: 'none',
+        } as any)
+      : {}),
   },
   phonePrefix: {
     paddingRight: 8,
@@ -1161,18 +1176,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     paddingVertical: 0,
-  },
-  devHintWrap: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    alignSelf: 'center',
-    marginBottom: 10,
-  },
-  devHintText: {
-    fontSize: 11,
-    color: ElixColors.blue,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+          borderStyle: 'none',
+        } as any)
+      : {}),
   },
   resendRow: {
     flexDirection: 'row',
@@ -1220,5 +1233,53 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: ElixColors.inkMuted,
+  },
+
+  // Error Popup Modal
+  errorModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 24,
+    width: '100%',
+    maxWidth: 380,
+    alignItems: 'center',
+    ...ElixShadows.lg,
+  },
+  errorModalIconCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  errorModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: ElixColors.ink,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  errorModalMessage: {
+    fontSize: 14,
+    color: ElixColors.inkSoft,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 22,
+  },
+  errorModalBtn: {
+    backgroundColor: ElixColors.blue,
+    borderRadius: 14,
+    paddingVertical: 13,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...ElixShadows.sm,
+  },
+  errorModalBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

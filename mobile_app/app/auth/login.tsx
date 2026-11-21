@@ -205,7 +205,7 @@ export default function LoginScreen() {
           ) : null}
 
           {/* ═════════════════════════════════════════════════════════════════ */}
-          {/* ── SEGMENTED TAB SWITCHER (Quick OTP vs Password) ───────────── */}
+          {/* ── SEGMENTED TAB SWITCHER (OTP vs Password) ─────────────────── */}
           {/* ═════════════════════════════════════════════════════════════════ */}
           {otpStep === 'request' && (
             <View style={styles.segmentContainer}>
@@ -221,7 +221,7 @@ export default function LoginScreen() {
                   name="flash"
                   size={14}
                   color={authMode === 'otp' ? ElixColors.blue : ElixColors.inkMuted}
-                  style={{ marginRight: 5 }}
+                  style={{ marginRight: 6 }}
                 />
                 <Text
                   style={[
@@ -229,23 +229,8 @@ export default function LoginScreen() {
                     authMode === 'otp' && styles.segmentTextActive,
                   ]}
                 >
-                  Quick OTP
+                  OTP
                 </Text>
-                <View
-                  style={[
-                    styles.recomBadge,
-                    authMode === 'otp' && styles.recomBadgeActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.recomBadgeText,
-                      authMode === 'otp' && styles.recomBadgeTextActive,
-                    ]}
-                  >
-                    Recommended
-                  </Text>
-                </View>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -263,7 +248,7 @@ export default function LoginScreen() {
                   name="key-outline"
                   size={14}
                   color={authMode === 'password' ? ElixColors.blue : ElixColors.inkMuted}
-                  style={{ marginRight: 5 }}
+                  style={{ marginRight: 6 }}
                 />
                 <Text
                   style={[
@@ -285,7 +270,13 @@ export default function LoginScreen() {
               {otpStep === 'request' ? (
                 <View style={styles.formSection}>
                   <View style={styles.authGroup}>
-                    <Text style={styles.fieldLabel}>Phone Number or Email</Text>
+                    <View style={styles.authLabelRow}>
+                      <Text style={styles.fieldLabel}>Phone Number or Email</Text>
+                      <View style={styles.recomBadge}>
+                        <Ionicons name="sparkles" size={10} color={ElixColors.blue} style={{ marginRight: 3 }} />
+                        <Text style={styles.recomBadgeText}>RECOMMENDED</Text>
+                      </View>
+                    </View>
                     <View
                       style={[
                         styles.inputContainer,
@@ -302,11 +293,13 @@ export default function LoginScreen() {
                         style={styles.textInput}
                         value={phoneOrEmail}
                         onChangeText={setPhoneOrEmail}
-                        placeholder="9876543210 or name@example.com"
+                        placeholder="Phone number or email"
                         placeholderTextColor={ElixColors.inkMuted}
                         keyboardType="email-address"
                         autoCapitalize="none"
                         autoCorrect={false}
+                        multiline={false}
+                        numberOfLines={1}
                         onFocus={() => setFocusedField('phoneOrEmail')}
                         onBlur={() => setFocusedField(null)}
                         returnKeyType="done"
@@ -434,11 +427,13 @@ export default function LoginScreen() {
                     style={styles.textInput}
                     value={identifier}
                     onChangeText={setIdentifier}
-                    placeholder="Enter your username or email"
+                    placeholder="Username or email"
                     placeholderTextColor={ElixColors.inkMuted}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
+                    multiline={false}
+                    numberOfLines={1}
                     onFocus={() => setFocusedField('identifier')}
                     onBlur={() => setFocusedField(null)}
                     returnKeyType="next"
@@ -485,6 +480,8 @@ export default function LoginScreen() {
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
+                    multiline={false}
+                    numberOfLines={1}
                     onFocus={() => setFocusedField('password')}
                     onBlur={() => setFocusedField(null)}
                     returnKeyType="done"
@@ -641,8 +638,8 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     backgroundColor: ElixColors.surface2, // #FFFFFF
     borderRadius: 24,
-    paddingHorizontal: 22,
-    paddingVertical: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 22,
     borderWidth: 1,
     borderColor: ElixColors.borderHairline,
     ...ElixShadows.md,
@@ -701,7 +698,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#F1F5F9', // light slate fill
     borderRadius: 14,
-    padding: 4,
+    padding: 3,
     marginBottom: 20,
     borderWidth: 1,
     borderColor: 'rgba(15, 23, 42, 0.06)',
@@ -711,15 +708,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 40,
+    height: 42,
     borderRadius: 10,
+    paddingHorizontal: 4,
+    gap: 2,
   },
   segmentBtnActive: {
     backgroundColor: '#FFFFFF',
     ...ElixShadows.sm,
   },
   segmentText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
     color: ElixColors.inkMuted,
   },
@@ -728,23 +727,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   recomBadge: {
-    marginLeft: 6,
-    paddingHorizontal: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: 'transparent',
-  },
-  recomBadgeActive: {
-    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+    backgroundColor: 'rgba(79, 70, 229, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(79, 70, 229, 0.16)',
   },
   recomBadgeText: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontWeight: '700',
-    color: ElixColors.inkMuted,
-    textTransform: 'uppercase',
-  },
-  recomBadgeTextActive: {
     color: ElixColors.blue,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
 
   // Form Section
@@ -801,6 +798,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: ElixColors.ink,
     height: '100%',
+    paddingVertical: 0,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+          borderStyle: 'none',
+        } as any)
+      : {}),
   },
 
   // OTP specific input
@@ -816,6 +824,16 @@ const styles = StyleSheet.create({
     letterSpacing: 8,
     textAlign: 'center',
     color: ElixColors.ink,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+          borderStyle: 'none',
+        } as any)
+      : {}),
   },
   passwordToggle: {
     padding: 6,

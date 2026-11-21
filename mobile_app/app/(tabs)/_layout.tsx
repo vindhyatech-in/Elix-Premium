@@ -2,10 +2,14 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ElixColors, ElixTypography } from '@/constants/theme';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   const isIos = Platform.OS === 'ios';
+  const bottomPad = Math.max(insets.bottom, isIos ? 28 : 10);
+  const tabHeight = 56 + bottomPad;
 
   return (
     <Tabs
@@ -16,8 +20,8 @@ export default function TabLayout() {
           backgroundColor: ElixColors.surface2,
           borderTopColor: ElixColors.borderHairline,
           borderTopWidth: 1,
-          height: isIos ? 88 : 70,
-          paddingBottom: isIos ? 28 : 8,
+          height: tabHeight,
+          paddingBottom: bottomPad,
           paddingTop: 6,
         },
         tabBarItemStyle: {

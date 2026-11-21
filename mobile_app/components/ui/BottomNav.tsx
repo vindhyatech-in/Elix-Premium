@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ElixColors, ElixTypography } from '@/constants/theme';
 
 export type TabKey = 'index' | 'services' | 'bookings' | 'profile';
@@ -11,6 +12,11 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ activeTab = 'profile' }: BottomNavProps) {
+  const insets = useSafeAreaInsets();
+  const isIos = Platform.OS === 'ios';
+  const bottomPad = Math.max(insets.bottom, isIos ? 28 : 12);
+  const navHeight = 56 + bottomPad;
+
   const tabs: Array<{
     key: TabKey;
     label: string;
@@ -50,7 +56,7 @@ export function BottomNav({ activeTab = 'profile' }: BottomNavProps) {
   ];
 
   return (
-    <View style={styles.navBar}>
+    <View style={[styles.navBar, { height: navHeight, paddingBottom: bottomPad }]}>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.key;
         const tintColor = isActive
@@ -85,8 +91,6 @@ const styles = StyleSheet.create({
     backgroundColor: ElixColors.surface2,
     borderTopColor: ElixColors.borderHairline,
     borderTopWidth: 1,
-    height: Platform.OS === 'ios' ? 88 : 64,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 10,
     paddingTop: 8,
     width: '100%',
     alignItems: 'center',
