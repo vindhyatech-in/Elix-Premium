@@ -103,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
             onPress={handleLogoPress}
             style={styles.logoBtn}
             hitSlop={8}
-            accessibilityLabel="Elix Home"
+            accessibilityLabel="Elix Premium Home"
           >
             {logoSource ? (
               <Image source={logoSource} style={styles.logoImg} resizeMode="contain" />
@@ -112,6 +112,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <Text style={styles.logoText}>
                   <Text style={styles.logoAccent}>E</Text>LIX
                 </Text>
+                <Text style={styles.logoSub}>PREMIUM</Text>
               </View>
             )}
           </Pressable>
@@ -183,21 +184,29 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   brandWordmark: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    justifyContent: 'center',
   },
   logoImg: {
     width: 60,
     height: 24,
   },
   logoText: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '900',
     color: ElixColors.ink,
     letterSpacing: 1.5,
+    lineHeight: 16,
   },
   logoAccent: {
     color: ElixColors.blue,
+  },
+  logoSub: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: ElixColors.blue,
+    letterSpacing: 1.5,
+    marginTop: 1,
   },
   locationChip: {
     flexDirection: 'row',

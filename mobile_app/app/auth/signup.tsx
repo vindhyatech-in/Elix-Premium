@@ -283,9 +283,9 @@ export default function SignupScreen() {
           activeOpacity={0.8}
         >
           <Text style={styles.brandLogo}>
-            <Text style={styles.brandLogoAccent}>E</Text>LIX
+            <Text style={styles.brandLogoAccent}>E</Text>lix Premium
           </Text>
-          <Text style={styles.brandTagline}>LUXURY SALON & SPA AT HOME</Text>
+          <Text style={styles.brandTagline}>SALON AT HOME</Text>
         </TouchableOpacity>
 
         {/* Auth Card */}

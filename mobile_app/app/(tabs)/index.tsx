@@ -193,7 +193,7 @@ export default function HomeScreen() {
             <Badge label="★ 4.9 (1,200+ INDORE REVIEWS)" variant="discount" style={{ marginBottom: 8 }} />
             {/* headline_lines comes from the Hero CMS record */}
             <Text style={styles.heroTitle}>
-              {hero?.headline_lines?.join(' ') ?? 'Luxury Salon Services at Your Doorstep'}
+              {hero?.headline_lines?.join(' ') ?? 'Salon at Home'}
             </Text>
             <Text style={styles.heroSubtitle}>
               {hero?.subhead ?? 'Hygienic single-use kits, background-verified senior beauticians in Indore.'}
