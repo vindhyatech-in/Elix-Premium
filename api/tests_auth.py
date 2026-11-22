@@ -87,3 +87,35 @@ class AuthChangePasswordAndBookingTest(TestCase):
         self.assertIsNotNone(b_data['assigned_beautician'])
         self.assertEqual(b_data['assigned_beautician']['name'], 'Sachin Shah')
         self.assertEqual(b_data['assigned_beautician']['phone'], '9876543210')
+
+    def test_mobile_checkout_auto_assigns_beautician(self):
+        from catalog.models import Category, Service, ServiceVariant
+        cat = Category.objects.create(name='Waxing', slug='waxing')
+        srv = Service.objects.create(category=cat, name='Full Wax', slug='full-wax', is_active=True)
+        variant = ServiceVariant.objects.create(service=srv, label='Standard', price=299.00, duration_mins=45, is_active=True)
+        emp = Employee.objects.create(name='Expert Beautician 1', phone='9876543210', status='active')
+
+        tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+        payload = {
+            'address': {'label': 'Home', 'text': '123 MG Road, Indore', 'pincode': '452001'},
+            'booking_type': 'regular',
+            'time_slot': 'morning',
+            'scheduled_date': tomorrow.isoformat(),
+            'payment_method': 'pay_at_home',
+            'cart': [{
+                'id': srv.id,
+                'variant_id': variant.id,
+                'is_package': False,
+                'qty': 1,
+            }]
+        }
+        resp = self.client.post('/api/v1/bookings/checkout/', json.dumps(payload), content_type='application/json', **self.auth_headers)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get('ok'))
+        booking_num = data.get('booking_number')
+
+        booking = Booking.objects.get(booking_number=booking_num)
+        self.assertIsNotNone(booking.assigned_beautician)
+        self.assertEqual(booking.assigned_beautician.id, emp.id)
+

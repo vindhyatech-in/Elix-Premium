@@ -1329,7 +1329,8 @@ def checkout_view(request):
     address = payload.get('address') or {}
     cart = payload.get('cart') or []
     booking_type = payload.get('booking_type')
-    payment_method = PAYMENT_METHOD_MAP.get(payload.get('payment_method'))
+    raw_pm = payload.get('payment_method')
+    payment_method = PAYMENT_METHOD_MAP.get(raw_pm) or (raw_pm if raw_pm in dict(Booking.PAYMENT_METHOD_CHOICES) else None)
 
     if payment_method != 'pay_at_home':
         return JsonResponse({'ok': False, 'error': 'Only Pay At Home is supported from the app right now.'}, status=400)
@@ -1419,6 +1420,30 @@ def checkout_view(request):
     except Exception:
         logger.exception('Mobile checkout failed for user=%s.', request.user.id)
         return JsonResponse({'ok': False, 'error': 'Something went wrong completing your booking — please try again.'}, status=500)
+
+    # Auto-assign the best available beautician immediately after booking is confirmed
+    assigned = None
+    try:
+        from bookings.auto_assign import auto_assign_beautician
+        assigned = auto_assign_beautician(booking)
+        if assigned:
+            booking.assigned_beautician = assigned
+            booking.save(update_fields=['assigned_beautician', 'beautician_rush_bonus'])
+    except Exception:
+        logger.exception('auto_assign failed for mobile booking %s — leaving unassigned.', booking.booking_number)
+
+    try:
+        send_booking_email_all(
+            event_customer='booking_confirmed',
+            event_admin='admin_new_booking',
+            event_beautician='beautician_new_job' if assigned else None,
+            booking=booking,
+        )
+        notify_user(booking, 'booking_confirmed')
+        if assigned:
+            notify_user(booking, 'beautician_assigned')
+    except Exception:
+        logger.exception('Notification dispatch failed for mobile booking %s', booking.booking_number)
 
     return JsonResponse({'ok': True, 'booking_number': booking.booking_number})
 
@@ -1616,6 +1641,30 @@ def razorpay_verify(request):
             'ok': False,
             'error': 'Payment received but booking creation failed. Contact support with payment ID: ' + payment_id,
         }, status=500)
+
+    # Auto-assign the best available beautician immediately after booking is confirmed
+    assigned = None
+    try:
+        from bookings.auto_assign import auto_assign_beautician
+        assigned = auto_assign_beautician(booking)
+        if assigned:
+            booking.assigned_beautician = assigned
+            booking.save(update_fields=['assigned_beautician', 'beautician_rush_bonus'])
+    except Exception:
+        logger.exception('auto_assign failed for mobile online booking %s — leaving unassigned.', booking.booking_number)
+
+    try:
+        send_booking_email_all(
+            event_customer='booking_confirmed',
+            event_admin='admin_new_booking',
+            event_beautician='beautician_new_job' if assigned else None,
+            booking=booking,
+        )
+        notify_user(booking, 'booking_confirmed')
+        if assigned:
+            notify_user(booking, 'beautician_assigned')
+    except Exception:
+        logger.exception('Notification dispatch failed for mobile online booking %s', booking.booking_number)
 
     return JsonResponse({'ok': True, 'booking_number': booking.booking_number, 'payment_id': payment_id})
 
