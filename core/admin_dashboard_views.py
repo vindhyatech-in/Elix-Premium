@@ -44,6 +44,10 @@ SLOT_WINDOWS = {
 }
 
 
+def _generate_otp():
+    return ''.join(secrets.choice('0123456789') for _ in range(6))
+
+
 def _booking_time_window(booking):
     """(start, end) as datetime.time for overlap comparisons — a fixed
     slot window for regular bookings, or the requested start time plus

@@ -252,7 +252,12 @@
         headers: { 'X-CSRFToken': getCsrfToken() },
         body: formData,
       })
-        .then(function (resp) { return resp.text(); })
+        .then(function (resp) {
+          if (!resp.ok) {
+            throw new Error('Server returned ' + resp.status);
+          }
+          return resp.text();
+        })
         .then(function (html) {
           var freshRoot = new DOMParser().parseFromString(html, 'text/html').getElementById('adminContentRoot');
           var root = document.getElementById('adminContentRoot');
