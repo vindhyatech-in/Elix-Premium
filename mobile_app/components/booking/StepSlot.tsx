@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ElixColors, ElixRadii } from '@/constants/theme';
 import { useBookingFlowStore } from '@/store/bookingFlowStore';
 import type { TimeSlot, BookingType } from '@/store/bookingFlowStore';
+import { useCartStore } from '@/store/cartStore';
 import { toYMD } from './StepDate';
 
 interface RegularSlotDef {
@@ -56,6 +57,17 @@ export function StepSlot({ onNext }: { onNext: () => void }) {
     exactTime, setExactTime,
     selectedDate, setDate,
   } = useBookingFlowStore();
+  const isCartUrgent = useCartStore((s) => s.isUrgent);
+  const setUrgent = useCartStore((s) => s.setUrgent);
+
+  // Sync initial state if mismatched
+  useEffect(() => {
+    if (bookingType === 'urgent' && !isCartUrgent) {
+      setUrgent(true);
+    } else if (bookingType !== 'urgent' && isCartUrgent) {
+      setBookingType('urgent');
+    }
+  }, []);
 
   const urgentSlots = useMemo(() => getUrgentSlots(selectedDate), [selectedDate]);
 
@@ -115,7 +127,10 @@ export function StepSlot({ onNext }: { onNext: () => void }) {
           <Pressable
             key={t.key}
             style={[styles.typeCard, bookingType === t.key && ((t.key === 'urgent') ? styles.typeCardUrgentActive : styles.typeCardActive)]}
-            onPress={() => setBookingType(t.key)}
+            onPress={() => {
+              setBookingType(t.key);
+              setUrgent(t.key === 'urgent');
+            }}
           >
             <View style={[styles.typeIcon, (t.key === 'urgent') && { backgroundColor: ElixColors.blueLight }]}>
               <Ionicons name={t.icon as any} size={22} color={(t.key === 'urgent') ? ElixColors.urgentRed : ElixColors.blue} />

@@ -158,8 +158,6 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Header
-        location="Indore, MP"
-        onLocationPress={() => {}}
         onSearchPress={() => router.push({ pathname: '/(tabs)/services', params: { autoSearch: '1' } })}
         onCartPress={() => router.push({ pathname: '/(tabs)/services', params: { openCart: '1' } })}
         cartItemCount={cartCount}
@@ -196,7 +194,7 @@ export default function HomeScreen() {
               <Button
                 title="Explore Services"
                 size="sm"
-                onPress={() => router.push('/services')}
+                onPress={() => router.push({ pathname: '/(tabs)/services', params: { category: 'all' } })}
               />
             </View>
           </View>
@@ -295,7 +293,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Service Categories</Text>
-            <Pressable onPress={() => router.push('/services')}>
+            <Pressable onPress={() => router.push({ pathname: '/(tabs)/services', params: { category: 'all' } })}>
               <Text style={styles.viewAllText}>View All</Text>
             </Pressable>
           </View>
@@ -311,7 +309,7 @@ export default function HomeScreen() {
                 <Pressable
                   key={cat.slug}
                   style={styles.categoryCard}
-                  onPress={() => router.push('/services')}>
+                  onPress={() => router.push({ pathname: '/(tabs)/services', params: { category: cat.slug } })}>
                   <View style={styles.categoryIconWrap}>
                     <Ionicons
                       name={getCategoryIcon(cat.slug) as any}
@@ -339,6 +337,12 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Curated Luxury Packages</Text>
+              <Pressable
+                onPress={() => router.push({ pathname: '/(tabs)/services', params: { category: 'packages' } })}
+                hitSlop={8}
+              >
+                <Text style={styles.viewAllText}>View All</Text>
+              </Pressable>
             </View>
 
             {catalogLoading ? (

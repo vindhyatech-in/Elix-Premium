@@ -6,22 +6,25 @@ from django import forms
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import Group, User
 from django.db import transaction
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
+from decimal import Decimal
+
 from django.conf import settings
 from django.core.cache import cache
+from django.db.models import Avg, Count
 from accounts import whatsapp_otp
 from accounts.fields import IndianPhoneField
 from accounts.models import Address, Employee, Profile
 from accounts.utils import generate_username_from_name
 from allauth.account.adapter import get_adapter
 from bookings import razorpay_client
-from bookings.models import Booking, BookingItem, Offer
+from bookings.models import Booking, BookingItem, Offer, Review
 from bookings.notifications import notify_user
 from bookings.views import PAYMENT_METHOD_MAP, CartError, _resolve_cart_pricing
 from catalog.models import Category, Package, Service
@@ -747,6 +750,40 @@ def auth_logout(request):
     return JsonResponse({'ok': True})
 
 
+@csrf_exempt
+@require_POST
+@token_required
+def change_password_view(request):
+    """
+    POST /api/v1/auth/change-password/
+    Payload: { "current_password": "...", "new_password": "..." }
+    """
+    try:
+        data = json.loads(request.body)
+    except Exception:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    current_password = data.get('current_password', '')
+    new_password = data.get('new_password', '')
+
+    if not current_password or not new_password:
+        return JsonResponse({'error': 'Both current password and new password are required.'}, status=400)
+
+    if not request.user.check_password(current_password):
+        return JsonResponse({'error': 'Current password does not match.'}, status=400)
+
+    if len(new_password) < 6:
+        return JsonResponse({'error': 'New password must be at least 6 characters long.'}, status=400)
+
+    if current_password == new_password:
+        return JsonResponse({'error': 'New password cannot be the same as your current password.'}, status=400)
+
+    request.user.set_password(new_password)
+    request.user.save()
+
+    return JsonResponse({'ok': True, 'message': 'Password changed successfully.'})
+
+
 @require_http_methods(['GET'])
 def auth_social_callback(request):
     """
@@ -831,7 +868,15 @@ def profile_view(request):
     profile.phone = phone
     profile.save(update_fields=['phone'])
 
-    return JsonResponse({'ok': True})
+    return JsonResponse({
+        'ok': True,
+        'user': {
+            'email': request.user.email,
+            'first_name': request.user.first_name,
+            'last_name': request.user.last_name,
+        },
+        'phone': profile.phone,
+    })
 
 
 @csrf_exempt
@@ -881,59 +926,307 @@ def addresses_view(request):
 
 @csrf_exempt
 @token_required
-@require_http_methods(['DELETE'])
-def address_delete_view(request, address_id):
-    """DELETE /api/v1/addresses/<id>/ — get_object_or_404(..., user=...)
-    doubles as the ownership check, same pattern as the web's
-    accounts/views.py::address_delete."""
+@require_http_methods(['GET', 'POST', 'PUT', 'DELETE'])
+def address_detail_api(request, address_id):
+    """GET/PUT/POST/DELETE /api/v1/addresses/<id>/ — retrieve, update, or delete
+    a saved address for the authenticated user."""
     address = get_object_or_404(Address, id=address_id, user=request.user)
-    address.delete()
-    return JsonResponse({'ok': True})
+
+    if request.method == 'DELETE':
+        address.delete()
+        return JsonResponse({'ok': True})
+
+    if request.method == 'GET':
+        return JsonResponse({'ok': True, 'address': {
+            'id': address.id, 'label': address.label, 'text': address.text,
+            'pincode': address.pincode, 'lat': address.lat, 'lng': address.lng,
+        }})
+
+    try:
+        payload = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body.'}, status=400)
+
+    text = (payload.get('text') or '').strip()
+    if not text:
+        return JsonResponse({'ok': False, 'error': 'Enter your full address.'}, status=400)
+
+    pincode = (payload.get('pincode') or '').strip()
+    if pincode and not (pincode.isdigit() and len(pincode) == 6):
+        return JsonResponse({'ok': False, 'error': 'Enter a valid 6-digit pincode.'}, status=400)
+
+    lat, lng = payload.get('lat'), payload.get('lng')
+    try:
+        lat = float(lat) if lat is not None else address.lat
+        lng = float(lng) if lng is not None else address.lng
+    except (TypeError, ValueError):
+        return JsonResponse({'ok': False, 'error': 'Invalid map coordinates.'}, status=400)
+
+    address.label = (payload.get('label') or '').strip()[:60] or address.label
+    address.text = text
+    address.pincode = pincode
+    address.lat = lat
+    address.lng = lng
+    address.save()
+
+    return JsonResponse({'ok': True, 'address': {
+        'id': address.id, 'label': address.label, 'text': address.text,
+        'pincode': address.pincode, 'lat': address.lat, 'lng': address.lng,
+    }})
 
 
+address_delete_view = address_detail_api
+
+
+def _serialize_booking(booking):
+    items = []
+    for item in booking.items.all():
+        review_obj = getattr(item, 'review', None)
+        items.append({
+            'id': item.id,
+            'name': item.name_snapshot,
+            'price': float(item.price_snapshot),
+            'quantity': item.quantity,
+            'included': item.included_snapshot,
+            'rating': review_obj.rating if review_obj else None,
+            'beautician_rating': review_obj.beautician_rating if review_obj else None,
+        })
+
+    beautician_data = None
+    if booking.assigned_beautician:
+        b = booking.assigned_beautician
+        photo_url = None
+        if b.face_photo_front:
+            photo_url = b.face_photo_front.url
+        elif b.photo:
+            photo_url = b.photo
+        phone_val = b.phone or ''
+        if not phone_val and hasattr(b, 'user') and b.user:
+            profile = getattr(b.user, 'profile', None)
+            phone_val = getattr(profile, 'phone', '') or getattr(b.user, 'phone', '')
+        beautician_data = {
+            'id': b.id,
+            'name': b.name,
+            'phone': phone_val or '',
+            'photo': photo_url,
+            'role': b.get_role_display() if hasattr(b, 'get_role_display') else 'Expert Beautician',
+            'rating': float(b.rating) if b.rating else 5.0,
+            'specialties': b.specialties or '',
+        }
+
+    rebook_items = []
+    for item in booking.items.all():
+        if item.service_variant and item.service_variant.service.is_active and item.service_variant.is_active:
+            rebook_items.append({
+                'id': item.service_variant.service.id,
+                'variantId': item.service_variant.id,
+                'name': item.name_snapshot,
+                'price': float(item.price_snapshot),
+                'quantity': item.quantity,
+                'isPackage': False,
+            })
+        elif item.package and item.package.is_active:
+            rebook_items.append({
+                'id': item.package.id,
+                'packageId': item.package.id,
+                'name': item.name_snapshot,
+                'price': float(item.price_snapshot),
+                'quantity': item.quantity,
+                'isPackage': True,
+            })
+
+    can_reschedule = booking.status in ('upcoming', 'pending', 'confirmed') and booking.can_cancel
+
+    # Status refinement: if beautician is assigned while booking is upcoming/pending/confirmed, mark as 'assigned'
+    effective_status = booking.status
+    effective_status_display = booking.get_status_display()
+    if booking.assigned_beautician and booking.status in ('upcoming', 'pending', 'confirmed'):
+        effective_status = 'assigned'
+        effective_status_display = 'Beautician Assigned'
+
+    # Ensure start_otp is generated for 'on_the_way' orders
+    start_otp = None
+    if booking.status == 'on_the_way' and not booking.otp_verified_at:
+        if not booking.start_otp:
+            import secrets
+            booking.start_otp = ''.join(secrets.choice('0123456789') for _ in range(6))
+            booking.otp_generated_at = timezone.now()
+            booking.save(update_fields=['start_otp', 'otp_generated_at'])
+        start_otp = booking.start_otp
+
+    return {
+        'booking_number': booking.booking_number,
+        'status': effective_status,
+        'raw_status': booking.status,
+        'status_display': effective_status_display,
+        'scheduled_date': booking.scheduled_date.isoformat(),
+        'booking_type': booking.booking_type,
+        'time_slot': booking.time_slot,
+        'time_slot_display': booking.get_time_slot_display() if booking.time_slot else None,
+        'exact_time': booking.exact_time.strftime('%H:%M') if booking.exact_time else None,
+        'address_label': booking.address_label,
+        'address_text': booking.address_text,
+        'address_pincode': booking.address_pincode or '',
+        'customer_name': f"{booking.user.first_name} {booking.user.last_name or ''}".strip() if booking.user else 'Customer',
+        'customer_phone': getattr(booking.user, 'phone', '') or (booking.user.profile.phone if hasattr(booking.user, 'profile') and getattr(booking.user.profile, 'phone', None) else ''),
+        'payment_method': booking.payment_method,
+        'payment_status': booking.payment_status,
+        'subtotal': float(booking.subtotal),
+        'discount_amount': float(booking.discount_amount),
+        'urgent_fee': float(booking.urgent_fee),
+        'total_amount': float(booking.total_amount),
+        'coupon_code': booking.coupon_code or '',
+        'can_cancel': booking.can_cancel,
+        'can_reschedule': can_reschedule,
+        'start_otp': start_otp,
+        'otp_verified_at': booking.otp_verified_at.isoformat() if booking.otp_verified_at else None,
+        'created_at': booking.created_at.isoformat() if booking.created_at else None,
+        'rescheduled_at': booking.rescheduled_at.isoformat() if booking.rescheduled_at else None,
+        'feedback_comment': booking.feedback_comment or '',
+        'feedback_submitted_at': booking.feedback_submitted_at.isoformat() if booking.feedback_submitted_at else None,
+        'assigned_beautician': beautician_data,
+        'rebook_items': rebook_items,
+        'items': items,
+    }
+
+
+@csrf_exempt
 @token_required
-@require_http_methods(['GET'])
+@require_GET
 def bookings_view(request):
     """GET /api/v1/bookings/ — the signed-in user's own bookings, same
     query as bookings/views.py::bookings_dashboard, JSON instead of a
     rendered template."""
     bookings = (
         request.user.bookings
-        .prefetch_related('items__service_variant__service', 'items__package')
+        .select_related('assigned_beautician', 'user')
+        .prefetch_related('items__service_variant__service', 'items__package', 'items__review')
         .all()
     )
-    data = []
-    for booking in bookings:
-        items = [
-            {
-                'name': item.name_snapshot,
-                'price': float(item.price_snapshot),
-                'quantity': item.quantity,
-                'included': item.included_snapshot,
-            }
-            for item in booking.items.all()
-        ]
-        data.append({
-            'booking_number': booking.booking_number,
-            'status': booking.status,
-            'status_display': booking.get_status_display(),
-            'scheduled_date': booking.scheduled_date.isoformat(),
-            'booking_type': booking.booking_type,
-            'time_slot': booking.time_slot,
-            'time_slot_display': booking.get_time_slot_display() if booking.time_slot else None,
-            'exact_time': booking.exact_time.strftime('%H:%M') if booking.exact_time else None,
-            'address_label': booking.address_label,
-            'address_text': booking.address_text,
-            'payment_method': booking.payment_method,
-            'payment_status': booking.payment_status,
-            'subtotal': float(booking.subtotal),
-            'discount_amount': float(booking.discount_amount),
-            'total_amount': float(booking.total_amount),
-            'can_cancel': booking.can_cancel,
-            'start_otp': booking.start_otp if booking.status == 'on_the_way' and not booking.otp_verified_at else None,
-            'items': items,
-        })
+    data = [_serialize_booking(b) for b in bookings]
     return JsonResponse({'ok': True, 'bookings': data})
+
+
+@csrf_exempt
+@token_required
+@require_GET
+def booking_detail_view(request, booking_number):
+    """GET /api/v1/bookings/<booking_number>/detail/ — single booking full details."""
+    booking = get_object_or_404(
+        Booking.objects.select_related('assigned_beautician', 'user').prefetch_related(
+            'items__service_variant__service', 'items__package', 'items__review'
+        ),
+        booking_number=booking_number,
+        user=request.user,
+    )
+    return JsonResponse({'ok': True, 'booking': _serialize_booking(booking)})
+
+
+@csrf_exempt
+@token_required
+@require_POST
+def booking_item_review_view(request, item_id):
+    """POST /api/v1/bookings/items/<item_id>/review/ — rate an item or beautician."""
+    item = get_object_or_404(BookingItem, id=item_id, booking__user=request.user, booking__status='completed')
+
+    if not item.service_variant and not item.package:
+        return JsonResponse({'ok': False, 'error': 'This service is no longer available to rate.'}, status=400)
+
+    try:
+        if request.content_type == 'application/json':
+            payload = json.loads(request.body)
+        else:
+            payload = request.POST
+    except Exception:
+        payload = {}
+
+    rating_raw = payload.get('rating')
+    beautician_rating_raw = payload.get('beautician_rating')
+
+    rating = None
+    if rating_raw is not None:
+        try:
+            val = int(rating_raw)
+            if val in range(1, 6):
+                rating = val
+        except (TypeError, ValueError):
+            pass
+
+    beautician_rating = None
+    if beautician_rating_raw is not None:
+        try:
+            val = int(beautician_rating_raw)
+            if val in range(1, 6):
+                beautician_rating = val
+        except (TypeError, ValueError):
+            pass
+
+    if rating is None and beautician_rating is None:
+        return JsonResponse({'ok': False, 'error': 'Rating must be between 1 and 5 stars.'}, status=400)
+
+    is_package = item.package_id is not None
+    reviewed = item.package if is_package else item.service_variant.service
+
+    review, _ = Review.objects.get_or_create(
+        booking_item=item,
+        defaults={
+            'user': request.user,
+            'package': reviewed if is_package else None,
+            'service': None if is_package else reviewed,
+        },
+    )
+
+    if rating is not None:
+        review.rating = rating
+    if beautician_rating is not None:
+        review.beautician_rating = beautician_rating
+    review.save()
+
+    # Recompute Service / Package aggregate rating
+    if rating is not None and reviewed:
+        agg = reviewed.reviews.filter(rating__isnull=False).aggregate(avg=Avg('rating'), count=Count('id'))
+        reviewed.rating = round(agg['avg'] or 0, 1)
+        reviewed.reviews_count = agg['count'] or 0
+        reviewed.save(update_fields=['rating', 'reviews_count'])
+
+    # Recompute Beautician (Employee) rating
+    beautician = item.booking.assigned_beautician
+    if beautician_rating is not None and beautician:
+        b_agg = Review.objects.filter(
+            booking_item__booking__assigned_beautician=beautician,
+            beautician_rating__isnull=False,
+        ).aggregate(avg=Avg('beautician_rating'), count=Count('id'))
+        if b_agg['count']:
+            beautician.rating = round(Decimal(str(b_agg['avg'])), 1)
+            beautician.reviews = b_agg['count']
+            beautician.save(update_fields=['rating', 'reviews'])
+
+    return JsonResponse({
+        'ok': True,
+        'rating': rating,
+        'beautician_rating': beautician_rating,
+    })
+
+
+@csrf_exempt
+@token_required
+@require_POST
+def booking_feedback_view(request, booking_number):
+    """POST /api/v1/bookings/<booking_number>/feedback/ — overall booking feedback comment."""
+    booking = get_object_or_404(Booking, booking_number=booking_number, user=request.user, status='completed')
+    try:
+        if request.content_type == 'application/json':
+            payload = json.loads(request.body)
+        else:
+            payload = request.POST
+    except Exception:
+        payload = {}
+
+    comment = payload.get('comment', '').strip()
+    booking.feedback_comment = comment
+    booking.feedback_submitted_at = timezone.now()
+    booking.save(update_fields=['feedback_comment', 'feedback_submitted_at'])
+    return JsonResponse({'ok': True, 'feedback_comment': comment})
 
 
 @csrf_exempt
@@ -994,6 +1287,28 @@ def booking_cancel_view(request, booking_number):
         'refund_message': refund_message,
         'payment_status': booking.payment_status,
     })
+
+
+@csrf_exempt
+@token_required
+@require_POST
+def booking_reschedule_view(request, booking_number):
+    """POST /api/v1/bookings/<booking_number>/reschedule/ — reschedules booking to new date/slot."""
+    from bookings.views import reschedule_booking
+    return reschedule_booking(request, booking_number)
+
+
+@csrf_exempt
+@token_required
+@require_GET
+def booking_invoice_pdf_view(request, booking_number):
+    """GET /api/v1/bookings/<booking_number>/invoice/pdf/ — generates and returns PDF receipt."""
+    from bookings.invoice import generate_booking_receipt_pdf
+    booking = get_object_or_404(Booking, booking_number=booking_number, user=request.user)
+    pdf_bytes = generate_booking_receipt_pdf(booking)
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="receipt-{booking.booking_number}.pdf"'
+    return response
 
 
 @csrf_exempt

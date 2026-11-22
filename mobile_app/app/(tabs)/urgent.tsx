@@ -49,7 +49,6 @@ export default function UrgentScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Header
-        location="Indore, MP"
         cartItemCount={totalItems}
         onSearchPress={() => router.push({ pathname: '/(tabs)/services', params: { autoSearch: '1' } })}
         onCartPress={() => router.push({ pathname: '/(tabs)/services', params: { openCart: '1' } })}

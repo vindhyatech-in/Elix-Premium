@@ -35,6 +35,15 @@ export function useAddAddress() {
   });
 }
 
+export function useUpdateAddress() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: Address) =>
+      apiClient.put(`/addresses/${id}/`, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['addresses'] }),
+  });
+}
+
 export function useDeleteAddress() {
   const qc = useQueryClient();
   return useMutation({
@@ -49,5 +58,14 @@ export function useUpdateProfile() {
     mutationFn: (payload: { first_name: string; last_name: string; phone: string }) =>
       apiClient.post('/profile/', payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['profile'] }),
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: async (payload: { current_password: string; new_password: string }) => {
+      const res = await apiClient.post<{ ok: boolean; message?: string }>('/auth/change-password/', payload);
+      return res.data;
+    },
   });
 }

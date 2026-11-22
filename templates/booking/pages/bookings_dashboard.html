@@ -63,7 +63,7 @@
                     {% endif %}
                   </p>
                 </div>
-                <span class="booking-card__status booking-card__status--{{ booking.status }}">{{ booking.get_status_display }}</span>
+                <span class="booking-card__status booking-card__status--{{ booking.status }}">{% if booking.assigned_beautician and booking.status == 'upcoming' %}Beautician Assigned{% else %}{{ booking.get_status_display }}{% endif %}</span>
               </div>
 
               {% if booking.assigned_beautician %}

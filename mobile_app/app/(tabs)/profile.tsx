@@ -23,22 +23,34 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
-import { useProfile, useAddresses, useDeleteAddress, useAddAddress } from '@/hooks/useProfile';
-import { getCurrentCoordinates, reverseGeocodeGoogle, LocationCoords, POPULAR_INDORE_LOCALITIES } from '@/lib/googleMaps';
+import { useProfile, useAddresses, useDeleteAddress, useAddAddress, useUpdateAddress, useUpdateProfile, useChangePassword } from '@/hooks/useProfile';
+import { getCurrentCoordinates, reverseGeocodeGoogle, searchPlacesGoogle, getPlaceDetailsGoogle, LocationCoords, PlacePrediction, POPULAR_INDORE_LOCALITIES } from '@/lib/googleMaps';
 import { GoogleMapView } from '@/components/booking/GoogleMapView';
+import type { Address } from '@/types/api';
+
+function getAddressIcon(label: string) {
+  const l = (label || '').toLowerCase();
+  if (l.includes('home')) return 'home';
+  if (l.includes('work') || l.includes('office')) return 'briefcase';
+  return 'location';
+}
 
 export default function ProfileScreen() {
-  const { isLoggedIn, user, logout } = useAuthStore();
+  const { isLoggedIn, user, logout, updateUser } = useAuthStore();
   const { totalItems } = useCartStore();
   const queryClient = useQueryClient();
   const { data: profile, isLoading: profileLoading } = useProfile(isLoggedIn);
   const { data: addresses, isLoading: addrLoading } = useAddresses(isLoggedIn);
   const deleteAddress = useDeleteAddress();
   const addAddress = useAddAddress();
+  const updateAddress = useUpdateAddress();
+  const updateProfile = useUpdateProfile();
+  const changePassword = useChangePassword();
 
+  // Address Modal State
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [addressToDelete, setAddressToDelete] = useState<number | null>(null);
   const [label, setLabel] = useState<'Home' | 'Work' | 'Other'>('Home');
   const [customLabel, setCustomLabel] = useState('');
@@ -48,10 +60,149 @@ export default function ProfileScreen() {
   const [locating, setLocating] = useState(false);
   const [locationInfo, setLocationInfo] = useState('');
   const [addressError, setAddressError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  // Edit Profile Modal State
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editProfileError, setEditProfileError] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Change Password Modal State
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [changePasswordError, setChangePasswordError] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordSuccessModal, setPasswordSuccessModal] = useState(false);
+
+  // Sign out modal
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const openWhatsAppSupport = () => {
     Linking.openURL('https://wa.me/917440670533?text=Hello%20Elix%20Support,%20I%20need%20help%20with%20my%20salon%20booking');
   };
+
+  function handleOpenEditProfile() {
+    if (!isLoggedIn) {
+      router.push('/auth/login');
+      return;
+    }
+    setEditProfileError('');
+    setEditFirstName(profile?.user?.first_name ?? user?.first_name ?? '');
+    setEditLastName(profile?.user?.last_name ?? user?.last_name ?? '');
+    setEditPhone(profile?.phone ?? user?.phone ?? '');
+    setShowEditProfileModal(true);
+  }
+
+  async function handleSaveProfile() {
+    setEditProfileError('');
+    const first = editFirstName.trim();
+    const last = editLastName.trim();
+    const rawPhone = editPhone.trim();
+
+    if (!first) {
+      setEditProfileError('First name cannot be empty.');
+      return;
+    }
+
+    let cleanPhone = '';
+    if (rawPhone) {
+      const digits = rawPhone.replace(/\D/g, '');
+      if (digits.length === 10) {
+        cleanPhone = `+91${digits}`;
+      } else if (digits.length === 12 && digits.startsWith('91')) {
+        cleanPhone = `+${digits}`;
+      } else {
+        setEditProfileError('Please enter a valid 10-digit Indian phone number.');
+        return;
+      }
+    }
+
+    setIsSavingProfile(true);
+    try {
+      await updateProfile.mutateAsync({
+        first_name: first,
+        last_name: last,
+        phone: cleanPhone,
+      });
+      await updateUser({
+        first_name: first,
+        last_name: last,
+        phone: cleanPhone,
+      });
+      setShowEditProfileModal(false);
+      Alert.alert('Profile Updated', 'Your profile details have been saved successfully.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'Failed to update profile. Please try again.';
+      setEditProfileError(msg);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
+
+  function handleOpenChangePassword() {
+    if (!isLoggedIn) {
+      router.push('/auth/login');
+      return;
+    }
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setChangePasswordError('');
+    setShowCurrentPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setShowChangePasswordModal(true);
+  }
+
+  async function handleSavePassword() {
+    setChangePasswordError('');
+    if (!currentPassword) {
+      setChangePasswordError('Please enter your current password.');
+      return;
+    }
+    if (!newPassword) {
+      setChangePasswordError('Please enter a new password.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setChangePasswordError('New password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setChangePasswordError('New password and confirmation do not match.');
+      return;
+    }
+    if (currentPassword === newPassword) {
+      setChangePasswordError('New password cannot be the same as your current password.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await changePassword.mutateAsync({
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      setShowChangePasswordModal(false);
+      setPasswordSuccessModal(true);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Could not change password. Please check your current password.';
+      setChangePasswordError(msg);
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }
 
   async function performSignOut() {
     setIsLoggingOut(true);
@@ -89,6 +240,7 @@ export default function ProfileScreen() {
       router.push('/auth/login');
       return;
     }
+    setEditingAddressId(null);
     setAddressError('');
     setLocationInfo('');
     setAddressText('');
@@ -96,7 +248,74 @@ export default function ProfileScreen() {
     setCoords(null);
     setLabel('Home');
     setCustomLabel('');
+    setSearchQuery('');
+    setPredictions([]);
+    setSearching(false);
     setShowAddModal(true);
+  }
+
+  function handleOpenEditAddress(addr: Address) {
+    if (!isLoggedIn) {
+      router.push('/auth/login');
+      return;
+    }
+    setEditingAddressId(addr.id);
+    setAddressError('');
+    setLocationInfo(addr.lat && addr.lng ? `Saved GPS: ${addr.lat.toFixed(4)}, ${addr.lng.toFixed(4)}` : '');
+    setAddressText(addr.text || '');
+    setPincode(addr.pincode || '');
+    setCoords(addr.lat && addr.lng ? { lat: addr.lat, lng: addr.lng } : null);
+    if (addr.label === 'Home' || addr.label === 'Work') {
+      setLabel(addr.label);
+      setCustomLabel('');
+    } else {
+      setLabel('Other');
+      setCustomLabel(addr.label || '');
+    }
+    setSearchQuery('');
+    setPredictions([]);
+    setSearching(false);
+    setShowAddModal(true);
+  }
+
+  async function handleSearchChange(text: string) {
+    setSearchQuery(text);
+    if (text.trim().length < 2) {
+      setPredictions([]);
+      return;
+    }
+    setSearching(true);
+    try {
+      const results = await searchPlacesGoogle(text);
+      setPredictions(results);
+    } catch {
+      setPredictions([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function handleSelectPrediction(item: PlacePrediction) {
+    setSearching(true);
+    setPredictions([]);
+    setSearchQuery('');
+    try {
+      const details = await getPlaceDetailsGoogle(item.place_id);
+      if (details.ok && details.address) {
+        setAddressText(details.address);
+        if (details.pincode) setPincode(details.pincode);
+        if (details.lat && details.lng) {
+          setCoords({ lat: details.lat, lng: details.lng });
+          setLocationInfo(`Selected: ${details.address}`);
+        }
+      } else {
+        setAddressText(item.description);
+      }
+    } catch {
+      setAddressText(item.description);
+    } finally {
+      setSearching(false);
+    }
   }
 
   async function handleUseCurrentLocation() {
@@ -152,19 +371,38 @@ export default function ProfileScreen() {
 
     const finalLabel = label === 'Other' && customLabel.trim() ? customLabel.trim() : label;
 
+    setIsSavingAddress(true);
     try {
-      await addAddress.mutateAsync({
-        label: finalLabel,
-        text: trimmedText,
-        pincode: trimmedPin,
-        lat: coords?.lat ?? null,
-        lng: coords?.lng ?? null,
-      });
-      setShowAddModal(false);
-      setCoords(null);
+      if (editingAddressId !== null) {
+        await updateAddress.mutateAsync({
+          id: editingAddressId,
+          label: finalLabel,
+          text: trimmedText,
+          pincode: trimmedPin,
+          lat: coords?.lat ?? null,
+          lng: coords?.lng ?? null,
+        });
+        setShowAddModal(false);
+        setEditingAddressId(null);
+        setCoords(null);
+        Alert.alert('Address Updated', 'Your address has been updated successfully.');
+      } else {
+        await addAddress.mutateAsync({
+          label: finalLabel,
+          text: trimmedText,
+          pincode: trimmedPin,
+          lat: coords?.lat ?? null,
+          lng: coords?.lng ?? null,
+        });
+        setShowAddModal(false);
+        setCoords(null);
+        Alert.alert('Address Saved', 'New address has been saved successfully.');
+      }
     } catch (err: any) {
       const errMsg = err?.response?.data?.error || 'Could not save address. Please try again.';
       setAddressError(errMsg);
+    } finally {
+      setIsSavingAddress(false);
     }
   }
 
@@ -201,7 +439,16 @@ export default function ProfileScreen() {
               <Badge label="Verified" variant="discount" />
             </View>
           </View>
-          {!isLoggedIn && (
+          {isLoggedIn ? (
+            <Pressable
+              style={styles.editProfileBtn}
+              onPress={handleOpenEditProfile}
+              hitSlop={8}
+            >
+              <Ionicons name="pencil" size={13} color={ElixColors.blue} style={{ marginRight: 4 }} />
+              <Text style={styles.editProfileBtnText}>Edit</Text>
+            </Pressable>
+          ) : (
             <Pressable style={styles.signInBtn} onPress={() => router.push('/auth/login')}>
               <Text style={styles.signInBtnText}>Sign In</Text>
             </Pressable>
@@ -221,11 +468,13 @@ export default function ProfileScreen() {
             addresses.map((addr) => (
               <View key={addr.id} style={styles.addressCard}>
                 <View style={styles.addressIconWrap}>
-                  <Ionicons name="home" size={18} color={ElixColors.blue} />
+                  <Ionicons name={getAddressIcon(addr.label) as any} size={18} color={ElixColors.blue} />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, paddingRight: 6 }}>
                   <View style={styles.addressTagRow}>
-                    <Text style={styles.addressLabel}>{addr.label}</Text>
+                    <Text style={styles.addressLabel} numberOfLines={1}>
+                      {addr.label}
+                    </Text>
                     {addr.pincode ? <Badge label={addr.pincode} variant="neutral" /> : null}
                     {addr.lat && addr.lng ? (
                       <View style={styles.profileGpsBadge}>
@@ -236,9 +485,24 @@ export default function ProfileScreen() {
                   </View>
                   <Text style={styles.addressText}>{addr.text}</Text>
                 </View>
-                <Pressable onPress={() => handleDeleteAddress(addr.id)} hitSlop={8}>
-                  <Ionicons name="trash-outline" size={16} color={ElixColors.inkMuted} />
-                </Pressable>
+                <View style={styles.addressActionRow}>
+                  <Pressable
+                    onPress={() => handleOpenEditAddress(addr)}
+                    hitSlop={8}
+                    style={styles.addressEditBtn}
+                    accessibilityLabel="Edit address"
+                  >
+                    <Ionicons name="pencil" size={15} color={ElixColors.blue} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleDeleteAddress(addr.id)}
+                    hitSlop={8}
+                    style={styles.addressDeleteBtn}
+                    accessibilityLabel="Delete address"
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                  </Pressable>
+                </View>
               </View>
             ))
           ) : (
@@ -295,6 +559,21 @@ export default function ProfileScreen() {
               </View>
               <Ionicons name="chevron-forward" size={16} color={ElixColors.inkMuted} />
             </Pressable>
+            {isLoggedIn ? (
+              <>
+                <View style={styles.divider} />
+                <Pressable style={styles.menuItem} onPress={handleOpenChangePassword}>
+                  <View style={[styles.menuIcon, { backgroundColor: '#FDF4FF' }]}>
+                    <Ionicons name="lock-closed-outline" size={18} color="#9333EA" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.menuItemTitle}>Change Password</Text>
+                    <Text style={styles.menuItemSubtitle}>Update your login password</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={ElixColors.inkMuted} />
+                </Pressable>
+              </>
+            ) : null}
           </View>
         </View>
 
@@ -327,8 +606,8 @@ export default function ProfileScreen() {
             <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowAddModal(false)} />
             <View style={styles.modalSheet}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Add New Address</Text>
-                <Pressable onPress={() => setShowAddModal(false)} hitSlop={10}>
+                <Text style={styles.modalTitle}>{editingAddressId ? 'Edit Address' : 'Add New Address'}</Text>
+                <Pressable onPress={() => { setShowAddModal(false); setEditingAddressId(null); }} hitSlop={10}>
                   <Ionicons name="close" size={22} color={ElixColors.ink} />
                 </Pressable>
               </View>
@@ -396,6 +675,46 @@ export default function ProfileScreen() {
                   {locating ? 'Detecting current location…' : 'Use Current Location (GPS - Google Maps)'}
                 </Text>
               </Pressable>
+
+              {/* Search Locality or Landmark on Map */}
+              <Text style={styles.modalMapLabel}>SEARCH AREA OR LANDMARK ON MAP:</Text>
+              <View style={styles.searchBox}>
+                <Ionicons name="search" size={16} color={ElixColors.inkMuted} style={{ marginRight: 6 }} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search locality, apartment or landmark in Indore…"
+                  placeholderTextColor={ElixColors.inkMuted}
+                  value={searchQuery}
+                  onChangeText={handleSearchChange}
+                  autoCorrect={false}
+                />
+                {searching ? (
+                  <ActivityIndicator size="small" color={ElixColors.blue} />
+                ) : searchQuery ? (
+                  <Pressable onPress={() => { setSearchQuery(''); setPredictions([]); }}>
+                    <Ionicons name="close-circle" size={16} color={ElixColors.inkMuted} />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {/* Search Predictions Dropdown */}
+              {predictions.length > 0 && (
+                <View style={styles.predictionsList}>
+                  {predictions.map((p) => (
+                    <Pressable
+                      key={p.place_id}
+                      style={styles.predictionItem}
+                      onPress={() => handleSelectPrediction(p)}
+                    >
+                      <Ionicons name="location-outline" size={16} color={ElixColors.blue} style={{ marginTop: 2 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.predMainText}>{p.main_text}</Text>
+                        <Text style={styles.predSubText}>{p.secondary_text || p.description}</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
 
               {/* Interactive Google Map in Profile Modal */}
               <Text style={styles.modalMapLabel}>PINPOINT ON MAP (TAP OR DRAG PIN):</Text>
@@ -468,21 +787,133 @@ export default function ProfileScreen() {
               <View style={styles.modalBtnRow}>
                 <Pressable
                   style={styles.modalCancelBtn}
-                  onPress={() => setShowAddModal(false)}
-                  disabled={addAddress.isPending}
+                  onPress={() => { setShowAddModal(false); setEditingAddressId(null); }}
+                  disabled={isSavingAddress || addAddress.isPending || updateAddress.isPending}
                 >
                   <Text style={styles.modalCancelBtnText}>Cancel</Text>
                 </Pressable>
 
                 <Pressable
-                  style={[styles.modalSaveBtn, addAddress.isPending && styles.btnDisabled]}
+                  style={[styles.modalSaveBtn, (isSavingAddress || addAddress.isPending || updateAddress.isPending) && styles.btnDisabled]}
                   onPress={handleSaveAddress}
-                  disabled={addAddress.isPending}
+                  disabled={isSavingAddress || addAddress.isPending || updateAddress.isPending}
                 >
-                  {addAddress.isPending ? (
+                  {isSavingAddress || addAddress.isPending || updateAddress.isPending ? (
                     <ActivityIndicator color={ElixColors.white} size="small" />
                   ) : (
-                    <Text style={styles.modalSaveBtnText}>Save Address</Text>
+                    <Text style={styles.modalSaveBtnText}>{editingAddressId ? 'Update Address' : 'Save Address'}</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── EDIT PROFILE MODAL ── */}
+      <Modal
+        visible={showEditProfileModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !isSavingProfile && setShowEditProfileModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => !isSavingProfile && setShowEditProfileModal(false)}
+            />
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={styles.editModalIconWrap}>
+                    <Ionicons name="person" size={18} color={ElixColors.blue} />
+                  </View>
+                  <Text style={styles.modalTitle}>Edit Profile</Text>
+                </View>
+                <Pressable
+                  onPress={() => !isSavingProfile && setShowEditProfileModal(false)}
+                  hitSlop={10}
+                >
+                  <Ionicons name="close" size={22} color={ElixColors.ink} />
+                </Pressable>
+              </View>
+
+              {editProfileError ? (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                  <Text style={styles.errorText}>{editProfileError}</Text>
+                </View>
+              ) : null}
+
+              <Text style={styles.fieldLabel}>FIRST NAME *</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="First name"
+                placeholderTextColor={ElixColors.inkMuted}
+                value={editFirstName}
+                onChangeText={setEditFirstName}
+                autoCapitalize="words"
+              />
+
+              <Text style={styles.fieldLabel}>LAST NAME</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Last name"
+                placeholderTextColor={ElixColors.inkMuted}
+                value={editLastName}
+                onChangeText={setEditLastName}
+                autoCapitalize="words"
+              />
+
+              <Text style={styles.fieldLabel}>PHONE NUMBER (10 DIGITS)</Text>
+              <View style={styles.phoneInputRow}>
+                <View style={styles.phonePrefixBox}>
+                  <Text style={styles.phonePrefixText}>+91</Text>
+                </View>
+                <TextInput
+                  style={[styles.modalInput, { flex: 1, marginBottom: 0 }]}
+                  placeholder="9876543210"
+                  placeholderTextColor={ElixColors.inkMuted}
+                  value={editPhone.replace(/^\+91/, '')}
+                  onChangeText={(val) => setEditPhone(val.replace(/\D/g, '').slice(0, 10))}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                />
+              </View>
+
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.fieldLabel}>EMAIL ADDRESS (READ-ONLY)</Text>
+                <View style={styles.readOnlyEmailWrap}>
+                  <Ionicons name="lock-closed" size={14} color={ElixColors.inkMuted} style={{ marginRight: 6 }} />
+                  <Text style={styles.readOnlyEmailText}>{displayEmail || 'No email attached'}</Text>
+                </View>
+                <Text style={styles.readOnlySubtext}>
+                  Email is linked to your login identity and cannot be changed here.
+                </Text>
+              </View>
+
+              <View style={[styles.modalBtnRow, { marginTop: 20 }]}>
+                <Pressable
+                  style={styles.modalCancelBtn}
+                  onPress={() => setShowEditProfileModal(false)}
+                  disabled={isSavingProfile}
+                >
+                  <Text style={styles.modalCancelBtnText}>Cancel</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.modalSaveBtn, isSavingProfile && styles.btnDisabled]}
+                  onPress={handleSaveProfile}
+                  disabled={isSavingProfile}
+                >
+                  {isSavingProfile ? (
+                    <ActivityIndicator color={ElixColors.white} size="small" />
+                  ) : (
+                    <Text style={styles.modalSaveBtnText}>Save Profile</Text>
                   )}
                 </Pressable>
               </View>
@@ -529,6 +960,175 @@ export default function ProfileScreen() {
                 ) : (
                   <Text style={styles.confirmDestructiveBtnText}>Sign Out</Text>
                 )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── CHANGE PASSWORD MODAL ── */}
+      <Modal
+        visible={showChangePasswordModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !isChangingPassword && setShowChangePasswordModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => !isChangingPassword && setShowChangePasswordModal(false)}
+            />
+            <View style={styles.modalSheet}>
+              <View style={styles.modalHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={[styles.editModalIconWrap, { backgroundColor: '#FDF4FF' }]}>
+                    <Ionicons name="lock-closed" size={18} color="#9333EA" />
+                  </View>
+                  <Text style={styles.modalTitle}>Change Password</Text>
+                </View>
+                <Pressable
+                  onPress={() => !isChangingPassword && setShowChangePasswordModal(false)}
+                  hitSlop={10}
+                >
+                  <Ionicons name="close" size={22} color={ElixColors.ink} />
+                </Pressable>
+              </View>
+
+              {changePasswordError ? (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                  <Text style={styles.errorText}>{changePasswordError}</Text>
+                </View>
+              ) : null}
+
+              <Text style={styles.fieldLabel}>CURRENT PASSWORD *</Text>
+              <View style={styles.passwordFieldContainer}>
+                <TextInput
+                  style={[styles.modalInput, styles.passwordInput]}
+                  placeholder="Enter current password"
+                  placeholderTextColor={ElixColors.inkMuted}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  secureTextEntry={!showCurrentPassword}
+                  autoCapitalize="none"
+                />
+                <Pressable
+                  style={styles.eyeToggleBtn}
+                  onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name={showCurrentPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={ElixColors.inkMuted}
+                  />
+                </Pressable>
+              </View>
+
+              <Text style={styles.fieldLabel}>NEW PASSWORD (MIN. 6 CHARACTERS) *</Text>
+              <View style={styles.passwordFieldContainer}>
+                <TextInput
+                  style={[styles.modalInput, styles.passwordInput]}
+                  placeholder="Enter new password"
+                  placeholderTextColor={ElixColors.inkMuted}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry={!showNewPassword}
+                  autoCapitalize="none"
+                />
+                <Pressable
+                  style={styles.eyeToggleBtn}
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name={showNewPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={ElixColors.inkMuted}
+                  />
+                </Pressable>
+              </View>
+
+              <Text style={styles.fieldLabel}>CONFIRM NEW PASSWORD *</Text>
+              <View style={styles.passwordFieldContainer}>
+                <TextInput
+                  style={[styles.modalInput, styles.passwordInput]}
+                  placeholder="Re-enter new password"
+                  placeholderTextColor={ElixColors.inkMuted}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                />
+                <Pressable
+                  style={styles.eyeToggleBtn}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={ElixColors.inkMuted}
+                  />
+                </Pressable>
+              </View>
+
+              <View style={[styles.modalBtnRow, { marginTop: 20 }]}>
+                <Pressable
+                  style={styles.modalCancelBtn}
+                  onPress={() => setShowChangePasswordModal(false)}
+                  disabled={isChangingPassword}
+                >
+                  <Text style={styles.modalCancelBtnText}>Cancel</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.modalSaveBtn, isChangingPassword && styles.btnDisabled]}
+                  onPress={handleSavePassword}
+                  disabled={isChangingPassword}
+                >
+                  {isChangingPassword ? (
+                    <ActivityIndicator color={ElixColors.white} size="small" />
+                  ) : (
+                    <Text style={styles.modalSaveBtnText}>Update Password</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── PASSWORD SUCCESS POPUP MODAL ── */}
+      <Modal
+        visible={passwordSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPasswordSuccessModal(false)}
+      >
+        <View style={styles.confirmModalOverlay}>
+          <Pressable
+            style={styles.confirmBackdrop}
+            onPress={() => setPasswordSuccessModal(false)}
+          />
+          <View style={styles.confirmModalCard}>
+            <View style={[styles.confirmIconWrap, { backgroundColor: '#ECFDF5' }]}>
+              <Ionicons name="checkmark-circle-outline" size={28} color="#059669" />
+            </View>
+            <Text style={styles.confirmTitle}>Password Updated</Text>
+            <Text style={styles.confirmMessage}>
+              Your account password has been changed successfully. You can use your new password next time you sign in.
+            </Text>
+            <View style={styles.confirmBtnRow}>
+              <Pressable
+                style={[styles.confirmDestructiveBtn, { backgroundColor: ElixColors.blue }]}
+                onPress={() => setPasswordSuccessModal(false)}
+              >
+                <Text style={styles.confirmDestructiveBtnText}>Done</Text>
               </Pressable>
             </View>
           </View>
@@ -608,31 +1208,79 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   signInBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  editProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+  },
+  editProfileBtnText: {
+    color: ElixColors.blue,
+    fontWeight: '700',
+    fontSize: 13,
+  },
   section: { paddingHorizontal: 16, marginTop: 20 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: ElixColors.ink },
   linkText: { fontSize: 13, color: ElixColors.blue, fontWeight: '600' },
   addressCard: {
     backgroundColor: ElixColors.white,
-    borderRadius: ElixRadii.md,
+    borderRadius: ElixRadii.lg,
     padding: 14,
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 8,
-    ...ElixShadows.md,
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    ...ElixShadows.sm,
   },
   addressIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addressTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 4,
+  },
+  addressLabel: { fontSize: 14, fontWeight: '700', color: ElixColors.ink },
+  addressText: { fontSize: 13, color: ElixColors.inkMuted, lineHeight: 18 },
+  addressActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addressEditBtn: {
     width: 34,
     height: 34,
     borderRadius: 17,
     backgroundColor: '#EFF6FF',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
-  addressTagRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  addressLabel: { fontSize: 13, fontWeight: '700', color: ElixColors.ink },
-  addressText: { fontSize: 13, color: ElixColors.inkMuted, lineHeight: 18 },
+  addressDeleteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
   menuCard: {
     backgroundColor: ElixColors.white,
     borderRadius: ElixRadii.lg,
@@ -742,6 +1390,12 @@ const styles = StyleSheet.create({
     color: ElixColors.ink,
     backgroundColor: ElixColors.surface1,
     marginBottom: 14,
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+        } as any)
+      : {}),
   },
   modalTextArea: {
     minHeight: 74,
@@ -781,6 +1435,53 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: ElixColors.white,
   },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: ElixRadii.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: ElixColors.ink,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+        } as any)
+      : {}),
+  },
+  predictionsList: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: ElixRadii.sm,
+    marginBottom: 10,
+    maxHeight: 150,
+    overflow: 'hidden',
+  },
+  predictionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  predMainText: { fontSize: 13, fontWeight: '600', color: ElixColors.ink },
+  predSubText: { fontSize: 11, color: ElixColors.inkMuted },
   modalMapLabel: {
     fontSize: 10,
     fontWeight: '800',
@@ -942,5 +1643,74 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+
+  // Edit Profile Modal Styles
+  editModalIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  phoneInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  phonePrefixBox: {
+    height: 48,
+    paddingHorizontal: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  phonePrefixText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: ElixColors.ink,
+  },
+  readOnlyEmailWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 48,
+    paddingHorizontal: 14,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  readOnlyEmailText: {
+    fontSize: 14,
+    color: ElixColors.inkMuted,
+    fontWeight: '500',
+  },
+  readOnlySubtext: {
+    fontSize: 11,
+    color: ElixColors.inkMuted,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  passwordFieldContainer: {
+    position: 'relative',
+    marginBottom: 12,
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: 48,
+    marginBottom: 0,
+  },
+  eyeToggleBtn: {
+    position: 'absolute',
+    right: 12,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
   },
 });

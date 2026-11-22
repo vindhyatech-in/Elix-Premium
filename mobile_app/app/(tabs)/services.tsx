@@ -7,6 +7,7 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,16 +22,80 @@ import type { CatalogItem } from '@/types/api';
 import { BookingDrawer } from '@/components/booking/BookingDrawer';
 import { resolveImageUrl } from '@/lib/apiClient';
 
+export type SortOption =
+  | 'default'
+  | 'price_asc'
+  | 'price_desc'
+  | 'name_asc'
+  | 'name_desc'
+  | 'duration_asc'
+  | 'duration_desc';
+
+interface SortOptionConfig {
+  id: SortOption;
+  label: string;
+  shortLabel: string;
+  desc: string;
+  icon: string;
+}
+
+const SORT_OPTIONS: SortOptionConfig[] = [
+  { id: 'default', label: 'Recommended', shortLabel: 'Default', desc: 'Popular & featured catalog order', icon: 'sparkles' },
+  { id: 'price_asc', label: 'Price: Low to High', shortLabel: 'Price: Low → High', desc: 'Most affordable services first', icon: 'trending-up' },
+  { id: 'price_desc', label: 'Price: High to Low', shortLabel: 'Price: High → Low', desc: 'Premium & luxury packages first', icon: 'trending-down' },
+  { id: 'name_asc', label: 'Name: A to Z', shortLabel: 'Name A → Z', desc: 'Alphabetical order A to Z', icon: 'text-outline' },
+  { id: 'name_desc', label: 'Name: Z to A', shortLabel: 'Name Z → A', desc: 'Alphabetical order Z to A', icon: 'text-outline' },
+  { id: 'duration_asc', label: 'Time: Shortest First', shortLabel: 'Quickest', desc: 'Services that take less time', icon: 'timer-outline' },
+  { id: 'duration_desc', label: 'Time: Longest First', shortLabel: 'Longest Time', desc: 'Comprehensive full-session treatments', icon: 'time-outline' },
+];
+
+function formatCategoryLabel(cat: string) {
+  if (!cat || cat === 'all') return 'All';
+  if (cat.toLowerCase() === 'packages') return 'Packages';
+  return cat
+    .split(/[-_ ]+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function getItemDurationMinutes(item: CatalogItem): number {
+  if (item.duration_mins && typeof item.duration_mins === 'number') return item.duration_mins;
+  if (item.duration && typeof item.duration === 'number') return item.duration;
+  if (item.duration_label) {
+    const hoursMatch = item.duration_label.match(/(\d+)\s*h/i);
+    const minsMatch = item.duration_label.match(/(\d+)\s*m/i);
+    let total = 0;
+    if (hoursMatch) total += parseInt(hoursMatch[1], 10) * 60;
+    if (minsMatch) total += parseInt(minsMatch[1], 10);
+    if (total > 0) return total;
+  }
+  return 0;
+}
+
 export default function ServicesScreen() {
-  const params = useLocalSearchParams<{ autoSearch?: string; openBooking?: string; openCart?: string }>();
+  const params = useLocalSearchParams<{
+    autoSearch?: string;
+    openBooking?: string;
+    openCart?: string;
+    category?: string;
+  }>();
   const [activeTab, setActiveTab] = useState<string>('all');
   const [isSearchActive, setIsSearchActive] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sortBy, setSortBy] = useState<SortOption>('default');
+  const [showSortModal, setShowSortModal] = useState<boolean>(false);
 
   const { data: catalog, isLoading, error } = useCatalog();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [drawerInitialMode, setDrawerInitialMode] = useState<'cart' | 'checkout'>('cart');
   const { items: cartItems, totalItems, totalAmount, addItem, increment, decrement, getKey } = useCartStore();
+
+  // If navigated here with category param, select that category tab
+  useEffect(() => {
+    if (params.category) {
+      setActiveTab(params.category.toLowerCase());
+    }
+  }, [params.category]);
 
   // If navigated here with autoSearch=1, immediately activate search
   useEffect(() => {
@@ -51,21 +116,41 @@ export default function ServicesScreen() {
     }
   }, [params.openBooking, params.openCart]);
 
-  // Derive category tabs from live catalog data
+  // Derive category tabs from live catalog data, ensuring "Packages" is always present
   const categoryTabs = useMemo(() => {
-    if (!catalog) return [{ id: 'all', label: 'All' }];
-    const cats = Array.from(new Set(catalog.map((i) => i.category).filter(Boolean)));
-    return [{ id: 'all', label: 'All' }, ...cats.map((c) => ({ id: c, label: c }))];
+    const tabs: { id: string; label: string }[] = [{ id: 'all', label: 'All' }];
+    tabs.push({ id: 'packages', label: 'Packages' });
+    if (catalog) {
+      const cats = Array.from(new Set(catalog.map((i) => i.category).filter(Boolean)));
+      cats.forEach((c) => {
+        const normalized = c.toLowerCase();
+        if (normalized !== 'packages' && normalized !== 'all') {
+          tabs.push({ id: c, label: formatCategoryLabel(c) });
+        }
+      });
+    }
+    return tabs;
   }, [catalog]);
 
-  // Filter by category tab AND search query
+  // Filter by category tab, search query, and sort by chosen order
   const filtered = useMemo(() => {
     if (!catalog) return [];
     let list = catalog;
 
     // Filter by category if not 'all'
-    if (activeTab !== 'all') {
-      list = list.filter((i) => i.category === activeTab);
+    if (activeTab === 'packages') {
+      list = list.filter((i) => i.kind === 'package' || (i.category || '').toLowerCase() === 'packages');
+    } else if (activeTab !== 'all') {
+      const target = activeTab.toLowerCase().replace(/\s+/g, '-');
+      list = list.filter((i) => {
+        const itemCat = (i.category || '').toLowerCase().replace(/\s+/g, '-');
+        return (
+          itemCat === target ||
+          itemCat.includes(target) ||
+          target.includes(itemCat) ||
+          (i.category || '').toLowerCase() === activeTab.toLowerCase()
+        );
+      });
     }
 
     // Filter by search query (name, category, description, variant label, features)
@@ -81,8 +166,23 @@ export default function ServicesScreen() {
       });
     }
 
+    // Apply sorting
+    if (sortBy === 'price_asc') {
+      list = [...list].sort((a, b) => a.price - b.price);
+    } else if (sortBy === 'price_desc') {
+      list = [...list].sort((a, b) => b.price - a.price);
+    } else if (sortBy === 'name_asc') {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'name_desc') {
+      list = [...list].sort((a, b) => b.name.localeCompare(a.name));
+    } else if (sortBy === 'duration_asc') {
+      list = [...list].sort((a, b) => getItemDurationMinutes(a) - getItemDurationMinutes(b));
+    } else if (sortBy === 'duration_desc') {
+      list = [...list].sort((a, b) => getItemDurationMinutes(b) - getItemDurationMinutes(a));
+    }
+
     return list;
-  }, [catalog, activeTab, searchQuery]);
+  }, [catalog, activeTab, searchQuery, sortBy]);
 
   function getItemQty(item: CatalogItem): number {
     const key = item.kind === 'package'
@@ -122,7 +222,6 @@ export default function ServicesScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Header
-        location="Indore, MP"
         cartItemCount={totalItems}
         onSearchPress={() => {
           setIsSearchActive(true);
@@ -139,6 +238,10 @@ export default function ServicesScreen() {
           setIsSearchActive(false);
           setSearchQuery('');
         }}
+        onDismissSearch={() => {
+          setIsSearchActive(false);
+        }}
+        resultsCount={filtered.length}
         searchPlaceholder="Search services, packages, categories..."
       />
 
@@ -161,6 +264,84 @@ export default function ServicesScreen() {
           </Pressable>
         ))}
       </ScrollView>
+
+      {/* Sorting bar & Quick Sort chips */}
+      <View style={styles.controlsBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sortChipsContent}
+        >
+          {/* Main Sort Modal Trigger */}
+          <Pressable
+            style={[styles.sortModalTrigger, sortBy !== 'default' && styles.sortModalTriggerActive]}
+            onPress={() => setShowSortModal(true)}
+            accessibilityRole="button"
+          >
+            <Ionicons
+              name="swap-vertical"
+              size={13}
+              color={sortBy !== 'default' ? ElixColors.blue : ElixColors.ink}
+            />
+            <Text style={[styles.sortModalTriggerText, sortBy !== 'default' && styles.sortModalTriggerTextActive]}>
+              {sortBy === 'default' ? 'Sort' : SORT_OPTIONS.find((s) => s.id === sortBy)?.shortLabel ?? 'Sort'}
+            </Text>
+            <Ionicons
+              name="chevron-down"
+              size={12}
+              color={sortBy !== 'default' ? ElixColors.blue : ElixColors.inkMuted}
+            />
+          </Pressable>
+
+          {/* Quick Sort Direct Chips */}
+          {SORT_OPTIONS.map((opt) => {
+            const isSelected = sortBy === opt.id;
+            return (
+              <Pressable
+                key={opt.id}
+                style={[styles.sortChip, isSelected && styles.sortChipActive]}
+                onPress={() => setSortBy(isSelected && opt.id !== 'default' ? 'default' : opt.id)}
+              >
+                <Ionicons
+                  name={opt.icon as any}
+                  size={12}
+                  color={isSelected ? '#FFFFFF' : ElixColors.inkMuted}
+                />
+                <Text style={[styles.sortChipText, isSelected && styles.sortChipTextActive]}>
+                  {opt.shortLabel}
+                </Text>
+                {isSelected && opt.id !== 'default' && (
+                  <Ionicons name="close-circle" size={12} color="#FFFFFF" style={{ marginLeft: 3 }} />
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Results Count & Active Sort Info Bar */}
+      <View style={styles.resultsInfoBar}>
+        <Text style={styles.resultsInfoText}>
+          {filtered.length} {filtered.length === 1 ? 'item' : 'items'}
+          {activeTab === 'packages'
+            ? ' in Packages'
+            : activeTab !== 'all'
+            ? ` in ${formatCategoryLabel(activeTab)}`
+            : ''}
+        </Text>
+        {sortBy !== 'default' && (
+          <Pressable
+            style={styles.activeSortReset}
+            onPress={() => setSortBy('default')}
+            hitSlop={6}
+          >
+            <Text style={styles.activeSortResetText}>
+              Sorted by: {SORT_OPTIONS.find((s) => s.id === sortBy)?.shortLabel}
+            </Text>
+            <Ionicons name="close-circle" size={13} color={ElixColors.blue} />
+          </Pressable>
+        )}
+      </View>
 
       {/* Search results status row */}
       {searchQuery.trim().length > 0 && (
@@ -359,6 +540,75 @@ export default function ServicesScreen() {
         onClose={() => setDrawerVisible(false)}
         initialMode={drawerInitialMode}
       />
+
+      {/* Sort Bottom Sheet Modal */}
+      <Modal
+        visible={showSortModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSortModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowSortModal(false)}
+        >
+          <Pressable style={styles.sortSheetContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <View>
+                <Text style={styles.sheetTitle}>Sort Services & Packages</Text>
+                <Text style={styles.sheetSubtitle}>Choose how you want items ordered</Text>
+              </View>
+              {sortBy !== 'default' && (
+                <Pressable
+                  onPress={() => {
+                    setSortBy('default');
+                    setShowSortModal(false);
+                  }}
+                  hitSlop={8}
+                >
+                  <Text style={styles.sheetResetText}>Reset</Text>
+                </Pressable>
+              )}
+            </View>
+
+            <View style={styles.sortOptionsList}>
+              {SORT_OPTIONS.map((opt) => {
+                const isSelected = sortBy === opt.id;
+                return (
+                  <Pressable
+                    key={opt.id}
+                    style={[styles.sortOptionItem, isSelected && styles.sortOptionItemSelected]}
+                    onPress={() => {
+                      setSortBy(opt.id);
+                      setShowSortModal(false);
+                    }}
+                  >
+                    <View style={styles.sortOptionLeft}>
+                      <View style={[styles.sortIconCircle, isSelected && styles.sortIconCircleSelected]}>
+                        <Ionicons
+                          name={opt.icon as any}
+                          size={16}
+                          color={isSelected ? ElixColors.blue : ElixColors.inkMuted}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.sortOptionLabel, isSelected && styles.sortOptionLabelSelected]}>
+                          {opt.label}
+                        </Text>
+                        <Text style={styles.sortOptionSub}>{opt.desc}</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.sortRadio, isSelected && styles.sortRadioSelected]}>
+                      {isSelected && <View style={styles.sortRadioInner} />}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -376,6 +626,209 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: ElixColors.blue },
   tabText: { fontSize: 13, fontWeight: '600', color: ElixColors.inkMuted },
   tabTextActive: { color: '#fff' },
+
+  controlsBar: {
+    backgroundColor: ElixColors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    paddingVertical: 8,
+  },
+  sortChipsContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  sortModalTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  sortModalTriggerActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: ElixColors.blue,
+  },
+  sortModalTriggerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: ElixColors.ink,
+  },
+  sortModalTriggerTextActive: {
+    color: ElixColors.blue,
+  },
+  sortChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  sortChipActive: {
+    backgroundColor: ElixColors.blue,
+    borderColor: ElixColors.blue,
+  },
+  sortChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: ElixColors.inkMuted,
+  },
+  sortChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  resultsInfoBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 2,
+  },
+  resultsInfoText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: ElixColors.inkMuted,
+  },
+  activeSortReset: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  activeSortResetText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: ElixColors.blue,
+  },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  sortSheetContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 34,
+    paddingTop: 12,
+    maxHeight: '80%',
+  },
+  sheetHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: ElixColors.ink,
+  },
+  sheetSubtitle: {
+    fontSize: 12,
+    color: ElixColors.inkMuted,
+    marginTop: 2,
+  },
+  sheetResetText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: ElixColors.blue,
+  },
+  sortOptionsList: {
+    gap: 8,
+  },
+  sortOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  sortOptionItemSelected: {
+    backgroundColor: '#EFF6FF',
+    borderColor: ElixColors.blue,
+  },
+  sortOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  sortIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  sortIconCircleSelected: {
+    backgroundColor: '#DBEAFE',
+    borderColor: '#BFDBFE',
+  },
+  sortOptionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: ElixColors.ink,
+  },
+  sortOptionLabelSelected: {
+    color: ElixColors.blue,
+  },
+  sortOptionSub: {
+    fontSize: 11,
+    color: ElixColors.inkMuted,
+    marginTop: 1,
+  },
+  sortRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sortRadioSelected: {
+    borderColor: ElixColors.blue,
+  },
+  sortRadioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: ElixColors.blue,
+  },
 
   searchStatusRow: {
     flexDirection: 'row',

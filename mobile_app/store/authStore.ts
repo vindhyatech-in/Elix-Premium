@@ -86,6 +86,7 @@ interface AuthState {
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   setSession: (token: string, user: User) => Promise<void>;
+  updateUser: (updatedFields: Partial<User>) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -254,5 +255,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ token, user, isLoggedIn: true, isLoading: false });
     // Merge guest cart with saved user cart
     useCartStore.getState().onUserLogin(user.id);
+  },
+
+  updateUser: async (updatedFields: Partial<User>) => {
+    const current = get().user;
+    if (!current) return;
+    const nextUser = { ...current, ...updatedFields };
+    try {
+      await storage.setItem('auth_user', JSON.stringify(nextUser));
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        localStorage.setItem('auth_user', JSON.stringify(nextUser));
+      }
+    } catch {}
+    set({ user: nextUser });
   },
 }));

@@ -232,11 +232,39 @@ export interface HomeData {
 
 // ---- Bookings ----
 
+export interface IncludedSnapshotItem {
+  name: string;
+  variant_label?: string;
+}
+
 export interface BookingItem {
+  id?: number;
   name: string;
   price: number;
   quantity: number;
-  included: string[];
+  included?: (string | IncludedSnapshotItem)[];
+  rating?: number | null;
+  beautician_rating?: number | null;
+}
+
+export interface AssignedBeautician {
+  id: number;
+  name: string;
+  phone?: string;
+  photo?: string | null;
+  role?: string;
+  rating?: number;
+  specialties?: string;
+}
+
+export interface RebookItem {
+  id: number | string;
+  variantId?: number | string;
+  packageId?: number | string;
+  name: string;
+  price: number;
+  quantity: number;
+  isPackage: boolean;
 }
 
 export interface Booking {
@@ -250,13 +278,26 @@ export interface Booking {
   exact_time: string | null;
   address_label: string;
   address_text: string;
+  address_pincode?: string;
+  customer_name?: string;
+  customer_phone?: string;
   payment_method: string;
   payment_status: string;
   subtotal: number;
   discount_amount: number;
+  urgent_fee?: number;
   total_amount: number;
+  coupon_code?: string;
   can_cancel: boolean;
+  can_reschedule?: boolean;
   start_otp: string | null;
+  otp_verified_at?: string | null;
+  created_at?: string | null;
+  rescheduled_at?: string | null;
+  feedback_comment?: string;
+  feedback_submitted_at?: string | null;
+  assigned_beautician?: AssignedBeautician | null;
+  rebook_items?: RebookItem[];
   items: BookingItem[];
 }
 

@@ -299,9 +299,19 @@ export function BookingDrawer({ visible, onClose, initialMode = 'cart' }: Bookin
           <View style={{ flex: 1 }}>
             {/* Header */}
             <View style={styles.header}>
-              <View>
-                <Text style={styles.headerTitle}>Book a Session</Text>
-                <Text style={styles.headerSub}>Step {step} of 5 — {STEPS[step - 1].label}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Pressable
+                  style={styles.headerBackBtn}
+                  onPress={step === 1 ? () => setDrawerMode('cart') : prevStep}
+                  hitSlop={8}
+                  accessibilityLabel={step === 1 ? 'Back to cart' : 'Previous step'}
+                >
+                  <Ionicons name="arrow-back" size={18} color={ElixColors.ink} />
+                </Pressable>
+                <View>
+                  <Text style={styles.headerTitle}>Book a Session</Text>
+                  <Text style={styles.headerSub}>Step {step} of 5 — {STEPS[step - 1].label}</Text>
+                </View>
               </View>
               <Pressable style={styles.closeBtn} onPress={handleClose} hitSlop={12} accessibilityLabel="Close booking">
                 <Ionicons name="close" size={20} color={ElixColors.inkMuted} />
@@ -337,25 +347,6 @@ export function BookingDrawer({ visible, onClose, initialMode = 'cart' }: Bookin
               {step === 3 && <StepSlot onNext={nextStep} />}
               {step === 4 && <StepPayment onNext={nextStep} />}
               {step === 5 && <StepSummary onClose={handleClose} />}
-            </View>
-
-            {/* Bottom Nav / Back Bar */}
-            <View style={styles.checkoutFooter}>
-              {step === 1 ? (
-                <Pressable
-                  style={styles.reviewCartBtn}
-                  onPress={() => setDrawerMode('cart')}
-                  hitSlop={8}
-                >
-                  <Ionicons name="cart-outline" size={16} color={ElixColors.blue} />
-                  <Text style={styles.reviewCartText}>Review Cart ({totalItems})</Text>
-                </Pressable>
-              ) : step < 5 ? (
-                <Pressable style={styles.backBtn} onPress={prevStep} hitSlop={8}>
-                  <Ionicons name="arrow-back" size={16} color={ElixColors.inkMuted} />
-                  <Text style={styles.backBtnText}>Back</Text>
-                </Pressable>
-              ) : null}
             </View>
           </View>
         )}
@@ -401,6 +392,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontWeight: '800', color: ElixColors.ink },
   headerSub: { fontSize: 13, color: ElixColors.inkMuted, marginTop: 2 },
+  headerBackBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center', justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+  },
   closeBtn: {
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: '#F1F5F9',

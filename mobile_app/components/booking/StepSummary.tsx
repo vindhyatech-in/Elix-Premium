@@ -33,15 +33,24 @@ function SummaryRow({ label, value, highlight }: { label: string; value: string;
 
 export function StepSummary({ onClose }: { onClose: () => void }) {
   const flow = useBookingFlowStore();
-  const { items, subtotal, urgentFee, totalAmount, clear } = useCartStore();
+  const { items, subtotal, urgentFee, totalAmount, clear, setUrgent } = useCartStore();
   const checkout = useCheckout();
   const createRazorpayOrder = useRazorpayOrder();
   const verifyRazorpay = useRazorpayVerify();
 
+  const isUrgent = flow.bookingType === 'urgent';
+  const effectiveUrgentFee = isUrgent ? 99 : 0;
+
+  React.useEffect(() => {
+    if (isUrgent && urgentFee === 0) {
+      setUrgent(true);
+    }
+  }, [isUrgent, urgentFee, setUrgent]);
+
   const discountAmt = flow.couponApplied
     ? Math.round(subtotal * (flow.discountPct / 100))
     : 0;
-  const finalTotal = totalAmount - discountAmt;
+  const finalTotal = Math.max(0, subtotal - discountAmt + effectiveUrgentFee);
   const finalPaise = Math.round(finalTotal * 100);
 
   function buildBookingPayload(extra: Record<string, unknown> = {}) {
@@ -238,7 +247,6 @@ export function StepSummary({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const isUrgent = flow.bookingType === 'urgent';
   const isPayNow = flow.paymentMethod === 'pay_now';
 
   return (
@@ -297,7 +305,7 @@ export function StepSummary({ onClose }: { onClose: () => void }) {
             highlight
           />
         )}
-        {urgentFee > 0 && (
+        {effectiveUrgentFee > 0 && (
           <SummaryRow label="Express Priority Fee" value="+Rs.99" />
         )}
         <View style={styles.totalRow}>

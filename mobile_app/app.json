@@ -13,6 +13,15 @@
     },
     "android": {
       "package": "com.elixpremium.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDyYUVMKo-C_bHI1QzVieD8qAmlfvylVrA"
+        }
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -28,6 +37,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Elix Premium to use your location for accurate beautician dispatch."
+        }
+      ],
       [
         "expo-splash-screen",
         {

@@ -36,4 +36,12 @@ body {
   body {
     background-color: #000;
   }
-}`;
+}
+input, textarea {
+  outline: none;
+  -webkit-appearance: none;
+}
+input:focus, textarea:focus {
+  outline: none;
+}
+`;

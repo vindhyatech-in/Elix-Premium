@@ -17,11 +17,12 @@ urlpatterns = [
     path('auth/phone/verify/', views.auth_phone_verify, name='api_auth_phone_verify'),
     path('auth/verify-code/', views.auth_verify_code, name='api_auth_verify_code'),
     path('auth/logout/', views.auth_logout, name='api_auth_logout'),
+    path('auth/change-password/', views.change_password_view, name='api_change_password'),
     path('auth/social-callback/', views.auth_social_callback, name='api_auth_social_callback'),
 
     path('profile/', views.profile_view, name='api_profile'),
     path('addresses/', views.addresses_view, name='api_addresses'),
-    path('addresses/<int:address_id>/', views.address_delete_view, name='api_address_delete'),
+    path('addresses/<int:address_id>/', views.address_detail_api, name='api_address_detail'),
 
     path('maps/reverse-geocode/', views.maps_reverse_geocode, name='api_maps_reverse_geocode'),
     path('maps/places-autocomplete/', views.maps_places_autocomplete, name='api_maps_places_autocomplete'),
@@ -30,7 +31,12 @@ urlpatterns = [
 
     path('bookings/', views.bookings_view, name='api_bookings'),
     path('bookings/checkout/', views.checkout_view, name='api_bookings_checkout'),
+    path('bookings/<str:booking_number>/detail/', views.booking_detail_view, name='api_booking_detail'),
     path('bookings/<str:booking_number>/cancel/', views.booking_cancel_view, name='api_booking_cancel'),
+    path('bookings/<str:booking_number>/reschedule/', views.booking_reschedule_view, name='api_booking_reschedule'),
+    path('bookings/<str:booking_number>/invoice/pdf/', views.booking_invoice_pdf_view, name='api_booking_invoice_pdf'),
+    path('bookings/<str:booking_number>/feedback/', views.booking_feedback_view, name='api_booking_feedback'),
+    path('bookings/items/<int:item_id>/review/', views.booking_item_review_view, name='api_booking_item_review'),
 
     path('payments/razorpay/create-order/', views.razorpay_create_order, name='api_razorpay_create_order'),
     path('payments/razorpay/verify/', views.razorpay_verify, name='api_razorpay_verify'),

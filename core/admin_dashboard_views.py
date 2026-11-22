@@ -393,6 +393,9 @@ def dashboard_bookings(request):
                 if new_status in dict(Booking.STATUS_CHOICES):
                     if new_status in ['upcoming', 'on_the_way'] and booking.status in ['in_progress', 'completed', 'cancelled']:
                         booking.reset_face_verification()
+                    if new_status == 'on_the_way' and not booking.start_otp:
+                        booking.start_otp = _generate_otp()
+                        booking.otp_generated_at = timezone.now()
                     booking.status = new_status
                 if new_payment in dict(Booking.PAYMENT_STATUS_CHOICES):
                     booking.payment_status = new_payment

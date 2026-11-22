@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ElixColors, ElixRadii } from '@/constants/theme';
 import { useBookingFlowStore } from '@/store/bookingFlowStore';
@@ -134,7 +134,24 @@ const styles = StyleSheet.create({
   couponSection: { marginTop: 8, marginBottom: 16 },
   couponTitle: { fontSize: 14, fontWeight: '700', color: ElixColors.ink, marginBottom: 8 },
   couponRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  couponInput: { flex: 1, borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: ElixRadii.md, padding: 10, fontSize: 14, fontWeight: '700', color: ElixColors.ink, letterSpacing: 1, backgroundColor: '#fff' },
+  couponInput: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: ElixRadii.md,
+    padding: 10,
+    fontSize: 14,
+    fontWeight: '700',
+    color: ElixColors.ink,
+    letterSpacing: 1,
+    backgroundColor: '#fff',
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+        } as any)
+      : {}),
+  },
   couponInputApplied: { borderColor: ElixColors.green, backgroundColor: '#F0FDF4' },
   couponApplyBtn: { backgroundColor: ElixColors.blue, paddingHorizontal: 16, paddingVertical: 10, borderRadius: ElixRadii.md, minWidth: 70, alignItems: 'center' },
   couponApplyText: { color: '#fff', fontWeight: '700', fontSize: 13 },

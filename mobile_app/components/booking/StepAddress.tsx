@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ElixColors, ElixRadii, ElixShadows } from '@/constants/theme';
 import { useBookingFlowStore } from '@/store/bookingFlowStore';
@@ -18,6 +18,13 @@ import {
   NearbyPlace,
 } from '@/lib/googleMaps';
 import type { Address } from '@/types/api';
+
+function getAddressIcon(label: string) {
+  const l = (label || '').toLowerCase();
+  if (l.includes('home')) return 'home';
+  if (l.includes('work') || l.includes('office')) return 'briefcase';
+  return 'location';
+}
 
 export function StepAddress({ onNext }: { onNext: () => void }) {
   const { selectedAddress, setAddress } = useBookingFlowStore();
@@ -220,7 +227,7 @@ export function StepAddress({ onNext }: { onNext: () => void }) {
                   <Text style={styles.addrText}>{addr.text}</Text>
                   {addr.pincode ? <Text style={styles.addrPincode}>Pincode: {addr.pincode}</Text> : null}
                 </View>
-                <Ionicons name="home" size={16} color={selected ? ElixColors.blue : ElixColors.inkMuted} />
+                <Ionicons name={getAddressIcon(addr.label) as any} size={16} color={selected ? ElixColors.blue : ElixColors.inkMuted} />
               </Pressable>
             );
           })}
@@ -444,7 +451,7 @@ const styles = StyleSheet.create({
   radioOuter: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   radioOuterSelected: { borderColor: ElixColors.blue },
   radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: ElixColors.blue },
-  addrHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  addrHeaderRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 2 },
   addrLabel: { fontSize: 13, fontWeight: '700', color: ElixColors.ink },
   gpsBadge: { flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
   gpsBadgeText: { fontSize: 10, fontWeight: '700', color: '#166534' },
@@ -463,7 +470,22 @@ const styles = StyleSheet.create({
   actionBtnText: { color: '#1D4ED8', fontSize: 12, fontWeight: '700' },
   btnDisabled: { opacity: 0.6 },
   searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#D1D5DB', borderRadius: ElixRadii.sm, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 8 },
-  searchInput: { flex: 1, fontSize: 13, color: ElixColors.ink },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: ElixColors.ink,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+        } as any)
+      : {}),
+  },
   predictionsList: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: ElixRadii.sm, marginBottom: 10, maxHeight: 150, overflow: 'hidden' },
   predictionItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   predMainText: { fontSize: 13, fontWeight: '600', color: ElixColors.ink },
@@ -487,7 +509,22 @@ const styles = StyleSheet.create({
   segBtnActive: { backgroundColor: ElixColors.blue },
   segBtnText: { fontSize: 13, fontWeight: '600', color: ElixColors.inkMuted },
   segBtnTextActive: { color: '#fff' },
-  input: { borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: ElixRadii.sm, padding: 10, fontSize: 14, color: ElixColors.ink, backgroundColor: '#fff', marginBottom: 12 },
+  input: {
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: ElixRadii.sm,
+    padding: 10,
+    fontSize: 14,
+    color: ElixColors.ink,
+    backgroundColor: '#fff',
+    marginBottom: 12,
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+        } as any)
+      : {}),
+  },
   formActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
   cancelBtn: { flex: 1, paddingVertical: 10, borderRadius: ElixRadii.md, borderWidth: 1.5, borderColor: '#E5E7EB', alignItems: 'center' },
   cancelBtnText: { fontSize: 14, fontWeight: '600', color: ElixColors.inkMuted },
