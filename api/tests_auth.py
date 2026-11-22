@@ -93,7 +93,7 @@ class AuthChangePasswordAndBookingTest(TestCase):
         cat = Category.objects.create(name='Waxing', slug='waxing')
         srv = Service.objects.create(category=cat, name='Full Wax', slug='full-wax', is_active=True)
         variant = ServiceVariant.objects.create(service=srv, label='Standard', price=299.00, duration_mins=45, is_active=True)
-        emp = Employee.objects.create(name='Expert Beautician 1', phone='9876543210', status='active')
+        emp = Employee.objects.create(name='Expert Beautician 1', phone='9111222333', status='active')
 
         tomorrow = datetime.date.today() + datetime.timedelta(days=1)
         payload = {
@@ -103,8 +103,8 @@ class AuthChangePasswordAndBookingTest(TestCase):
             'scheduled_date': tomorrow.isoformat(),
             'payment_method': 'pay_at_home',
             'cart': [{
-                'id': srv.id,
-                'variant_id': variant.id,
+                'id': srv.slug,
+                'variantId': variant.id,
                 'is_package': False,
                 'qty': 1,
             }]

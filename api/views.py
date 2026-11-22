@@ -1345,7 +1345,7 @@ def checkout_view(request):
     if booking_type not in ('regular', 'urgent'):
         return JsonResponse({'ok': False, 'error': 'Invalid booking type.'}, status=400)
 
-    scheduled_date = parse_date(payload.get('date') or '')
+    scheduled_date = parse_date(payload.get('date') or payload.get('scheduled_date') or '')
     if not scheduled_date:
         return JsonResponse({'ok': False, 'error': 'Invalid date.'}, status=400)
     if scheduled_date < timezone.localdate():
@@ -1574,7 +1574,7 @@ def razorpay_verify(request):
     if booking_type not in ('regular', 'urgent'):
         return JsonResponse({'ok': False, 'error': 'Invalid booking type.'}, status=400)
 
-    scheduled_date = parse_date(payload.get('date') or '')
+    scheduled_date = parse_date(payload.get('date') or payload.get('scheduled_date') or '')
     if not scheduled_date:
         return JsonResponse({'ok': False, 'error': 'Invalid date.'}, status=400)
 
